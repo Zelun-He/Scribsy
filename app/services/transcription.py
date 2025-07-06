@@ -24,8 +24,9 @@ class TranscriptionService:
         Returns:
             Transcribed text
         """
-        # TODO: Implement actual transcription
-        return "Dummy transcription"
+        # Use Whisper to transcribe the audio file
+        result = self.model.transcribe(str(audio_path))
+        return result["text"]
 
 # Singleton instance
 transcription_service = TranscriptionService()
