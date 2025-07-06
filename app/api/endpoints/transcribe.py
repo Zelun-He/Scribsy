@@ -13,6 +13,13 @@ router = APIRouter()
 
 @router.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), summarize: bool = Query(False)):
+    """
+    Accepts an audio file, saves it to a temp file, calls the transcription service, and returns the transcript.
+    If summarize=true, also returns a structured SOAP note summary.
+    """
+    # Validate file type
+    if not file.content_type.startswith("audio/"):
+        raise HTTPException(status_code=400, detail="Only audio files are accepted.")
     try:
         # Preserve the extension of the uploaded file
         suffix = Path(file.filename).suffix or ".wav"
