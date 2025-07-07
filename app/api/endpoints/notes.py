@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import schemas
 from app.crud import notes as crud_notes
 from app.db.database import get_db
-from typing import List
+from typing import List, Optional
+from datetime import datetime
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -12,8 +13,30 @@ def create_note(note: schemas.NoteCreate, db: Session = Depends(get_db)):
     return crud_notes.create_note(db, note)
 
 @router.get("/", response_model=List[schemas.NoteRead])
-def read_notes(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
-    return crud_notes.get_notes(db, skip=skip, limit=limit)
+def read_notes(
+    skip: int = 0,
+    limit: int = 10,
+    patient_id: Optional[int] = Query(None),
+    provider_id: Optional[int] = Query(None),
+    visit_id: Optional[int] = Query(None),
+    note_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    created_from: Optional[datetime] = Query(None),
+    created_to: Optional[datetime] = Query(None),
+    db: Session = Depends(get_db),
+):
+    return crud_notes.get_notes(
+        db,
+        skip=skip,
+        limit=limit,
+        patient_id=patient_id,
+        provider_id=provider_id,
+        visit_id=visit_id,
+        note_type=note_type,
+        status=status,
+        created_from=created_from,
+        created_to=created_to,
+    )
 
 @router.get("/{note_id}", response_model=schemas.NoteRead)
 def read_note(note_id: int, db: Session = Depends(get_db)):

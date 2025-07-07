@@ -22,11 +22,37 @@ def get_note(db: Session, note_id: int) -> Optional[models.Note]:
     """
     return db.query(models.Note).filter(models.Note.id == note_id).first()
 
-def get_notes(db: Session, skip: int = 0, limit: int = 10) -> List[models.Note]:
+def get_notes(
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    patient_id: Optional[int] = None,
+    provider_id: Optional[int] = None,
+    visit_id: Optional[int] = None,
+    note_type: Optional[str] = None,
+    status: Optional[str] = None,
+    created_from: Optional[datetime] = None,
+    created_to: Optional[datetime] = None,
+) -> List[models.Note]:
     """
     Retrieve a list of notes.
     """
-    return db.query(models.Note).offset(skip).limit(limit).all()
+    query = db.query(models.Note)
+    if patient_id is not None:
+        query = query.filter(models.Note.patient_id == patient_id)
+    if provider_id is not None:
+        query = query.filter(models.Note.provider_id == provider_id)
+    if visit_id is not None:
+        query = query.filter(models.Note.visit_id == visit_id)
+    if note_type is not None:
+        query = query.filter(models.Note.note_type == note_type)
+    if status is not None:
+        query = query.filter(models.Note.status == status)
+    if created_from is not None:
+        query = query.filter(models.Note.created_at >= created_from)
+    if created_to is not None:
+        query = query.filter(models.Note.created_at <= created_to)
+    return query.offset(skip).limit(limit).all()
 
 def update_note(db: Session, note_id: int, note: schemas.NoteUpdate) -> Optional[models.Note]:
     """
