@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.transcribe import router as transcribe_router
 from app.api.endpoints.notes import router as notes_router
+from app.api.endpoints.auth import router as auth_router
 from dotenv import load_dotenv
 import os
 
@@ -23,6 +24,7 @@ app.add_middleware(
 # Mount API routers
 app.include_router(transcribe_router)
 app.include_router(notes_router)
+app.include_router(auth_router)
 
 @app.get("/test-env")
 def test_env():

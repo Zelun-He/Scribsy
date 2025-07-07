@@ -24,3 +24,10 @@ class Note(Base):
     status = Column(String, nullable=False, default="draft")
     
     user = relationship("User", back_populates="notes")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Integer, default=1)

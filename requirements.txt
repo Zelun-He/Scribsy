@@ -4,3 +4,5 @@ sqlalchemy
 pydantic
 python-multipart
 pydantic-ai
+python-jose
+passlib[bcrypt]
