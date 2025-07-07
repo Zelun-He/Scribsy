@@ -1,7 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 import openai
 import os
 import json
+from fastapi import HTTPException
 
 class NoteSummary(BaseModel):
     subjective: str
@@ -22,7 +23,7 @@ You are an expert medical scribe trained in creating detailed, clinically accura
 When provided with a raw medical conversation, transcription, or provider dictation, extract and summarize information into:
 - Subjective: Patient's stated complaints, symptoms, and history in the patient's own words or as described by the provider.
 - Objective: Observable findings, vital signs, physical exam results, lab or imaging results, or factual measurements.
-- Assessment: The provider’s clinical impressions, differential diagnoses, or conclusions about the patient’s condition.
+- Assessment: The provider's clinical impressions, differential diagnoses, or conclusions about the patient's condition.
 - Plan: The proposed or enacted plan of care, including tests ordered, medications prescribed, procedures done, follow-up instructions, lifestyle recommendations, and referrals.
 
 Your output must follow this format exactly:
