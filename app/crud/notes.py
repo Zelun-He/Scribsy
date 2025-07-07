@@ -4,6 +4,7 @@ notes.py: CRUD operations for Note model.
 from sqlalchemy.orm import Session
 from app.db import models, schemas
 from typing import List, Optional
+from datetime import datetime
 
 def create_note(db: Session, note: schemas.NoteCreate) -> models.Note:
     """
@@ -27,14 +28,15 @@ def get_notes(db: Session, skip: int = 0, limit: int = 10) -> List[models.Note]:
     """
     return db.query(models.Note).offset(skip).limit(limit).all()
 
-def update_note(db: Session, note_id: int, note: schemas.NoteCreate) -> Optional[models.Note]:
+def update_note(db: Session, note_id: int, note: schemas.NoteUpdate) -> Optional[models.Note]:
     """
     Update an existing note.
     """
     db_note = get_note(db, note_id)
     if db_note:
-        db_note.content = note.content  # type: ignore
-        db_note.user_id = note.user_id  # type: ignore
+        for field, value in note.dict(exclude_unset=True).items():
+            setattr(db_note, field, value)
+        db_note.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(db_note)
     return db_note

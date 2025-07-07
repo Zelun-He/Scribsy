@@ -4,6 +4,7 @@ main.py: FastAPI app entry point. Sets up the application, CORS, and includes AP
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints.transcribe import router as transcribe_router
+from app.api.endpoints.notes import router as notes_router
 from dotenv import load_dotenv
 import os
 
@@ -21,6 +22,7 @@ app.add_middleware(
 
 # Mount API routers
 app.include_router(transcribe_router)
+app.include_router(notes_router)
 
 @app.get("/test-env")
 def test_env():
