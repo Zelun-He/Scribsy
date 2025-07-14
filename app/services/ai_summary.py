@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ValidationError
-import openai
+from openai import OpenAI
 import os
 import json
 from fastapi import HTTPException
@@ -10,9 +10,10 @@ class NoteSummary(BaseModel):
     assessment: str
     plan: str
 
-def summarize_note(user_message: str) -> NoteSummary:
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-    response = openai.ChatCompletion.create(
+async def summarize_note(user_message: str) -> NoteSummary:
+    from app.config import settings
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {
@@ -40,7 +41,7 @@ Avoid adding any extra commentary or disclaimers. Do not invent information — 
         temperature=0.3,
     )
 
-    content = response.choices[0].message["content"]
+    content = response.choices[0].message.content
     # Convert plain text SOAP note to a dictionary
     lines = content.strip().split("\n")
     summary_data = {"subjective": "", "objective": "", "assessment": "", "plan": ""}

@@ -1,25 +1,33 @@
 """
 transcribe.py: Defines the /transcribe endpoint for audio transcription.
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 import tempfile
 from app.services.transcription import transcription_service
 from pathlib import Path
 from app.services.ai_summary import summarize_note, NoteSummary
+from app.api.endpoints.auth import get_current_user
+from app.db.database import get_db
 import os
 
 router = APIRouter()
 
 # POST /transcribe - Upload an audio file and receive a transcript.
 # Optionally, get a structured SOAP note summary if summarize=true.
-# No authentication required.
+# Requires authentication.
 # Parameters:
 #   - file: audio file to transcribe (form-data, required)
 #   - summarize: bool (query, optional, default: false)
 # Returns: transcript (and summary if requested)
 @router.post("/transcribe")
-async def transcribe(file: UploadFile = File(...), summarize: bool = Query(False)):
+async def transcribe(
+    file: UploadFile = File(...), 
+    summarize: bool = Query(False),
+    current_user=Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Accepts an audio file, saves it to a temp file, calls the transcription service, and returns the transcript.
     If summarize=true, also returns a structured SOAP note summary.
@@ -43,7 +51,11 @@ async def transcribe(file: UploadFile = File(...), summarize: bool = Query(False
         # Transcribe
         transcript = await transcription_service.transcribe(Path(temp_path))
 
-        response = {"transcript": transcript}
+        response = {
+            "transcript": transcript,
+            "user_id": current_user.id,
+            "username": current_user.username
+        }
 
         if summarize:
             summary: NoteSummary = await summarize_note(transcript)
