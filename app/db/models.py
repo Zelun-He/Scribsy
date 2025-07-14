@@ -16,12 +16,13 @@ class Note(Base):
     patient_id = Column(Integer, index=True, nullable=False)
     provider_id = Column(Integer, index=True, nullable=False)
     visit_id = Column(Integer, index=True, nullable=False)
-    note_type = Column(String, nullable=False)
+    note_type = Column(String, nullable=False) #Progress, discharge,admission, consult,etc.
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow, nullable=False)
     signed_at = Column(DateTime, nullable=True)
-    status = Column(String, nullable=False, default="draft")
+    status = Column(String, nullable=False, default="draft") #draft, signed, completed, cancelled
+    audio_file = Column(String, nullable=True)  # Path or URL to uploaded audio file
     
     user = relationship("User", back_populates="notes")
 

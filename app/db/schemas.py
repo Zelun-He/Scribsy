@@ -13,6 +13,7 @@ class NoteBase(BaseModel):
     content: str
     status: str
     signed_at: Optional[datetime] = None
+    audio_file: Optional[str] = None  # Path or URL to uploaded audio file
 
 class NoteCreate(NoteBase):
     pass
@@ -23,12 +24,14 @@ class NoteUpdate(BaseModel):
     status: Optional[str] = None
     signed_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    audio_file: Optional[str] = None  # Path or URL to uploaded audio file
 
 class NoteRead(NoteBase):
     id: int
     created_at: datetime
     updated_at: datetime
     signed_at: Optional[datetime] = None
+    audio_file: Optional[str] = None  # Path or URL to uploaded audio file
 
     class Config:
         orm_mode = True

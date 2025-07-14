@@ -28,5 +28,22 @@ class TranscriptionService:
         result = self.model.transcribe(str(audio_path))
         return result["text"]
 
+    async def transcribe_chunk(self, audio_bytes: bytes) -> str:
+        """
+        Transcribe a chunk of audio bytes using Whisper.
+        For demonstration, treat each chunk as a complete short audio segment.
+        TODO: Implement buffering and proper streaming for real-time transcription.
+        Args:
+            audio_bytes: Raw audio bytes (e.g., PCM or WAV)
+        Returns:
+            Transcribed text for the chunk
+        """
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=True) as tmp:
+            tmp.write(audio_bytes)
+            tmp.flush()
+            result = self.model.transcribe(tmp.name)
+            return result["text"]
+
 # Singleton instance
 transcription_service = TranscriptionService()
