@@ -1,7 +1,7 @@
 """
 transcribe.py: Defines the /transcribe endpoint for audio transcription.
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 import tempfile
 from app.services.transcription import transcription_service
@@ -11,6 +11,13 @@ import os
 
 router = APIRouter()
 
+# POST /transcribe - Upload an audio file and receive a transcript.
+# Optionally, get a structured SOAP note summary if summarize=true.
+# No authentication required.
+# Parameters:
+#   - file: audio file to transcribe (form-data, required)
+#   - summarize: bool (query, optional, default: false)
+# Returns: transcript (and summary if requested)
 @router.post("/transcribe")
 async def transcribe(file: UploadFile = File(...), summarize: bool = Query(False)):
     """
@@ -51,3 +58,30 @@ async def transcribe(file: UploadFile = File(...), summarize: bool = Query(False
     finally:
         if 'temp_path' in locals() and os.path.exists(temp_path):
             os.remove(temp_path)
+
+# WebSocket endpoint for live, chunked transcription using Whisper
+# Usage: Client streams audio chunks (e.g., PCM or WAV bytes) to this endpoint
+# The server transcribes each chunk and sends back the partial transcript
+# On disconnect, the server sends the full transcript and a SOAP summary
+@router.websocket("/ws/live-transcribe")
+async def websocket_live_transcribe(websocket: WebSocket):
+    await websocket.accept()
+    transcript = ""
+    try:
+        while True:
+            # Receive audio chunk from client
+            data = await websocket.receive_bytes()
+            # TODO: Buffer and preprocess audio chunks as needed (e.g., accumulate enough for Whisper)
+            # For demonstration, treat each chunk as a complete short audio segment
+            chunk_text = await transcription_service.transcribe_chunk(data)
+            transcript += chunk_text + " "
+            # Send partial transcript back to client
+            await websocket.send_text(chunk_text)
+    except WebSocketDisconnect:
+        # On disconnect, generate SOAP summary
+        summary = await summarize_note(transcript)
+        await websocket.send_json({
+            "full_transcript": transcript.strip(),
+            "soap_summary": summary.dict()
+        })
+        await websocket.close()
