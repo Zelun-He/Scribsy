@@ -4,8 +4,11 @@ from app.db import schemas
 from app.crud import notes as crud_notes
 from app.db.database import get_db
 from app.api.endpoints.auth import get_current_user
+from app.services.transcription import transcription_service
+from app.services.ai_summary import summarize_note
 from typing import List, Optional
 from datetime import datetime
+from pathlib import Path
 import os
 import shutil
 
@@ -20,19 +23,24 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Now supports optional audio file upload (multipart/form-data).
 # Requires authentication. Expects note fields as form data and optional audio file.
 @router.post("/", response_model=schemas.NoteRead)
-def create_note(
+async def create_note(
     patient_id: int = Form(...),
     provider_id: int = Form(None),  # Will be overridden by current_user
     visit_id: int = Form(...),
     note_type: str = Form(...),
-    content: str = Form(...),
+    content: str = Form(""),  # Make content optional when audio is provided
     status: str = Form(...),
     signed_at: Optional[datetime] = Form(None),
     audio_file: Optional[UploadFile] = File(None),
+    auto_transcribe: bool = Form(True),  # New option to auto-transcribe audio
+    auto_summarize: bool = Form(True),   # New option to auto-generate SOAP
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
     audio_file_path = None
+    transcription = ""
+    soap_summary = None
+    
     if audio_file:
         # Validate audio file type
         if not audio_file.content_type.startswith("audio/"):
@@ -43,11 +51,45 @@ def create_note(
         file_path = os.path.join(UPLOAD_DIR, filename)
         
         try:
+            # Save audio file
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(audio_file.file, buffer)
             audio_file_path = file_path
+            
+            # Auto-transcribe if requested
+            if auto_transcribe:
+                try:
+                    transcription = await transcription_service.transcribe(Path(file_path))
+                    
+                    # Auto-summarize if requested
+                    if auto_summarize and transcription:
+                        soap_summary = await summarize_note(transcription)
+                        
+                        # If content is empty, use the transcription
+                        if not content.strip():
+                            content = f"Transcription: {transcription}"
+                            
+                        # Add SOAP summary to content
+                        if soap_summary:
+                            content += f"\n\nSOAP Summary:\n"
+                            content += f"Subjective: {soap_summary.subjective}\n"
+                            content += f"Objective: {soap_summary.objective}\n"
+                            content += f"Assessment: {soap_summary.assessment}\n"
+                            content += f"Plan: {soap_summary.plan}"
+                            
+                except Exception as e:
+                    # Don't fail note creation if transcription fails
+                    print(f"Transcription failed: {str(e)}")
+                    if not content.strip():
+                        content = "Audio file uploaded - transcription failed"
+                        
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to save audio file: {str(e)}")
+    
+    # Validate that we have some content
+    if not content.strip() and not audio_file_path:
+        raise HTTPException(status_code=400, detail="Note must have either content or audio file")
+    
     note_data = {
         "patient_id": patient_id,
         "provider_id": current_user.id,
