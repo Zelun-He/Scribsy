@@ -6,3 +6,7 @@ python-multipart
 pydantic-ai
 python-jose
 passlib[bcrypt]
+openai
+openai-whisper
+python-dotenv
+requests

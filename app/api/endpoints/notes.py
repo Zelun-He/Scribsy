@@ -11,7 +11,9 @@ import shutil
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
-UPLOAD_DIR = "uploads"
+from app.config import settings
+
+UPLOAD_DIR = settings.upload_dir
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # POST /notes/ - Create a new note for the authenticated provider.
@@ -32,11 +34,20 @@ def create_note(
 ):
     audio_file_path = None
     if audio_file:
+        # Validate audio file type
+        if not audio_file.content_type.startswith("audio/"):
+            raise HTTPException(status_code=400, detail="Only audio files are accepted.")
+        
+        # Generate unique filename
         filename = f"{current_user.id}_{datetime.utcnow().isoformat().replace(':', '-')}_{audio_file.filename}"
         file_path = os.path.join(UPLOAD_DIR, filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(audio_file.file, buffer)
-        audio_file_path = file_path
+        
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(audio_file.file, buffer)
+            audio_file_path = file_path
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to save audio file: {str(e)}")
     note_data = {
         "patient_id": patient_id,
         "provider_id": current_user.id,

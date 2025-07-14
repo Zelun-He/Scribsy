@@ -34,7 +34,7 @@ class NoteRead(NoteBase):
     audio_file: Optional[str] = None  # Path or URL to uploaded audio file
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserBase(BaseModel):
     username: str
@@ -47,7 +47,7 @@ class UserRead(UserBase):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str

@@ -14,7 +14,7 @@ class Note(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, index=True, nullable=False)
-    provider_id = Column(Integer, index=True, nullable=False)
+    provider_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
     visit_id = Column(Integer, index=True, nullable=False)
     note_type = Column(String, nullable=False) #Progress, discharge,admission, consult,etc.
     content = Column(Text, nullable=False)
@@ -32,3 +32,5 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Integer, default=1)
+    
+    notes = relationship("Note", back_populates="user")

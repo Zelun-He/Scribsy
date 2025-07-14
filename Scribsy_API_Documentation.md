@@ -99,12 +99,15 @@ uvicorn app.main:app --reload
   - `summarize`: (query, optional, default: false) If true, returns a SOAP note summary.
 - **Returns:**
   - `transcript`: The raw transcription of the audio.
+  - `user_id`: ID of the authenticated user.
+  - `username`: Username of the authenticated user.
   - `summary`: (if requested) A structured SOAP note summary (see ai_summary.py).
-- **Authentication:** Not required.
+- **Authentication:** Required (JWT Bearer token).
 
 **Example Request:**
 ```bash
 curl -X POST "http://127.0.0.1:8000/transcribe?summarize=true" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -F "file=@your-audio-file.mp3"
 ```
 
@@ -112,6 +115,8 @@ curl -X POST "http://127.0.0.1:8000/transcribe?summarize=true" \
 ```json
 {
   "transcript": "Patient reports chest pain for two days, worse with exertion.",
+  "user_id": 1,
+  "username": "dr_smith",
   "summary": {
     "subjective": "Patient reports chest pain for two days, worse with exertion.",
     "objective": "No abnormal findings on exam.",
@@ -131,28 +136,69 @@ curl -X POST "http://127.0.0.1:8000/transcribe?summarize=true" \
 
 - **POST `/notes/`**
   - Create a new note for the authenticated provider.
-  - Request body: `NoteCreate` schema.
-  - Returns: `NoteRead` schema.
+  - **Content-Type:** `multipart/form-data` (supports audio file uploads)
+  - **Form fields:**
+    - `patient_id` (int, required)
+    - `visit_id` (int, required)
+    - `note_type` (str, required)
+    - `content` (str, required)
+    - `status` (str, required)
+    - `signed_at` (datetime, optional)
+    - `audio_file` (file, optional) - Audio file to attach to the note
+  - **Returns:** `NoteRead` schema with `audio_file` field containing file path if uploaded.
 
 - **GET `/notes/`**
   - Retrieve a list of notes for the authenticated provider.
   - Supports filtering by patient, visit, type, status, and date range.
-  - Returns: List of `NoteRead` schemas.
+  - **Returns:** List of `NoteRead` schemas with `audio_file` field if present.
 
 - **GET `/notes/{note_id}`**
   - Retrieve a specific note by ID.
-  - Returns: `NoteRead` schema.
+  - **Returns:** `NoteRead` schema with `audio_file` field if present.
 
 - **PUT `/notes/{note_id}`**
   - Update a specific note by ID.
-  - Request body: `NoteUpdate` schema.
-  - Returns: `NoteRead` schema.
+  - **Request body:** `NoteUpdate` schema.
+  - **Returns:** `NoteRead` schema.
 
 - **DELETE `/notes/{note_id}`**
   - Delete a specific note by ID.
-  - Returns: `{ "ok": true }` if successful.
+  - **Returns:** `{ "ok": true }` if successful.
 
 **Authentication:** All endpoints require a valid JWT Bearer token.
+
+### Audio File Support
+
+Notes can have audio files attached during creation. The audio file is validated (must be audio/* content type) and stored in the `uploads/` directory with a unique filename format: `{user_id}_{timestamp}_{original_filename}`.
+
+**Example: Creating a note with audio file**
+```bash
+curl -X POST "http://127.0.0.1:8000/notes/" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  -F "patient_id=123" \
+  -F "visit_id=456" \
+  -F "note_type=SOAP" \
+  -F "content=Patient visit summary..." \
+  -F "status=draft" \
+  -F "audio_file=@recording.mp3"
+```
+
+**Example Response:**
+```json
+{
+  "id": 1,
+  "patient_id": 123,
+  "provider_id": 1,
+  "visit_id": 456,
+  "note_type": "SOAP",
+  "content": "Patient visit summary...",
+  "status": "draft",
+  "created_at": "2023-12-01T10:00:00Z",
+  "updated_at": "2023-12-01T10:00:00Z",
+  "signed_at": null,
+  "audio_file": "uploads/1_2023-12-01T10-00-00_recording.mp3"
+}
+```
 
 ---
 

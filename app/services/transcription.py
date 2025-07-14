@@ -5,13 +5,16 @@ import whisper
 from pathlib import Path
 
 class TranscriptionService:
-    def __init__(self, model_size: str = "base"):
+    def __init__(self, model_size: str = None):
         """
         Initialize the transcription service with a specified Whisper model.
         
         Args:
             model_size: Size of the Whisper model to use (base, small, medium, large)
         """
+        from app.config import settings
+        if model_size is None:
+            model_size = settings.whisper_model
         self.model = whisper.load_model(model_size)
 
     async def transcribe(self, audio_path: Path) -> str:
