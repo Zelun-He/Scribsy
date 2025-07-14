@@ -4,7 +4,9 @@
       "Bash(taskkill:*)",
       "Bash(python:*)",
       "Bash(curl:*)",
-      "Bash(del scribsy.db)"
+      "Bash(del scribsy.db)",
+      "Bash(npx create-next-app:*)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }
