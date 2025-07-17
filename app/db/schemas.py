@@ -38,6 +38,7 @@ class NoteRead(NoteBase):
 
 class UserBase(BaseModel):
     username: str
+    email: str  # Add email field
 
 class UserCreate(UserBase):
     password: str
@@ -45,9 +46,10 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool
+    is_admin: Optional[bool] = False
 
     class Config:
-        from_attributes = True
+        orm_mode = True
 
 class Token(BaseModel):
     access_token: str
