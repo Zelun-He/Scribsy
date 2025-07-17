@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/lib/auth';
-import { ThemeProvider } from '@/lib/theme';
+import { ThemeProvider } from '@/lib/theme-provider';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,7 +21,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <ThemeProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <AuthProvider>
             {children}
           </AuthProvider>

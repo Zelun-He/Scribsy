@@ -6,7 +6,8 @@
       "Bash(curl:*)",
       "Bash(del scribsy.db)",
       "Bash(npx create-next-app:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": []
   }

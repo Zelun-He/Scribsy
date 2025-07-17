@@ -15,7 +15,7 @@ import {
   Cog6ToothIcon 
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth';
-import { useTheme } from '@/lib/theme';
+import { useTheme } from 'next-themes';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
@@ -245,7 +245,7 @@ export default function SettingsPage() {
                     Download a copy of your clinical notes
                   </p>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="secondary" size="sm">
                   Export Data
                 </Button>
               </div>
@@ -259,7 +259,7 @@ export default function SettingsPage() {
                     Update your account password
                   </p>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="secondary" size="sm">
                   Change Password
                 </Button>
               </div>
@@ -288,7 +288,7 @@ export default function SettingsPage() {
                     Sign out of your account on this device
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={logout}>
+                <Button variant="secondary" size="sm" onClick={logout}>
                   Sign Out
                 </Button>
               </div>

@@ -22,7 +22,14 @@ class ApiClient {
     }
   }
 
+  private refreshTokenFromStorage() {
+    if (typeof window !== 'undefined') {
+      this.token = localStorage.getItem('auth_token');
+    }
+  }
+
   private getHeaders(includeAuth: boolean = true): HeadersInit {
+    this.refreshTokenFromStorage(); // Ensure token is always up-to-date
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
