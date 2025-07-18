@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { useAuth } from '@/lib/auth';
 
 export default function LoginPage() {
@@ -41,18 +42,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-purple-100 to-white">
+    <div className="min-h-screen flex flex-col items-center justify-center" style={{ background: 'var(--background)' }}>
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center mb-4">
+          <div className="mx-auto w-12 h-12 rounded-lg flex items-center justify-center mb-4" style={{ background: 'var(--primary)' }}>
             <span className="text-white font-bold text-xl">S</span>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+          <h2 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>
             Sign in to Scribsy
           </h2>
-          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Don't have an account?{' '}
-            <Link href="/register" className="text-blue-600 hover:text-blue-500">
+          <p className="mt-2 text-sm" style={{ color: 'var(--muted-foreground)' }}>
+            Don&apos;t have an account?{' '}
+            <Link href="/register" className="hover:opacity-80 transition-opacity" style={{ color: 'var(--primary)' }}>
               Sign up
             </Link>
           </p>
@@ -95,7 +99,7 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                className="w-full bg-purple-400 hover:bg-purple-500 text-white font-medium py-2 rounded-md transition"
+                className="w-full"
                 loading={loading}
                 disabled={loading}
               >
@@ -105,10 +109,8 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-          <Link href="/" className="text-blue-600 hover:text-blue-500">
-            ← Back to home
-          </Link>
+        <p className="text-center text-sm" style={{ color: 'var(--muted-foreground)' }}>
+          <Link href="/" className="inline-block mt-6 font-medium hover:opacity-80 transition-opacity" style={{ color: 'var(--primary)' }}>Back to home</Link>
         </p>
       </div>
     </div>

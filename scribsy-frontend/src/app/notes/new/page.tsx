@@ -20,6 +20,10 @@ import { apiClient } from '@/lib/api';
 export default function NewNotePage() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [patientId, setPatientId] = useState('');
+  const [visitId, setVisitId] = useState('');
+  const [noteType, setNoteType] = useState('');
+  const [status, setStatus] = useState('draft');
   const [isRecording, setIsRecording] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -102,8 +106,8 @@ export default function NewNotePage() {
     
     try {
       const response = await apiClient.transcribeAudio(audioFile);
-      setTranscription(response.transcription);
-      setSoapNote(response.soap_note);
+      setTranscription(response.transcript);
+      setSoapNote(response.summary ? JSON.stringify(response.summary) : '');
     } catch (err) {
       setError('Failed to transcribe audio. Please try again.');
     } finally {
@@ -116,19 +120,28 @@ export default function NewNotePage() {
     setLoading(true);
     setError('');
 
+    // Validate required fields
+    if (!patientId || !visitId || !noteType || (!content && !transcription)) {
+      setError('Please fill in all required fields: Patient ID, Visit ID, Note Type, and Content');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const noteData = {
-        title: title || 'Clinical Note',
+      const noteData: any = {
+        patient_id: patientId,
+        visit_id: visitId,
+        note_type: noteType,
         content: content || transcription,
-        soap_note: soapNote,
+        status: status,
+        auto_transcribe: !!audioFile,
+        auto_summarize: !!audioFile
       };
+      if (audioFile) {
+        noteData.audio_file = audioFile;
+      }
 
       const response = await apiClient.createNote(noteData);
-      
-      // Upload audio file if present
-      if (audioFile) {
-        await apiClient.uploadAudio(response.id, audioFile);
-      }
       
       router.push('/notes');
     } catch (err) {
@@ -142,12 +155,12 @@ export default function NewNotePage() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-purple-100">
             Create New Note
           </h1>
           <Button
             onClick={handleSubmit}
-            disabled={loading || (!content && !transcription)}
+            disabled={loading || (!content && !transcription) || !patientId || !visitId || !noteType}
             loading={loading}
           >
             {loading ? 'Saving...' : 'Save Note'}
@@ -161,18 +174,80 @@ export default function NewNotePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title Input */}
+          {/* Patient Information */}
           <Card>
             <CardHeader>
-              <CardTitle>Note Details</CardTitle>
+              <CardTitle>Patient Information</CardTitle>
+              <CardDescription>
+                Required fields for proper note management
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Input
-                label="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter note title (optional)"
-              />
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    Patient ID *
+                  </label>
+                  <Input
+                    type="text"
+                    value={patientId}
+                    onChange={(e) => setPatientId(e.target.value)}
+                    placeholder="Enter patient ID"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    Visit ID *
+                  </label>
+                  <Input
+                    type="text"
+                    value={visitId}
+                    onChange={(e) => setVisitId(e.target.value)}
+                    placeholder="Enter visit ID"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    Note Type *
+                  </label>
+                  <select
+                    value={noteType}
+                    onChange={(e) => setNoteType(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
+                    required
+                  >
+                    <option value="">Select note type</option>
+                    <option value="consultation">Consultation</option>
+                    <option value="follow-up">Follow-up</option>
+                    <option value="physical">Physical Examination</option>
+                    <option value="urgent">Urgent Care</option>
+                    <option value="post-op">Post-Operative</option>
+                    <option value="admission">Admission</option>
+                    <option value="discharge">Discharge</option>
+                    <option value="progress">Progress Note</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="pending">Pending Review</option>
+                    <option value="signed">Signed</option>
+                    <option value="final">Final</option>
+                  </select>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -194,7 +269,7 @@ export default function NewNotePage() {
                     <Button
                       type="button"
                       onClick={startRecording}
-                      variant="outline"
+                      variant="secondary"
                       className="flex items-center"
                     >
                       <MicrophoneIcon className="w-4 h-4 mr-2" />
@@ -215,12 +290,14 @@ export default function NewNotePage() {
 
                 <div className="flex items-center">
                   <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">or</span>
-                  <label htmlFor="audio-upload" className="cursor-pointer">
-                    <Button type="button" variant="outline" asChild>
-                      <span>
-                        <CloudArrowUpIcon className="w-4 h-4 mr-2" />
-                        Upload Audio
-                      </span>
+                  <div className="flex items-center">
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      onClick={() => document.getElementById('audio-upload')?.click()}
+                    >
+                      <CloudArrowUpIcon className="w-4 h-4 mr-2" />
+                      Upload Audio
                     </Button>
                     <input
                       id="audio-upload"
@@ -229,7 +306,7 @@ export default function NewNotePage() {
                       onChange={handleFileUpload}
                       className="hidden"
                     />
-                  </label>
+                  </div>
                 </div>
               </div>
 
@@ -244,7 +321,7 @@ export default function NewNotePage() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           onClick={playAudio}
                         >
                           <PlayIcon className="w-4 h-4" />
@@ -253,7 +330,7 @@ export default function NewNotePage() {
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           onClick={pauseAudio}
                         >
                           <PauseIcon className="w-4 h-4" />
@@ -299,7 +376,7 @@ export default function NewNotePage() {
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Enter your clinical notes here..."
                 rows={8}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
               />
             </CardContent>
           </Card>
@@ -315,7 +392,7 @@ export default function NewNotePage() {
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  <p className="text-sm text-gray-700 dark:text-purple-300 whitespace-pre-wrap">
                     {transcription}
                   </p>
                 </div>
@@ -334,7 +411,7 @@ export default function NewNotePage() {
               </CardHeader>
               <CardContent>
                 <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
-                  <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
+                  <pre className="text-sm text-gray-700 dark:text-purple-300 whitespace-pre-wrap font-mono">
                     {soapNote}
                   </pre>
                 </div>

@@ -42,7 +42,7 @@ export default function EditNotePage() {
 
   const fetchNote = async (noteId: string) => {
     try {
-      const fetchedNote = await apiClient.getNote(noteId);
+      const fetchedNote = await apiClient.getNote(parseInt(noteId));
       setNote(fetchedNote);
       setTitle(fetchedNote.title);
       setContent(fetchedNote.content);

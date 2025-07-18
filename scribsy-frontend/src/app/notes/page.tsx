@@ -115,7 +115,7 @@ export default function NotesPage() {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 dark:border-purple-600"></div>
         </div>
       </DashboardLayout>
     );
@@ -126,7 +126,7 @@ export default function NotesPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-purple-100">
             Notes History
           </h1>
           <Link href="/notes/new">
@@ -161,7 +161,7 @@ export default function NotesPage() {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'title')}
-                  className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100"
+                  className="px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
@@ -215,21 +215,21 @@ export default function NotesPage() {
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-purple-300 mb-2">
                         Content
                       </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-600 dark:text-purple-400">
                         {truncateContent(note.content)}
                       </p>
                     </div>
                     
                     {note.soap_note && (
                       <div>
-                        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <h4 className="text-sm font-medium text-gray-700 dark:text-purple-300 mb-2">
                           SOAP Note
                         </h4>
-                        <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-3">
-                          <pre className="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
+                        <div className="bg-blue-50 dark:bg-purple-900/10 rounded-lg p-3">
+                          <pre className="text-xs text-gray-700 dark:text-purple-300 whitespace-pre-wrap font-mono">
                             {truncateContent(note.soap_note, 200)}
                           </pre>
                         </div>
@@ -253,10 +253,10 @@ export default function NotesPage() {
           <Card>
             <CardContent className="text-center py-12">
               <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-purple-100">
                 {searchQuery ? 'No notes found' : 'No notes yet'}
               </h3>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-500 dark:text-purple-400">
                 {searchQuery 
                   ? 'Try adjusting your search query or filters.' 
                   : 'Get started by creating your first clinical note.'

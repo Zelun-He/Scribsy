@@ -41,7 +41,7 @@ export default function NotePage() {
 
   const fetchNote = async (noteId: string) => {
     try {
-      const fetchedNote = await apiClient.getNote(noteId);
+      const fetchedNote = await apiClient.getNote(parseInt(noteId));
       setNote(fetchedNote);
       setError('');
     } catch (err) {
