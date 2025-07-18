@@ -1,6 +1,7 @@
 export interface User {
   id: number;
   username: string;
+  email: string;
   is_active: boolean;
 }
 
@@ -39,6 +40,7 @@ export interface LoginRequest {
 
 export interface RegisterRequest {
   username: string;
+  email: string;
   password: string;
 }
 

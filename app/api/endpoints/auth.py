@@ -47,13 +47,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 # POST /auth/register - Register a new user.
 # No authentication required.
-# Request body: UserCreate schema (username, password)
+# Request body: UserCreate schema (username, password, email)
 # Returns: UserRead schema
 @router.post("/register", response_model=schemas.UserRead)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = crud_notes.get_user_by_username(db, user.username)
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
+    # Check for existing email
+    db_email = db.query(schemas.UserRead).filter_by(email=user.email).first()
+    if db_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
     hashed_password = crud_notes.get_password_hash(user.password)
     return crud_notes.create_user(db, user, hashed_password)
 

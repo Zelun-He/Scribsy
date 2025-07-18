@@ -92,6 +92,14 @@ def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
 def get_user(db: Session, user_id: int):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
+def set_user_admin(db: Session, username: str):
+    user = get_user_by_username(db, username)
+    if user:
+        user.is_admin = 1
+        db.commit()
+        db.refresh(user)
+    return user
+
 # Authentication helper
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
