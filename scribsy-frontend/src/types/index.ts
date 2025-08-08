@@ -17,8 +17,6 @@ export interface Note {
   signed_at?: string;
   status: string;
   audio_file?: string;
-  title?: string;
-  soap_note?: string;
 }
 
 export interface SOAPNote {
@@ -52,8 +50,9 @@ export interface LoginResponse {
 }
 
 export interface CreateNoteRequest {
-  patient_id: string;
-  visit_id: string;
+  patient_id: number;
+  provider_id: number;
+  visit_id: number;
   note_type: string;
   content: string;
   status: string;

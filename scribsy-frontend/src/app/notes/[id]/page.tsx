@@ -15,15 +15,7 @@ import {
   CalendarIcon 
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  soap_note?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Note } from '@/types';
 
 export default function NotePage() {
   const params = useParams();
@@ -44,7 +36,7 @@ export default function NotePage() {
       const fetchedNote = await apiClient.getNote(parseInt(noteId));
       setNote(fetchedNote);
       setError('');
-    } catch (err) {
+    } catch {
       setError('Failed to fetch note');
     } finally {
       setLoading(false);
@@ -58,7 +50,7 @@ export default function NotePage() {
     try {
       await apiClient.deleteNote(note.id);
       router.push('/notes');
-    } catch (err) {
+    } catch {
       setError('Failed to delete note');
       setDeleteLoading(false);
     }
@@ -93,7 +85,7 @@ export default function NotePage() {
           </div>
           <div className="mt-4">
             <Link href="/notes">
-              <Button variant="outline">
+              <Button variant="ghost">
                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
                 Back to Notes
               </Button>
@@ -113,7 +105,7 @@ export default function NotePage() {
             Note not found
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            The note you're looking for doesn't exist.
+            The note you&apos;re looking for doesn&apos;t exist.
           </p>
           <div className="mt-6">
             <Link href="/notes">
@@ -146,7 +138,7 @@ export default function NotePage() {
           </div>
           <div className="flex gap-2">
             <Link href={`/notes/${note.id}/edit`}>
-              <Button variant="outline">
+              <Button variant="ghost">
                 <PencilIcon className="w-4 h-4 mr-2" />
                 Edit
               </Button>
@@ -237,7 +229,7 @@ export default function NotePage() {
             </Button>
           </Link>
           <Link href="/notes/new">
-            <Button variant="outline" size="lg">
+            <Button variant="ghost" size="lg">
               <DocumentTextIcon className="w-5 h-5 mr-2" />
               Create New Note
             </Button>

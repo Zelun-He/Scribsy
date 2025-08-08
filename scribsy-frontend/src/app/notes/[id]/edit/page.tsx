@@ -9,27 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   ArrowLeftIcon,
-  DocumentTextIcon,
-  SparklesIcon 
+  DocumentTextIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
-
-interface Note {
-  id: string;
-  title: string;
-  content: string;
-  soap_note?: string;
-  created_at: string;
-  updated_at: string;
-}
+import { Note } from '@/types';
 
 export default function EditNotePage() {
   const params = useParams();
   const router = useRouter();
   const [note, setNote] = useState<Note | null>(null);
-  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [soapNote, setSoapNote] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -44,11 +33,9 @@ export default function EditNotePage() {
     try {
       const fetchedNote = await apiClient.getNote(parseInt(noteId));
       setNote(fetchedNote);
-      setTitle(fetchedNote.title);
       setContent(fetchedNote.content);
-      setSoapNote(fetchedNote.soap_note || '');
       setError('');
-    } catch (err) {
+    } catch {
       setError('Failed to fetch note');
     } finally {
       setLoading(false);
@@ -64,12 +51,10 @@ export default function EditNotePage() {
 
     try {
       const updatedNote = await apiClient.updateNote(note.id, {
-        title: title || 'Untitled Note',
         content,
-        soap_note: soapNote || undefined,
       });
       
-      router.push(`/notes/${updatedNote.id}`);
+      router.push(`/notes/${updatedNote.id.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update note');
     } finally {
@@ -96,7 +81,7 @@ export default function EditNotePage() {
           </div>
           <div className="mt-4">
             <Link href="/notes">
-              <Button variant="outline">
+              <Button variant="ghost">
                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
                 Back to Notes
               </Button>
@@ -116,7 +101,7 @@ export default function EditNotePage() {
             Note not found
           </h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            The note you're trying to edit doesn't exist.
+            The note you&apos;re trying to edit doesn&apos;t exist.
           </p>
           <div className="mt-6">
             <Link href="/notes">
@@ -137,7 +122,7 @@ export default function EditNotePage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href={`/notes/${note.id}`}>
+            <Link href={`/notes/${note.id.toString()}`}>
               <Button variant="ghost" size="sm">
                 <ArrowLeftIcon className="w-4 h-4 mr-2" />
                 Back to Note
@@ -163,22 +148,6 @@ export default function EditNotePage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Note Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Input
-                label="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Enter note title"
-                required
-              />
-            </CardContent>
-          </Card>
-
           {/* Content */}
           <Card>
             <CardHeader>
@@ -202,32 +171,10 @@ export default function EditNotePage() {
             </CardContent>
           </Card>
 
-          {/* SOAP Note */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <SparklesIcon className="w-5 h-5 mr-2" />
-                SOAP Note
-              </CardTitle>
-              <CardDescription>
-                Edit the structured clinical documentation (optional)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                value={soapNote}
-                onChange={(e) => setSoapNote(e.target.value)}
-                placeholder="SOAP note content (optional)..."
-                rows={10}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 font-mono text-sm"
-              />
-            </CardContent>
-          </Card>
-
           {/* Actions */}
           <div className="flex justify-end gap-4">
-            <Link href={`/notes/${note.id}`}>
-              <Button variant="outline" type="button">
+            <Link href={`/notes/${note.id.toString()}`}>
+              <Button variant="ghost" type="button">
                 Cancel
               </Button>
             </Link>

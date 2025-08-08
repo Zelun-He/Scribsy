@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { useAuth } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
@@ -78,53 +79,84 @@ const X = ({ className }: { className?: string }) => (
 interface DashboardStats {
   totalNotes: number;
   recentNotes: Note[];
-  monthlyNotes: number;
   timeSaved: number;
+  patientEncounters: number;
+  noteAccuracy: number;
 }
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats>({
     totalNotes: 0,
     recentNotes: [],
-    monthlyNotes: 0,
-    timeSaved: 0
+    timeSaved: 0,
+    patientEncounters: 0,
+    noteAccuracy: 0
   });
   const [loading, setLoading] = useState(true);
+
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [animatedStats, setAnimatedStats] = useState({
     totalNotes: 0,
-    monthlyNotes: 0,
-    timeSaved: 0
+    timeSaved: 0,
+    patientEncounters: 0,
+    noteAccuracy: 0
   });
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      // Use router.push instead of window.location.href for better navigation
+      router.push('/access-denied');
+    }
+  }, [user, authLoading, router]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      // Only fetch data if user is authenticated
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const notes = await apiClient.getNotes();
-        const monthlyNotes = notes.filter(note => {
-          const noteDate = new Date(note.created_at);
-          const now = new Date();
-          return noteDate.getMonth() === now.getMonth() && 
-                 noteDate.getFullYear() === now.getFullYear();
-        }).length;
+        
+        // Calculate unique patient encounters
+        const uniquePatients = new Set(notes.map(note => note.patient_id));
+        const patientEncounters = uniquePatients.size;
+        
+        // Calculate time saved (assuming 15 minutes saved per note)
+        const timeSaved = notes.length * 15;
+        
+        // Calculate note accuracy - percentage of completed/signed notes
+        const completedNotes = notes.filter(note => 
+          note.status === 'completed' || note.status === 'signed' || note.signed_at
+        ).length;
+        const noteAccuracy = notes.length > 0 ? Math.round((completedNotes / notes.length) * 100) : 0;
         
         setStats({
           totalNotes: notes.length,
           recentNotes: notes.slice(0, 3),
-          monthlyNotes,
-          timeSaved: notes.length * 15
+          timeSaved,
+          patientEncounters,
+          noteAccuracy
         });
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
+        // If there's an authentication error, don't continue trying to fetch data
+        if (error instanceof Error && error.message.includes('401')) {
+          console.log('User not authenticated, stopping data fetch');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchDashboardData();
-  }, []);
+  }, [user]);
 
   // Animate stats when they load
   useEffect(() => {
@@ -147,11 +179,14 @@ export default function DashboardPage() {
       animateValue(0, stats.totalNotes, 1500, (value) => 
         setAnimatedStats(prev => ({ ...prev, totalNotes: value }))
       );
-      animateValue(0, stats.monthlyNotes, 1200, (value) => 
-        setAnimatedStats(prev => ({ ...prev, monthlyNotes: value }))
-      );
       animateValue(0, stats.timeSaved, 2000, (value) => 
         setAnimatedStats(prev => ({ ...prev, timeSaved: value }))
+      );
+      animateValue(0, stats.patientEncounters, 1800, (value) => 
+        setAnimatedStats(prev => ({ ...prev, patientEncounters: value }))
+      );
+      animateValue(0, stats.noteAccuracy, 1600, (value) => 
+        setAnimatedStats(prev => ({ ...prev, noteAccuracy: value }))
       );
     }
   }, [loading, stats]);
@@ -201,13 +236,13 @@ export default function DashboardPage() {
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      consultation: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-      'follow-up': 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-      physical: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      urgent: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      'post-op': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+      consultation: 'bg-emerald-100 text-emerald-800',
+      'follow-up': 'bg-amber-100 text-amber-800',
+      physical: 'bg-blue-100 text-blue-800',
+      urgent: 'bg-red-100 text-red-800',
+      'post-op': 'bg-purple-100 text-purple-800'
     };
-    return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    return colors[category] || 'bg-gray-100 text-gray-800';
   };
 
   const calendarDays = generateCalendarDays();
@@ -215,6 +250,15 @@ export default function DashboardPage() {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  // Don't render dashboard if user is not authenticated
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      </div>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -227,11 +271,11 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-bold mb-2">
                   Welcome back, {user?.username || 'Dr. Smith'}!
                 </h1>
-                <p className="text-green-100 dark:text-purple-100 mb-6 text-lg">
-                  Ready to create your next clinical note? Let's make a difference today.
+                <p className="text-green-100 mb-6 text-lg">
+                  Ready to create your next clinical note? Let&apos;s make a difference today.
                 </p>
                 <Link href="/notes/new">
-                  <button className="bg-white text-green-600 dark:text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 dark:hover:bg-purple-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                  <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
                     <DocumentPlus className="w-5 h-5 mr-2" />
                     Create New Note
                   </button>
@@ -260,22 +304,8 @@ export default function DashboardPage() {
               <div className="text-3xl font-bold text-stone-800 dark:text-purple-100 mb-1">
                 {loading ? '...' : animatedStats.totalNotes}
               </div>
-              <p className="text-stone-600 dark:text-purple-300 text-sm">Total Clinical Notes</p>
-              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">+12% this month</div>
-            </div>
-
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-purple-700 hover:shadow-xl transition-all">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-amber-100 p-3 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-amber-600" />
-                </div>
-                <TrendingUp className="w-5 h-5 text-green-500" />
-              </div>
-              <div className="text-3xl font-bold text-stone-800 dark:text-purple-100 mb-1">
-                {loading ? '...' : animatedStats.monthlyNotes}
-              </div>
-              <p className="text-stone-600 dark:text-purple-300 text-sm">This Month</p>
-              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Above average</div>
+              <p className="text-stone-600 dark:text-purple-300 text-sm">Total Notes Generated</p>
+              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Clinical documentation</div>
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-purple-700 hover:shadow-xl transition-all">
@@ -289,21 +319,35 @@ export default function DashboardPage() {
                 {loading ? '...' : `${animatedStats.timeSaved}m`}
               </div>
               <p className="text-stone-600 dark:text-purple-300 text-sm">Time Saved</p>
-              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Efficiency boost</div>
+              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Efficiency gained</div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-purple-700 hover:shadow-xl transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <div className="bg-amber-100 p-3 rounded-lg">
+                  <Users className="w-6 h-6 text-amber-600" />
+                </div>
+                <TrendingUp className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="text-3xl font-bold text-stone-800 dark:text-purple-100 mb-1">
+                {loading ? '...' : animatedStats.patientEncounters}
+              </div>
+              <p className="text-stone-600 dark:text-purple-300 text-sm">Patient Encounters</p>
+              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Unique patients processed</div>
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-purple-700 hover:shadow-xl transition-all">
               <div className="flex items-center justify-between mb-4">
                 <div className="bg-purple-100 p-3 rounded-lg">
-                  <Users className="w-6 h-6 text-purple-600" />
+                  <BarChart3 className="w-6 h-6 text-purple-600" />
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
               </div>
               <div className="text-3xl font-bold text-stone-800 dark:text-purple-100 mb-1">
-                {loading ? '...' : '94%'}
+                {loading ? '...' : `${animatedStats.noteAccuracy}%`}
               </div>
-              <p className="text-stone-600 dark:text-purple-300 text-sm">Patient Satisfaction</p>
-              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Excellent rating</div>
+              <p className="text-stone-600 dark:text-purple-300 text-sm">Note Accuracy Rate</p>
+              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Completion & approval rate</div>
             </div>
           </div>
 

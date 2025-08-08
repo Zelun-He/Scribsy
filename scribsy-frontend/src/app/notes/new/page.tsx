@@ -16,9 +16,17 @@ import {
   SparklesIcon 
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+
+interface SOAPNote {
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+}
 
 export default function NewNotePage() {
-  const [title, setTitle] = useState('');
+  const { user } = useAuth();
   const [content, setContent] = useState('');
   const [patientId, setPatientId] = useState('');
   const [visitId, setVisitId] = useState('');
@@ -30,7 +38,7 @@ export default function NewNotePage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcription, setTranscription] = useState('');
-  const [soapNote, setSoapNote] = useState('');
+  const [soapNote, setSoapNote] = useState<SOAPNote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -63,7 +71,7 @@ export default function NewNotePage() {
       
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (err) {
+    } catch {
       setError('Failed to start recording. Please check microphone permissions.');
     }
   };
@@ -107,8 +115,8 @@ export default function NewNotePage() {
     try {
       const response = await apiClient.transcribeAudio(audioFile);
       setTranscription(response.transcript);
-      setSoapNote(response.summary ? JSON.stringify(response.summary) : '');
-    } catch (err) {
+      setSoapNote(response.summary || null);
+    } catch {
       setError('Failed to transcribe audio. Please try again.');
     } finally {
       setIsTranscribing(false);
@@ -127,21 +135,33 @@ export default function NewNotePage() {
       return;
     }
 
+    // Validate that IDs are valid numbers
+    if (isNaN(parseInt(patientId)) || isNaN(parseInt(visitId))) {
+      setError('Patient ID and Visit ID must be valid numbers');
+      setLoading(false);
+      return;
+    }
+
+    if (!user?.id) {
+      setError('User not authenticated. Please log in again.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const noteData: any = {
-        patient_id: patientId,
-        visit_id: visitId,
+      const noteData = {
+        patient_id: parseInt(patientId),
+        provider_id: user.id, // Use current user's ID as provider
+        visit_id: parseInt(visitId),
         note_type: noteType,
         content: content || transcription,
         status: status,
         auto_transcribe: !!audioFile,
-        auto_summarize: !!audioFile
+        auto_summarize: !!audioFile,
+        ...(audioFile && { audio_file: audioFile })
       };
-      if (audioFile) {
-        noteData.audio_file = audioFile;
-      }
 
-      const response = await apiClient.createNote(noteData);
+      await apiClient.createNote(noteData);
       
       router.push('/notes');
     } catch (err) {
@@ -411,9 +431,12 @@ export default function NewNotePage() {
               </CardHeader>
               <CardContent>
                 <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
-                  <pre className="text-sm text-gray-700 dark:text-purple-300 whitespace-pre-wrap font-mono">
-                    {soapNote}
-                  </pre>
+                  <div className="space-y-2">
+                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Subjective:</span> {soapNote.subjective}</div>
+                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Objective:</span> {soapNote.objective}</div>
+                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Assessment:</span> {soapNote.assessment}</div>
+                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Plan:</span> {soapNote.plan}</div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from app.db import schemas
+from app.db import schemas, models
 from app.crud import notes as crud_notes
 from app.db.database import get_db
 from jose import JWTError, jwt
@@ -55,7 +55,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     # Check for existing email
-    db_email = db.query(schemas.UserRead).filter_by(email=user.email).first()
+    db_email = db.query(models.User).filter_by(email=user.email).first()
     if db_email:
         raise HTTPException(status_code=400, detail="Email already registered")
     hashed_password = crud_notes.get_password_hash(user.password)

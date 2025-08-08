@@ -39,7 +39,7 @@ export default function SettingsPage() {
       // For now, we'll just show a success message
       setSuccess('Profile updated successfully!');
       setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
+    } catch {
       setError('Failed to update profile');
     } finally {
       setLoading(false);

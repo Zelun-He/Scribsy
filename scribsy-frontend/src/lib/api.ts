@@ -9,17 +9,22 @@ import {
   ApiError 
 } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8003';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private authFailureCallback: (() => void) | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
     }
+  }
+
+  setAuthFailureCallback(callback: () => void) {
+    this.authFailureCallback = callback;
   }
 
   private refreshTokenFromStorage() {
@@ -43,8 +48,22 @@ class ApiClient {
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const error: ApiError = await response.json();
-      throw new Error(error.detail || 'An error occurred');
+      // Handle authentication errors specifically
+      if (response.status === 401) {
+        this.clearToken();
+        // Call the auth failure callback if it exists
+        if (this.authFailureCallback) {
+          this.authFailureCallback();
+        }
+        throw new Error('Authentication failed');
+      }
+      
+      try {
+        const error: ApiError = await response.json();
+        throw new Error(error.detail || 'An error occurred');
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
     }
     return response.json();
   }
@@ -134,6 +153,7 @@ class ApiClient {
     const formData = new FormData();
     
     formData.append('patient_id', noteData.patient_id.toString());
+    formData.append('provider_id', noteData.provider_id.toString());
     formData.append('visit_id', noteData.visit_id.toString());
     formData.append('note_type', noteData.note_type);
     formData.append('content', noteData.content);
