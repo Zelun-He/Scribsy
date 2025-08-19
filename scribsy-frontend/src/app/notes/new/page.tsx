@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,10 +13,16 @@ import {
   PauseIcon,
   CloudArrowUpIcon,
   DocumentTextIcon,
-  SparklesIcon 
+  SparklesIcon,
+  UserIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  MapPinIcon,
+  CalendarIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { Patient } from '@/types';
 
 interface SOAPNote {
   subjective: string;
@@ -27,11 +33,12 @@ interface SOAPNote {
 
 export default function NewNotePage() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [content, setContent] = useState('');
-  const [patientId, setPatientId] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState('');
   const [visitId, setVisitId] = useState('');
   const [noteType, setNoteType] = useState('');
-  const [status, setStatus] = useState('draft');
+  const [status, setStatus] = useState('pending_review'); // Always pending review for new notes
   const [isRecording, setIsRecording] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -42,10 +49,55 @@ export default function NewNotePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
+  // Patient management
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [loadingPatients, setLoadingPatients] = useState(true);
+  
+  // Additional patient information fields
+  const [patientFirstName, setPatientFirstName] = useState('');
+  const [patientLastName, setPatientLastName] = useState('');
+  const [patientDOB, setPatientDOB] = useState('');
+  const [patientPhone, setPatientPhone] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
+  const [patientAddress, setPatientAddress] = useState('');
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const router = useRouter();
+
+  // Fetch patients on component mount and handle URL params
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const fetchedPatients = await apiClient.getPatients();
+        setPatients(fetchedPatients);
+        
+        // Check if patient_id is provided in URL params
+        const patientIdParam = searchParams.get('patient_id');
+        if (patientIdParam) {
+          setSelectedPatientId(patientIdParam);
+        }
+      } catch (error) {
+        console.error('Failed to fetch patients:', error);
+      } finally {
+        setLoadingPatients(false);
+      }
+    };
+
+    fetchPatients();
+  }, [searchParams]);
+
+  // Update selected patient when patient ID changes
+  useEffect(() => {
+    if (selectedPatientId) {
+      const patient = patients.find(p => p.id.toString() === selectedPatientId);
+      setSelectedPatient(patient || null);
+    } else {
+      setSelectedPatient(null);
+    }
+  }, [selectedPatientId, patients]);
 
   const startRecording = async () => {
     try {
@@ -107,17 +159,59 @@ export default function NewNotePage() {
   };
 
   const transcribeAudio = async () => {
-    if (!audioFile) return;
+    if (!audioFile) {
+      setError('No audio file selected');
+      return;
+    }
+
+    console.log('Starting transcription with file:', audioFile.name);
     
     setIsTranscribing(true);
     setError('');
     
     try {
-      const response = await apiClient.transcribeAudio(audioFile);
+      console.log('Transcribing audio...');
+
+      const response = await apiClient.transcribeAudio(
+        audioFile,
+        true // Always summarize when transcribing
+      );
+
+      console.log('Transcription received:', response.transcript);
       setTranscription(response.transcript);
-      setSoapNote(response.summary || null);
-    } catch {
-      setError('Failed to transcribe audio. Please try again.');
+
+      // Handle the summary response - convert dictionary to SOAPNote object
+      if (response.summary) {
+        console.log('Summary received:', response.summary);
+        // Convert the dictionary response to SOAPNote object
+        const soapNoteData = response.summary as any;
+        if (soapNoteData.subjective && soapNoteData.objective && soapNoteData.assessment && soapNoteData.plan) {
+          setSoapNote({
+            subjective: soapNoteData.subjective,
+            objective: soapNoteData.objective,
+            assessment: soapNoteData.assessment,
+            plan: soapNoteData.plan
+          });
+        } else {
+          console.log('Invalid SOAP note structure:', soapNoteData);
+          setSoapNote(null);
+        }
+      } else {
+        console.log('No summary received');
+        setSoapNote(null);
+      }
+
+      // Check for summary error and show it to the user
+      if (response.summary_error) {
+        if (response.summary_error.includes("OpenAI API key")) {
+          setError(`Transcription completed successfully! However, SOAP note generation requires an OpenAI API key. Please contact your administrator to configure the OpenAI API key in the server environment.`);
+        } else {
+          setError(`Transcription completed, but SOAP generation failed: ${response.summary_error}`);
+        }
+      }
+    } catch (err) {
+      console.error('Transcription error:', err);
+      setError(`Failed to transcribe audio: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsTranscribing(false);
     }
@@ -128,16 +222,46 @@ export default function NewNotePage() {
     setLoading(true);
     setError('');
 
+    // Check if we need to create a new patient
+    const hasPatientInfo = patientFirstName && patientLastName && patientDOB;
+    let finalPatientId = selectedPatientId;
+
+    // If patient information is provided but no patient is selected, create a new patient
+    if (hasPatientInfo && !selectedPatientId) {
+      try {
+        const newPatient = await apiClient.createPatient({
+          first_name: patientFirstName.trim(),
+          last_name: patientLastName.trim(),
+          date_of_birth: patientDOB,
+          ...(patientPhone.trim() && { phone_number: patientPhone.trim() }),
+          ...(patientEmail.trim() && { email: patientEmail.trim() }),
+          ...(patientAddress.trim() && { address: patientAddress.trim() })
+        });
+        finalPatientId = newPatient.id.toString();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create patient');
+        setLoading(false);
+        return;
+      }
+    }
+
     // Validate required fields
-    if (!patientId || !visitId || !noteType || (!content && !transcription)) {
-      setError('Please fill in all required fields: Patient ID, Visit ID, Note Type, and Content');
+    if ((!selectedPatientId && !hasPatientInfo) || !noteType || (!content && !transcription)) {
+      setError('Please fill in all required fields: Either select a patient or provide patient information (First Name, Last Name, Date of Birth), Note Type, and Content');
       setLoading(false);
       return;
     }
 
-    // Validate that IDs are valid numbers
-    if (isNaN(parseInt(patientId)) || isNaN(parseInt(visitId))) {
-      setError('Patient ID and Visit ID must be valid numbers');
+    // Validate that Patient ID is a valid number
+    if (isNaN(parseInt(finalPatientId))) {
+      setError('Patient ID must be a valid number');
+      setLoading(false);
+      return;
+    }
+
+    // Validate Visit ID if provided
+    if (visitId && isNaN(parseInt(visitId))) {
+      setError('Visit ID must be a valid number');
       setLoading(false);
       return;
     }
@@ -149,15 +273,36 @@ export default function NewNotePage() {
     }
 
     try {
+      // Prepare the content - include manual content, transcription, and SOAP note if available
+      let finalContent = content || transcription || '';
+      
+      // If we have a generated SOAP note, append it to the content (but don't duplicate)
+      if (soapNote) {
+        const soapText = `\n\n=== GENERATED SOAP NOTE ===\nSubjective: ${soapNote.subjective}\n\nObjective: ${soapNote.objective}\n\nAssessment: ${soapNote.assessment}\n\nPlan: ${soapNote.plan}`;
+        
+        // Remove any existing SOAP notes (both formats) to prevent duplication
+        finalContent = finalContent.replace(/\n*=== GENERATED SOAP NOTE ===[\s\S]*$/g, '');
+        finalContent = finalContent.replace(/\n*SOAP Summary:[\s\S]*$/g, '');
+        
+        // Add the new SOAP note
+        finalContent = (finalContent.trim() || transcription || '') + soapText;
+      }
+
+      // Get client timezone information
+      const clientTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const clientTimestamp = new Date().toISOString();
+
       const noteData = {
-        patient_id: parseInt(patientId),
+        patient_id: parseInt(finalPatientId),
         provider_id: user.id, // Use current user's ID as provider
-        visit_id: parseInt(visitId),
+        visit_id: visitId ? parseInt(visitId) : undefined, // Optional - will be auto-generated if not provided
         note_type: noteType,
-        content: content || transcription,
+        content: finalContent,
         status: status,
         auto_transcribe: !!audioFile,
         auto_summarize: !!audioFile,
+        client_timezone: clientTimezone,
+        client_timestamp: clientTimestamp,
         ...(audioFile && { audio_file: audioFile })
       };
 
@@ -178,11 +323,11 @@ export default function NewNotePage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-purple-100">
             Create New Note
           </h1>
-          <Button
-            onClick={handleSubmit}
-            disabled={loading || (!content && !transcription) || !patientId || !visitId || !noteType}
-            loading={loading}
-          >
+                            <Button
+                    onClick={handleSubmit}
+                    disabled={loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
+                    loading={loading}
+                  >
             {loading ? 'Saving...' : 'Save Note'}
           </Button>
         </div>
@@ -206,29 +351,168 @@ export default function NewNotePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
-                    Patient ID *
+                    Patient *
                   </label>
-                  <Input
-                    type="text"
-                    value={patientId}
-                    onChange={(e) => setPatientId(e.target.value)}
-                    placeholder="Enter patient ID"
-                    required
-                  />
+                  <select
+                    value={selectedPatientId}
+                    onChange={(e) => setSelectedPatientId(e.target.value)}
+                    className="w-full h-10 px-3 py-2 text-sm border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 bg-gray-50 dark:bg-gray-800 dark:text-purple-100"
+                    disabled={loadingPatients}
+                  >
+                    <option value="">{loadingPatients ? 'Loading patients...' : 'Select an existing patient'}</option>
+                    {patients.map((patient) => (
+                      <option key={patient.id} value={patient.id}>
+                        {patient.first_name} {patient.last_name} (ID: {patient.id})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    OR create a new patient in the form below
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
-                    Visit ID *
+                    Visit ID (Auto-generated)
                   </label>
                   <Input
                     type="text"
                     value={visitId}
                     onChange={(e) => setVisitId(e.target.value)}
-                    placeholder="Enter visit ID"
-                    required
+                    placeholder="Leave empty for auto-generation"
+                    className="h-10 text-sm bg-gray-50 dark:bg-gray-800"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Leave empty to auto-generate based on patient and date
+                  </p>
                 </div>
               </div>
+              
+              {/* Selected Patient Information */}
+              {selectedPatient && (
+                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3">
+                    Selected Patient Information
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-blue-800 dark:text-blue-200">
+                        {selectedPatient.first_name} {selectedPatient.last_name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-blue-800 dark:text-blue-200">
+                        DOB: {new Date(selectedPatient.date_of_birth).toLocaleDateString()} 
+                        ({new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear()} years)
+                      </span>
+                    </div>
+                    {selectedPatient.phone_number && (
+                      <div className="flex items-center gap-2">
+                        <PhoneIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-blue-800 dark:text-blue-200">
+                          {selectedPatient.phone_number}
+                        </span>
+                      </div>
+                    )}
+                    {selectedPatient.email && (
+                      <div className="flex items-center gap-2">
+                        <EnvelopeIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-blue-800 dark:text-blue-200">
+                          {selectedPatient.email}
+                        </span>
+                      </div>
+                    )}
+                    {selectedPatient.address && (
+                      <div className="flex items-start gap-2 col-span-full">
+                        <MapPinIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
+                        <span className="text-blue-800 dark:text-blue-200">
+                          {selectedPatient.address}
+                          {selectedPatient.city && selectedPatient.state && (
+                            <span>, {selectedPatient.city}, {selectedPatient.state} {selectedPatient.zip_code}</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Patient Information */}
+              <div className="mt-6">
+                <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
+                  Patient Information
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      First Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={patientFirstName}
+                      onChange={(e) => setPatientFirstName(e.target.value)}
+                      placeholder="Enter first name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      Last Name
+                    </label>
+                    <Input
+                      type="text"
+                      value={patientLastName}
+                      onChange={(e) => setPatientLastName(e.target.value)}
+                      placeholder="Enter last name"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      Date of Birth
+                    </label>
+                    <Input
+                      type="date"
+                      value={patientDOB}
+                      onChange={(e) => setPatientDOB(e.target.value)}
+                      placeholder="Enter date of birth"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      Phone Number
+                    </label>
+                    <Input
+                      type="tel"
+                      value={patientPhone}
+                      onChange={(e) => setPatientPhone(e.target.value)}
+                      placeholder="(555) 123-4567"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      Email Address
+                    </label>
+                    <Input
+                      type="email"
+                      value={patientEmail}
+                      onChange={(e) => setPatientEmail(e.target.value)}
+                      placeholder="patient@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                      Address
+                    </label>
+                    <Input
+                      type="text"
+                      value={patientAddress}
+                      onChange={(e) => setPatientAddress(e.target.value)}
+                      placeholder="123 Main Street"
+                    />
+                  </div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
@@ -256,16 +540,9 @@ export default function NewNotePage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
                     Status
                   </label>
-                  <select
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
-                  >
-                    <option value="draft">Draft</option>
-                    <option value="pending">Pending Review</option>
-                    <option value="signed">Signed</option>
-                    <option value="final">Final</option>
-                  </select>
+                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                    Pending Review (Default)
+                  </div>
                 </div>
               </div>
             </CardContent>

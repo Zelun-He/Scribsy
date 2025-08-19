@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile, Form
 from sqlalchemy.orm import Session
-from app.db import schemas
-from app.crud import notes as crud_notes
+from app.db import schemas, models
+from app.crud import notes as crud_notes, patients as crud_patients
 from app.db.database import get_db
 from app.api.endpoints.auth import get_current_user
 from app.services.transcription import transcription_service
@@ -26,7 +26,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def create_note(
     patient_id: int = Form(...),
     provider_id: int = Form(None),  # Will be overridden by current_user
-    visit_id: int = Form(...),
+    visit_id: Optional[int] = Form(None),
     note_type: str = Form(...),
     content: str = Form(""),  # Make content optional when audio is provided
     status: str = Form(...),
@@ -34,6 +34,8 @@ async def create_note(
     audio_file: Optional[UploadFile] = File(None),
     auto_transcribe: bool = Form(True),  # New option to auto-transcribe audio
     auto_summarize: bool = Form(True),   # New option to auto-generate SOAP
+    client_timezone: Optional[str] = Form(None),  # Client timezone
+    client_timestamp: Optional[str] = Form(None),  # Client timestamp
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
@@ -61,21 +63,13 @@ async def create_note(
                 try:
                     transcription = await transcription_service.transcribe(Path(file_path))
                     
-                    # Auto-summarize if requested
+                    # Auto-summarize if requested - but don't add to content since frontend handles this
                     if auto_summarize and transcription:
                         soap_summary = await summarize_note(transcription)
-                        
-                        # If content is empty, use the transcription
+                        # Just ensure we have some content for the note
                         if not content.strip():
                             content = f"Transcription: {transcription}"
-                            
-                        # Add SOAP summary to content
-                        if soap_summary:
-                            content += f"\n\nSOAP Summary:\n"
-                            content += f"Subjective: {soap_summary.subjective}\n"
-                            content += f"Objective: {soap_summary.objective}\n"
-                            content += f"Assessment: {soap_summary.assessment}\n"
-                            content += f"Plan: {soap_summary.plan}"
+                        # Note: SOAP summary is not added here since frontend already includes it in content
                             
                 except Exception as e:
                     # Don't fail note creation if transcription fails
@@ -90,17 +84,62 @@ async def create_note(
     if not content.strip() and not audio_file_path:
         raise HTTPException(status_code=400, detail="Note must have either content or audio file")
     
+    # Auto-generate visit_id if not provided, before validation
+    if not visit_id:
+        visit_id = crud_notes.generate_visit_id(db, patient_id)
+    
+    # Handle timezone-aware timestamps
+    import pytz
+    if client_timezone:
+        try:
+            # Get the client timezone
+            client_tz = pytz.timezone(client_timezone)
+            # Create a timezone-aware timestamp for note creation
+            local_time = datetime.now(client_tz)
+            print(f"Note created at {local_time} in timezone {client_timezone}")
+        except Exception as e:
+            print(f"Invalid timezone {client_timezone}: {e}")
+            # Fallback to UTC
+            local_time = datetime.now(pytz.UTC)
+    else:
+        # Default to UTC
+        local_time = datetime.now(pytz.UTC)
+    
     note_data = {
         "patient_id": patient_id,
         "provider_id": current_user.id,
-        "visit_id": visit_id,
+        "visit_id": visit_id,  # Now guaranteed to be a valid integer
         "note_type": note_type,
         "content": content,
         "status": status,
         "signed_at": signed_at,
         "audio_file": audio_file_path
     }
-    return crud_notes.create_note(db, schemas.NoteCreate(**note_data))
+    
+    try:
+        note_create = schemas.NoteCreate(**note_data)
+        # Create the note directly since visit_id is already generated
+        db_note = models.Note(**note_create.dict())
+        
+        # Override the timestamps with timezone-aware ones
+        db_note.created_at = local_time.astimezone(pytz.UTC)  # Store in UTC but preserve timezone info
+        db_note.updated_at = local_time.astimezone(pytz.UTC)
+        
+        db.add(db_note)
+        db.commit()
+        db.refresh(db_note)
+        return db_note
+    except Exception as e:
+        # Log the actual error for debugging
+        print(f"Note creation error: {str(e)}")
+        print(f"Note data: {note_data}")
+        # Return a more specific error message
+        if "FOREIGN KEY constraint failed" in str(e):
+            raise HTTPException(status_code=422, detail=f"Patient ID {patient_id} does not exist. Please select a valid patient or create a new one.")
+        elif "NOT NULL constraint failed" in str(e):
+            raise HTTPException(status_code=422, detail=f"Required field missing: {str(e)}")
+        else:
+            raise HTTPException(status_code=422, detail=f"Database error: {str(e)}")
 
 # GET /notes/ - Retrieve a list of notes for the authenticated provider.
 # Supports filtering by patient_id, visit_id, note_type, status, and date range.
@@ -135,12 +174,36 @@ def read_notes(
 # GET /notes/{note_id} - Retrieve a specific note by ID for the authenticated provider.
 # Returns audio_file field if present.
 # Requires authentication.
-@router.get("/{note_id}", response_model=schemas.NoteRead)
+@router.get("/{note_id}", response_model=schemas.NoteWithPatientInfo)
 def read_note(note_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     db_note = crud_notes.get_note(db, note_id)
     if db_note is None or db_note.provider_id != current_user.id:
         raise HTTPException(status_code=404, detail="Note not found")
-    return db_note
+    
+    # Get patient information
+    patient = crud_patients.get_patient_by_id(db, db_note.patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    
+    # Create enhanced response with patient info
+    return schemas.NoteWithPatientInfo(
+        id=db_note.id,
+        patient_id=db_note.patient_id,
+        provider_id=db_note.provider_id,
+        visit_id=db_note.visit_id,
+        note_type=db_note.note_type,
+        content=db_note.content,
+        status=db_note.status,
+        created_at=db_note.created_at,
+        updated_at=db_note.updated_at,
+        signed_at=db_note.signed_at,
+        audio_file=db_note.audio_file,
+        patient_first_name=patient.first_name,
+        patient_last_name=patient.last_name,
+        patient_date_of_birth=patient.date_of_birth,
+        patient_phone_number=patient.phone_number,
+        patient_email=patient.email
+    )
 
 # PUT /notes/{note_id} - Update a specific note by ID for the authenticated provider.
 # Requires authentication. Expects NoteUpdate schema in the request body.

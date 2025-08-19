@@ -37,7 +37,7 @@ export default function Home() {
           <nav className="hidden md:flex gap-8 list-none items-center text-gray-700 text-base font-medium">
             <li><a href="#features" className="hover:text-emerald-600 transition-colors">Features</a></li>
             <li><a href="#how-it-works" className="hover:text-emerald-600 transition-colors">How It Works</a></li>
-            <li><a href="#benefits" className="hover:text-emerald-600 transition-colors">Benefits</a></li>
+            <li><Link href="/benefits" className="hover:text-emerald-600 transition-colors">Benefits</Link></li>
             <li><a href="#contact" className="hover:text-emerald-600 transition-colors">Contact</a></li>
           </nav>
           <div className="flex gap-3 items-center">

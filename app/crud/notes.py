@@ -6,11 +6,43 @@ from app.db import models, schemas
 from typing import List, Optional
 from datetime import datetime
 from passlib.context import CryptContext
+from sqlalchemy import func
+
+def generate_visit_id(db: Session, patient_id: int) -> int:
+    """
+    Auto-generate a Visit ID for a patient.
+    Format: Sequential number per patient per day
+    """
+    today = datetime.now()
+    
+    # Get the highest visit number for this patient on this date
+    today_start = today.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_end = today.replace(hour=23, minute=59, second=59, microsecond=999999)
+    
+    max_visit = db.query(func.max(models.Note.visit_id)).filter(
+        models.Note.patient_id == patient_id,
+        models.Note.created_at >= today_start,
+        models.Note.created_at <= today_end
+    ).scalar()
+    
+    if max_visit is None:
+        # First visit of the day for this patient
+        visit_number = 1
+    else:
+        # Increment the visit number
+        visit_number = max_visit + 1
+    
+    return visit_number
 
 def create_note(db: Session, note: schemas.NoteCreate) -> models.Note:
     """
     Create a new note in the database.
+    Auto-generates Visit ID if not provided.
     """
+    # Auto-generate Visit ID if not provided
+    if not note.visit_id:
+        note.visit_id = generate_visit_id(db, note.patient_id)
+    
     db_note = models.Note(**note.dict())
     db.add(db_note)
     db.commit()
@@ -115,6 +147,8 @@ def get_password_hash(password):
 
 def authenticate_user(db: Session, username: str, password: str):
     user = get_user_by_username(db, username)
-    if not user or not verify_password(password, user.hashed_password):
-        return None
-    return user
+    if not user:
+        return None, "User not found"
+    if not verify_password(password, user.hashed_password):
+        return None, "Incorrect password"
+    return user, None

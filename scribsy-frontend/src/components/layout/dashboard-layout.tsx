@@ -13,7 +13,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-transparent">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: 'var(--primary)' }}></div>
       </div>
     );
@@ -21,7 +21,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--background)' }}>
+      <div className="min-h-screen flex items-center justify-center bg-transparent">
         <div className="text-center">
           <h2 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Access Denied</h2>
           <p className="mt-2" style={{ color: 'var(--muted-foreground)' }}>Please log in to access this page.</p>
@@ -31,9 +31,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   }
 
   return (
-    <div className="flex h-screen" style={{ background: 'var(--background)' }}>
+    <div className="flex h-screen bg-transparent">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto bg-transparent">
         <div className="p-6">
           {children}
         </div>

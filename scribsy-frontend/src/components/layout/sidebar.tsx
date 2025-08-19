@@ -7,6 +7,7 @@ import {
   HomeIcon, 
   DocumentPlusIcon, 
   DocumentTextIcon, 
+  UserGroupIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon 
 } from '@heroicons/react/24/outline';
@@ -20,6 +21,7 @@ interface SidebarItem {
 
 const navigation: SidebarItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+  { name: 'Patients', href: '/patients', icon: UserGroupIcon },
   { name: 'New Note', href: '/notes/new', icon: DocumentPlusIcon },
   { name: 'Notes History', href: '/notes', icon: DocumentTextIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },

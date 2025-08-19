@@ -56,8 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiClient.login(credentials);
       const currentUser = await apiClient.getCurrentUser();
       setUser(currentUser);
-    } catch {
-      throw new Error('Login failed');
+    } catch (error) {
+      // Preserve the specific error message from the backend
+      throw error;
     }
   };
 
@@ -66,8 +67,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiClient.register(userData);
       // Auto-login after registration
       await login(userData);
-    } catch {
-      throw new Error('Registration failed');
+    } catch (error) {
+      // Preserve the specific error message from the backend
+      throw error;
     }
   };
 

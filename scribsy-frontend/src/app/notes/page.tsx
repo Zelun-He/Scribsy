@@ -12,7 +12,10 @@ import {
   TrashIcon,
   PencilIcon,
   MagnifyingGlassIcon,
-  FunnelIcon 
+  FunnelIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  DocumentCheckIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
@@ -21,7 +24,7 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'title'>('newest');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'status'>('newest');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
@@ -48,7 +51,10 @@ export default function NotesPage() {
     // Filter by search query
     if (searchQuery) {
       filtered = notes.filter(note =>
-        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.patient_id.toString().includes(searchQuery) ||
+        note.visit_id.toString().includes(searchQuery) ||
+        note.note_type.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -59,6 +65,8 @@ export default function NotesPage() {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         case 'oldest':
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'status':
+          return a.status.localeCompare(b.status);
         default:
           return 0;
       }
@@ -100,6 +108,30 @@ export default function NotesPage() {
     return content.substring(0, maxLength) + '...';
   };
 
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending_review':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
+      case 'finalized':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending_review':
+        return <ClockIcon className="w-4 h-4" />;
+      case 'finalized':
+        return <DocumentCheckIcon className="w-4 h-4" />;
+      default:
+        return <DocumentTextIcon className="w-4 h-4" />;
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -135,7 +167,7 @@ export default function NotesPage() {
         {/* Search and Filter */}
         <Card>
           <CardContent className="py-8 px-6">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 w-full min-h-[80px]">
               <div className="flex-1 relative">
                 <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -149,12 +181,12 @@ export default function NotesPage() {
                 <FunnelIcon className="w-4 h-4 text-gray-400" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'title')}
+                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'status')}
                   className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-gray-900"
                 >
                   <option value="newest">Newest First</option>
                   <option value="oldest">Oldest First</option>
-                  <option value="title">By Title</option>
+                  <option value="status">By Status</option>
                 </select>
               </div>
             </div>
@@ -169,7 +201,34 @@ export default function NotesPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      {/* Removed CardTitle for note.title */}
+                      {/* Patient Information */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                            Patient #{note.patient_id}
+                          </span>
+                        </div>
+                        <div className="bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-lg">
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
+                            Visit #{note.visit_id}
+                          </span>
+                        </div>
+                        <div className="bg-purple-50 dark:bg-purple-900/20 px-3 py-1 rounded-lg">
+                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300 capitalize">
+                            {note.note_type}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Status Badge */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(note.status)}`}>
+                          {getStatusIcon(note.status)}
+                          <span className="capitalize">{note.status.replace('_', ' ')}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Date Information */}
                       <CardDescription className="mt-1">
                         Created: {formatDate(note.created_at)}
                         {note.updated_at !== note.created_at && (

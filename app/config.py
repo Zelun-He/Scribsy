@@ -31,6 +31,14 @@ class Settings(BaseSettings):
     upload_dir: str = os.getenv("UPLOAD_DIR", "uploads")
     max_audio_file_size: int = int(os.getenv("MAX_AUDIO_FILE_SIZE", "50"))  # MB
     
+    # S3 Configuration
+    use_s3: bool = os.getenv("USE_S3", "False").lower() == "true"
+    s3_bucket_name: str = os.getenv("S3_BUCKET_NAME", "")
+    s3_access_key_id: str = os.getenv("S3_ACCESS_KEY_ID", "")
+    s3_secret_access_key: str = os.getenv("S3_SECRET_ACCESS_KEY", "")
+    s3_region_name: str = os.getenv("S3_REGION_NAME", "us-east-1")
+    s3_endpoint_url: Optional[str] = os.getenv("S3_ENDPOINT_URL", None)  # For local testing with MinIO
+    
     # Logging Configuration
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     log_file: str = os.getenv("LOG_FILE", "logs/scribsy.log")

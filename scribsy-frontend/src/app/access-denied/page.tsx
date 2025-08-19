@@ -27,47 +27,49 @@ export default function AccessDeniedPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-6">
-            <ExclamationTriangleIcon className="w-8 h-8 text-red-600" />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4 py-8">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center space-y-4">
+          <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+            <ExclamationTriangleIcon className="w-10 h-10 text-red-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Access Denied
-          </h1>
-          <p className="text-gray-600">
-            Your session has expired or you don't have permission to access this page.
-          </p>
+          <div className="space-y-3">
+            <h1 className="text-4xl font-bold text-gray-900">
+              Access Denied
+            </h1>
+            <p className="text-gray-600 text-lg leading-relaxed">
+              Your session has expired or you don't have permission to access this page.
+            </p>
+          </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Session Expired</CardTitle>
-            <CardDescription>
+        <Card className="shadow-lg">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-xl">Session Expired</CardTitle>
+            <CardDescription className="text-base">
               Please sign in again to continue using Scribsy
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <Link href="/login">
-              <Button className="w-full">
-                <ArrowRightIcon className="w-4 h-4 mr-2" />
+              <Button className="w-full h-12 text-base font-medium">
+                <ArrowRightIcon className="w-5 h-5 mr-2" />
                 Sign In Again
               </Button>
             </Link>
             
-            <div className="text-center">
-              <p className="text-sm text-gray-500 mb-2">Don't have an account?</p>
+            <div className="text-center space-y-2 pt-4">
+              <p className="text-sm text-gray-500">Don't have an account?</p>
               <Link href="/register">
-                <Button variant="ghost" className="w-full">
+                <Button variant="ghost" className="w-full h-10">
                   Create New Account
                 </Button>
               </Link>
             </div>
 
-            <div className="pt-4 border-t">
+            <div className="pt-2 -mx-6 border-t border-gray-200">
               <Link href="/">
-                <Button variant="ghost" className="w-full">
+                <Button variant="ghost" className="w-full h-10">
                   Back to Home
                 </Button>
               </Link>

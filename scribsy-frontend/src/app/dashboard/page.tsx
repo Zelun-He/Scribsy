@@ -124,9 +124,23 @@ export default function DashboardPage() {
       try {
         const notes = await apiClient.getNotes();
         
-        // Calculate unique patient encounters
-        const uniquePatients = new Set(notes.map(note => note.patient_id));
-        const patientEncounters = uniquePatients.size;
+        // Calculate active patients (patients with recent notes or pending status)
+        const now = new Date();
+        const twentyFourMonthsAgo = new Date(now.getTime() - 24 * 30 * 24 * 60 * 60 * 1000); // 24 months ago
+        
+        // Get patients with recent activity (last 24 months) or pending notes
+        const activePatients = new Set();
+        notes.forEach(note => {
+          const noteDate = new Date(note.created_at);
+          const isRecent = noteDate >= twentyFourMonthsAgo;
+          const isPending = note.status === 'pending_review';
+          
+          if (isRecent || isPending) {
+            activePatients.add(note.patient_id);
+          }
+        });
+        
+        const patientEncounters = activePatients.size;
         
         // Calculate time saved (assuming 15 minutes saved per note)
         const timeSaved = notes.length * 15;
@@ -285,8 +299,8 @@ export default function DashboardPage() {
                 <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
                   <Heart className="w-8 h-8 mx-auto mb-2 text-green-100 dark:text-purple-100" />
                   <p className="text-sm text-green-100 dark:text-purple-100">Caring for</p>
-                  <p className="text-2xl font-bold">1,247</p>
-                  <p className="text-xs text-green-100 dark:text-purple-100">patients</p>
+                  <p className="text-2xl font-bold">{loading ? '...' : animatedStats.patientEncounters}</p>
+                  <p className="text-xs text-green-100 dark:text-purple-100">active patients</p>
                 </div>
               </div>
             </div>
@@ -332,8 +346,8 @@ export default function DashboardPage() {
               <div className="text-3xl font-bold text-stone-800 dark:text-purple-100 mb-1">
                 {loading ? '...' : animatedStats.patientEncounters}
               </div>
-              <p className="text-stone-600 dark:text-purple-300 text-sm">Patient Encounters</p>
-              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Unique patients processed</div>
+              <p className="text-stone-600 dark:text-purple-300 text-sm">Active Patients</p>
+              <div className="mt-2 text-xs text-green-600 dark:text-purple-400">Currently under care (24 months)</div>
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-purple-700 hover:shadow-xl transition-all">
