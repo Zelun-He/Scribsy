@@ -11,3 +11,4 @@ openai
 openai-whisper
 python-dotenv
 requests
+boto3

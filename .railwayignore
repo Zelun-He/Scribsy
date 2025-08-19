@@ -1,0 +1,19 @@
+# Ignore frontend files for backend deployment
+scribsy-frontend/
+node_modules/
+package*.json
+.next/
+.env.local
+.env.production
+*.log
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/

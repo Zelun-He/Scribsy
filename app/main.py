@@ -7,6 +7,8 @@ from fastapi.responses import JSONResponse
 from app.api.endpoints.transcribe import router as transcribe_router
 from app.api.endpoints.notes import router as notes_router
 from app.api.endpoints.auth import router as auth_router
+from app.api.endpoints.patients import router as patients_router
+from app.api.endpoints.s3 import router as s3_router
 from app.utils.exceptions import ScribsyException, handle_scribsy_exception
 from app.utils.logging import logger, log_error
 from dotenv import load_dotenv
@@ -46,6 +48,8 @@ app.add_middleware(
 app.include_router(transcribe_router)
 app.include_router(notes_router)
 app.include_router(auth_router)
+app.include_router(patients_router, prefix="/patients", tags=["patients"])
+app.include_router(s3_router)
 
 @app.get("/")
 def root():

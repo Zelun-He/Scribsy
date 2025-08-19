@@ -3,23 +3,29 @@ import {
   RegisterRequest, 
   LoginResponse, 
   User, 
+  Patient,
   Note, 
   CreateNoteRequest, 
   TranscriptionResult,
   ApiError 
 } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8003';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8002';
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private authFailureCallback: (() => void) | null = null;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
     }
+  }
+
+  setAuthFailureCallback(callback: () => void) {
+    this.authFailureCallback = callback;
   }
 
   private refreshTokenFromStorage() {
@@ -43,10 +49,43 @@ class ApiClient {
 
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-      const error: ApiError = await response.json();
-      throw new Error(error.detail || 'An error occurred');
+      // Handle authentication errors specifically
+      if (response.status === 401) {
+        this.clearToken();
+        // Call the auth failure callback if it exists
+        if (this.authFailureCallback) {
+          this.authFailureCallback();
+        }
+        throw new Error('Authentication failed');
+      }
+      
+      try {
+        const error: ApiError = await response.json();
+        throw new Error(error.detail || 'An error occurred');
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
     }
-    return response.json();
+    
+    try {
+      // Try to parse as JSON first
+      const text = await response.text();
+      if (!text) {
+        throw new Error('Empty response received');
+      }
+      
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(`Failed to parse JSON response: ${text.substring(0, 200)}...`);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Failed to parse response');
+      }
+    }
   }
 
   setToken(token: string) {
@@ -134,7 +173,10 @@ class ApiClient {
     const formData = new FormData();
     
     formData.append('patient_id', noteData.patient_id.toString());
-    formData.append('visit_id', noteData.visit_id.toString());
+    formData.append('provider_id', noteData.provider_id.toString());
+    if (noteData.visit_id) {
+      formData.append('visit_id', noteData.visit_id.toString());
+    }
     formData.append('note_type', noteData.note_type);
     formData.append('content', noteData.content);
     formData.append('status', noteData.status);
@@ -186,11 +228,17 @@ class ApiClient {
   }
 
   // Transcription endpoint
-  async transcribeAudio(file: File, summarize: boolean = false): Promise<TranscriptionResult> {
+  async transcribeAudio(
+    file: File, 
+    summarize: boolean = false
+  ): Promise<TranscriptionResult> {
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch(`${this.baseURL}/transcribe?summarize=${summarize}`, {
+    const params = new URLSearchParams();
+    params.append('summarize', summarize.toString());
+
+    const response = await fetch(`${this.baseURL}/transcribe?${params}`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.token}`,
@@ -198,7 +246,101 @@ class ApiClient {
       body: formData,
     });
 
-    return this.handleResponse<TranscriptionResult>(response);
+    try {
+      const result = await this.handleResponse<TranscriptionResult>(response);
+      console.log('Transcription result:', result);
+      return result;
+    } catch (error) {
+      console.error('Transcription error in API client:', error);
+      throw error;
+    }
+  }
+
+  // Patient endpoints
+  async getPatients(search?: string): Promise<Patient[]> {
+    const params = new URLSearchParams();
+    if (search) {
+      params.append('search', search);
+    }
+
+    const response = await fetch(`${this.baseURL}/patients/?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<Patient[]>(response);
+  }
+
+  async getPatient(id: number): Promise<Patient> {
+    const response = await fetch(`${this.baseURL}/patients/${id}`, {
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<Patient>(response);
+  }
+
+  async createPatient(patientData: {
+    first_name: string;
+    last_name: string;
+    date_of_birth: string;
+    phone_number?: string;
+    email?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    zip_code?: string;
+  }): Promise<Patient> {
+    const response = await fetch(`${this.baseURL}/patients/`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify(patientData),
+    });
+
+    return this.handleResponse<Patient>(response);
+  }
+
+  async updatePatient(id: number, patientData: Partial<{
+    first_name: string;
+    last_name: string;
+    date_of_birth: string;
+    phone_number: string;
+    email: string;
+    address: string;
+    city: string;
+    state: string;
+    zip_code: string;
+  }>): Promise<Patient> {
+    const response = await fetch(`${this.baseURL}/patients/${id}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(patientData),
+    });
+
+    return this.handleResponse<Patient>(response);
+  }
+
+  async deletePatient(id: number): Promise<{ message: string }> {
+    const response = await fetch(`${this.baseURL}/patients/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<{ message: string }>(response);
+  }
+
+  async searchPatients(firstName?: string, lastName?: string): Promise<Patient[]> {
+    const params = new URLSearchParams();
+    if (firstName) {
+      params.append('first_name', firstName);
+    }
+    if (lastName) {
+      params.append('last_name', lastName);
+    }
+
+    const response = await fetch(`${this.baseURL}/patients/search/?${params}`, {
+      headers: this.getHeaders(),
+    });
+
+    return this.handleResponse<Patient[]>(response);
   }
 }
 
