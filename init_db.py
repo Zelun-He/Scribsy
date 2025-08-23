@@ -26,12 +26,12 @@ def main():
         
         hashed_password = get_password_hash(test_user.password)
         create_user(db, test_user, hashed_password)
-        print("✅ Test user created successfully!")
+        print("SUCCESS: Test user created successfully!")
         print("Username: testuser")
         print("Password: testpass123")
         print("Email: test@example.com")
     else:
-        print("✅ Test user already exists!")
+        print("SUCCESS: Test user already exists!")
         print("Username: testuser")
         print("Password: testpass123")
     
