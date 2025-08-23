@@ -11,7 +11,8 @@
       "Bash(npm run build:*)",
       "Bash(del \"C:\\Users\\zelun\\Desktop\\Projects\\Scribsy\\test_transcribe_debug.py\")",
       "Bash(rm:*)",
-      "Bash(del \"C:\\Users\\zelun\\Desktop\\Projects\\Scribsy\\scribsy-frontend\\next.config.ts\")"
+      "Bash(del \"C:\\Users\\zelun\\Desktop\\Projects\\Scribsy\\scribsy-frontend\\next.config.ts\")",
+      "Bash(timeout 10 python:*)"
     ],
     "deny": []
   }
