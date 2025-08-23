@@ -26,7 +26,7 @@ def get_patient(db: Session, patient_id: int, user_id: int) -> Optional[models.P
     ).first()
 
 def get_patients(
-    db: Session,
+    db: Session, 
     user_id: int,
     skip: int = 0,
     limit: int = 100,
@@ -101,10 +101,4 @@ def get_patient_by_phone(db: Session, phone: str, user_id: int) -> Optional[mode
     return db.query(models.Patient).filter(
         models.Patient.phone_number == phone,
         models.Patient.user_id == user_id
-    ).first()
-
-def get_patient_by_id(db: Session, patient_id: int) -> Optional[models.Patient]:
-    """
-    Get patient by ID (used for note display - doesn't filter by user_id).
-    """
-    return db.query(models.Patient).filter(models.Patient.id == patient_id).first() 
+    ).first() 
