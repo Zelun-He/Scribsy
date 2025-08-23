@@ -20,12 +20,6 @@ export default function AccessDeniedPage() {
     }
   }, [user, handleAuthFailure]);
 
-  const handleSignInAgain = () => {
-    // Clear any stale auth state
-    logout();
-    // Redirect will happen automatically from logout
-  };
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4 py-8">
       <div className="w-full max-w-md space-y-6">
