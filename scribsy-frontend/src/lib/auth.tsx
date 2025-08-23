@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isLoading: boolean;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => void;
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user, handleAuthFailure]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, handleAuthFailure }}>
+    <AuthContext.Provider value={{ user, loading, isLoading: loading, login, register, logout, handleAuthFailure }}>
       {children}
     </AuthContext.Provider>
   );

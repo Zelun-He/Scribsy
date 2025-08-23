@@ -158,7 +158,8 @@ export default function PatientsPage() {
         {filteredPatients.length > 0 ? (
           <div className="grid gap-6">
             {filteredPatients.map((patient) => (
-              <Card key={patient.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => router.push(`/patients/${patient.id}`)}>
+              <div key={patient.id} className="cursor-pointer" onClick={() => router.push(`/patients/${patient.id}`)}>
+                <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -267,6 +268,7 @@ export default function PatientsPage() {
                   </div>
                 </CardContent>
               </Card>
+              </div>
             ))}
           </div>
         ) : (
