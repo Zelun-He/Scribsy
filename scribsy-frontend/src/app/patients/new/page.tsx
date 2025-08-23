@@ -188,7 +188,7 @@ export default function NewPatientPage() {
             <CardHeader>
               <CardTitle>Address Information</CardTitle>
               <CardDescription>
-                Patient's residential address
+                Patient&apos;s residential address
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

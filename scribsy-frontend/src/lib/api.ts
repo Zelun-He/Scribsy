@@ -76,7 +76,7 @@ class ApiClient {
       
       try {
         return JSON.parse(text);
-      } catch (parseError) {
+      } catch (_parseError) {
         throw new Error(`Failed to parse JSON response: ${text.substring(0, 200)}...`);
       }
     } catch (error) {

@@ -14,7 +14,6 @@ import {
   EnvelopeIcon,
   MapPinIcon,
   CalendarIcon,
-  ClockIcon,
   PencilIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
@@ -56,7 +55,7 @@ export default function PatientProfilePage() {
       setError('No patient ID provided');
       setLoading(false);
     }
-  }, [params.id, user, authLoading, router]);
+  }, [params.id, user, authLoading, router, params]);
 
   const fetchPatient = async (patientId: string) => {
     console.log('Fetching patient with ID:', patientId);

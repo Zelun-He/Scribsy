@@ -11,7 +11,7 @@ import {
 import { useAuth } from '@/lib/auth';
 
 export default function AccessDeniedPage() {
-  const { logout, user, handleAuthFailure } = useAuth();
+  const { user, handleAuthFailure } = useAuth();
 
   // Clear any stale authentication state when this page loads
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function AccessDeniedPage() {
             </Link>
             
             <div className="text-center space-y-2 pt-4">
-              <p className="text-sm text-gray-500">Don't have an account?</p>
+              <p className="text-sm text-gray-500">Don&apos;t have an account?</p>
               <Link href="/register">
                 <Button variant="ghost" className="w-full h-10">
                   Create New Account

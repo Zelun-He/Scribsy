@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -16,7 +16,6 @@ import {
   EnvelopeIcon,
   MapPinIcon,
   CalendarIcon,
-  DocumentTextIcon,
   EyeIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
@@ -47,7 +46,7 @@ export default function PatientsPage() {
     }
   };
 
-  const filterPatients = () => {
+  const filterPatients = useCallback(() => {
     let filtered = patients;
 
     if (searchQuery) {
@@ -60,11 +59,11 @@ export default function PatientsPage() {
     }
 
     setFilteredPatients(filtered);
-  };
+  }, [patients, searchQuery]);
 
   useEffect(() => {
     filterPatients();
-  }, [patients, searchQuery]);
+  }, [patients, searchQuery, filterPatients]);
 
   const deletePatient = async (patientId: number) => {
     if (!confirm('Are you sure you want to delete this patient?')) return;
