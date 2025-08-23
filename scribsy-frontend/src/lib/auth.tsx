@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { User, LoginRequest, RegisterRequest } from '@/types';
 import { apiClient } from '@/lib/api';
@@ -22,14 +22,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   // Function to handle authentication failures
-  const handleAuthFailure = () => {
+  const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
     setUser(null);
     // Redirect to access denied page for expired sessions
     if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
       router.push('/access-denied');
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set up the auth failure callback
     apiClient.setAuthFailureCallback(handleAuthFailure);
-  }, []);
+  }, [handleAuthFailure]);
 
   const login = async (credentials: LoginRequest) => {
     try {
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const interval = setInterval(checkAuthStatus, 5 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, handleAuthFailure]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, register, logout, handleAuthFailure }}>

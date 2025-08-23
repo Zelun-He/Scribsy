@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,7 @@ interface SOAPNote {
   plan: string;
 }
 
-export default function NewNotePage() {
+function NewNotePageContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [content, setContent] = useState('');
@@ -721,5 +721,13 @@ export default function NewNotePage() {
         </form>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function NewNotePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewNotePageContent />
+    </Suspense>
   );
 }
