@@ -22,7 +22,7 @@ export function ThemeToggle() {
       variant="custom"
       size="sm"
       onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-      className="relative h-9 w-9 bg-white dark:bg-gray-800 border border-gray-300 dark:border-purple-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+      className="relative h-9 w-9 bg-white dark:bg-gray-800 border border-gray-300 dark:border-emerald-600 hover:bg-gray-50 dark:hover:bg-gray-700"
     >
       <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-gray-800 dark:text-gray-200" />
       <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-gray-800 dark:text-gray-200" />

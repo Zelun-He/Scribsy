@@ -22,6 +22,6 @@ except Exception as e:
 echo "Initializing database..."
 python init_db.py
 
-# Start the application
-echo "Starting uvicorn server..."
-exec uvicorn app.main:app --host 0.0.0.0 --port $PORT --log-level info
+# Start the application with gunicorn for production
+echo "Starting gunicorn server..."
+exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-2} --timeout ${WEB_TIMEOUT:-60}

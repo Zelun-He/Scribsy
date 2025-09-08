@@ -6,6 +6,7 @@ from app.db.database import get_db
 from app.api.endpoints.auth import get_current_user
 from app.services.transcription import transcription_service
 from app.services.ai_summary import summarize_note
+from app.services.preferences import load_user_preferences
 from typing import List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Now supports optional audio file upload (multipart/form-data).
 # Requires authentication. Expects note fields as form data and optional audio file.
 @router.post("/", response_model=schemas.NoteRead)
+@router.post("", response_model=schemas.NoteRead, include_in_schema=False)
 async def create_note(
     patient_id: int = Form(...),
     provider_id: int = Form(None),  # Will be overridden by current_user
@@ -65,7 +67,9 @@ async def create_note(
                     
                     # Auto-summarize if requested - but don't add to content since frontend handles this
                     if auto_summarize and transcription:
-                        soap_summary = await summarize_note(transcription)
+                        # Apply user AI preferences
+                        prefs = load_user_preferences(current_user.id)
+                        soap_summary = await summarize_note(transcription, preferences=prefs)
                         # Just ensure we have some content for the note
                         if not content.strip():
                             content = f"Transcription: {transcription}"
@@ -119,7 +123,7 @@ async def create_note(
     try:
         note_create = schemas.NoteCreate(**note_data)
         # Create the note directly since visit_id is already generated
-        db_note = models.Note(**note_create.dict())
+        db_note = models.Note(**note_create.model_dump())
         
         # Override the timestamps with timezone-aware ones
         db_note.created_at = local_time.astimezone(pytz.UTC)  # Store in UTC but preserve timezone info
@@ -146,6 +150,7 @@ async def create_note(
 # Returns audio_file field if present.
 # Requires authentication.
 @router.get("/", response_model=List[schemas.NoteRead])
+@router.get("", response_model=List[schemas.NoteRead], include_in_schema=False)
 def read_notes(
     skip: int = 0,
     limit: int = 10,
@@ -182,8 +187,6 @@ def read_note(note_id: int, db: Session = Depends(get_db), current_user=Depends(
     
     # Get patient information
     patient = crud_patients.get_patient_by_id(db, db_note.patient_id)
-    if not patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
     
     # Create enhanced response with patient info
     return schemas.NoteWithPatientInfo(
@@ -198,11 +201,11 @@ def read_note(note_id: int, db: Session = Depends(get_db), current_user=Depends(
         updated_at=db_note.updated_at,
         signed_at=db_note.signed_at,
         audio_file=db_note.audio_file,
-        patient_first_name=patient.first_name,
-        patient_last_name=patient.last_name,
-        patient_date_of_birth=patient.date_of_birth,
-        patient_phone_number=patient.phone_number,
-        patient_email=patient.email
+        patient_first_name=patient.first_name if patient else None,
+        patient_last_name=patient.last_name if patient else None,
+        patient_date_of_birth=patient.date_of_birth if patient else None,
+        patient_phone_number=patient.phone_number if patient else None,
+        patient_email=patient.email if patient else None
     )
 
 # PUT /notes/{note_id} - Update a specific note by ID for the authenticated provider.

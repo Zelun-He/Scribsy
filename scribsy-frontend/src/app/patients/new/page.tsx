@@ -109,7 +109,7 @@ export default function NewPatientPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     First Name *
                   </label>
                   <Input
@@ -121,7 +121,7 @@ export default function NewPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Last Name *
                   </label>
                   <Input
@@ -134,7 +134,7 @@ export default function NewPatientPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                   Date of Birth *
                 </label>
                 <Input
@@ -158,7 +158,7 @@ export default function NewPatientPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Phone Number
                   </label>
                   <Input
@@ -169,7 +169,7 @@ export default function NewPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Email Address
                   </label>
                   <Input
@@ -193,7 +193,7 @@ export default function NewPatientPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                   Street Address
                 </label>
                 <Input
@@ -205,7 +205,7 @@ export default function NewPatientPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     City
                   </label>
                   <Input
@@ -216,7 +216,7 @@ export default function NewPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     State
                   </label>
                   <Input
@@ -227,7 +227,7 @@ export default function NewPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     ZIP Code
                   </label>
                   <Input

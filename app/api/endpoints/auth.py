@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import schemas, models
 from app.crud import notes as crud_notes
 from app.db.database import get_db
+from app.audit.logger import HIPAAAuditLogger
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
@@ -15,26 +16,34 @@ SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # Utility to create JWT token
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    now = datetime.utcnow()
+    expire = now + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    # Add issued-at to support session timeout middleware
+    to_encode.update({"exp": expire, "iat": int(now.timestamp())})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # Dependency to get current user
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # Prefer Authorization header; fall back to cookie to avoid issues with stale cookies
+        header_token = token
+        cookie_token = request.cookies.get("auth_token")
+        active_token = header_token or cookie_token
+        if not active_token:
+            raise credentials_exception
+        payload = jwt.decode(active_token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
@@ -90,11 +99,126 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 # Request body: OAuth2PasswordRequestForm (username, password)
 # Returns: Token schema (access_token, token_type)
 @router.post("/token", response_model=schemas.Token)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db), request: Request = None):
     user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    
+    # Get client IP and user agent for audit
+    client_ip = request.client.host if request and request.client else "unknown"
+    user_agent = request.headers.get("user-agent") if request else None
+    
     if not user:
+        # Log failed login attempt
+        HIPAAAuditLogger.log_login_attempt(
+            db=db,
+            username=form_data.username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            failure_reason=error_message or "Invalid credentials"
+        )
         raise HTTPException(status_code=401, detail=error_message or "Incorrect username or password")
+    
+    # Log successful login attempt
+    HIPAAAuditLogger.log_login_attempt(
+        db=db,
+        username=form_data.username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
     access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Cookie-based login that also returns the token for backward compatibility
+@router.post("/token-cookie")
+def login_cookie(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    
+    # Get client IP and user agent for audit
+    client_ip = request.client.host if request.client else "unknown"
+    user_agent = request.headers.get("user-agent")
+    
+    if not user:
+        # Log failed login attempt
+        HIPAAAuditLogger.log_login_attempt(
+            db=db,
+            username=form_data.username,
+            ip_address=client_ip,
+            user_agent=user_agent,
+            success=False,
+            failure_reason=error_message or "Invalid credentials"
+        )
+        raise HTTPException(status_code=401, detail=error_message or "Incorrect username or password")
+    
+    # Log successful login attempt
+    HIPAAAuditLogger.log_login_attempt(
+        db=db,
+        username=form_data.username,
+        ip_address=client_ip,
+        user_agent=user_agent,
+        success=True
+    )
+    
+    access_token = create_access_token(data={"sub": user.username})
+
+    # Set HttpOnly auth cookie
+    # Mark Secure only when request is HTTPS (avoids cookie drop in local HTTP)
+    secure_cookie = (request.url.scheme == "https")
+    samesite_policy = "none" if secure_cookie else "lax"
+    cookie_max_age = settings.access_token_expire_minutes * 60
+    response.set_cookie(
+        key="auth_token",
+        value=access_token,
+        httponly=True,
+        secure=secure_cookie,
+        samesite=samesite_policy,
+        max_age=cookie_max_age,
+        path="/",
+    )
+
+    # Optional CSRF cookie (not enforced yet)
+    try:
+        import secrets
+        csrf = secrets.token_urlsafe(24)
+        response.set_cookie(
+            key="csrf_token",
+            value=csrf,
+            httponly=False,
+            secure=secure_cookie,
+            samesite=samesite_policy,
+            max_age=cookie_max_age,
+            path="/",
+        )
+    except Exception:
+        pass
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("auth_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
+    return {"ok": True}
+
+# POST /auth/refresh - refresh session (sliding expiration)
+@router.post("/refresh", response_model=schemas.Token)
+def refresh_session(request: Request, response: Response, current_user=Depends(get_current_user)):
+    # Issue a new token for the current user
+    access_token = create_access_token(data={"sub": current_user.username})
+
+    secure_cookie = (request.url.scheme == "https")
+    samesite_policy = "none" if secure_cookie else "lax"
+    cookie_max_age = settings.access_token_expire_minutes * 60
+    response.set_cookie(
+        key="auth_token",
+        value=access_token,
+        httponly=True,
+        secure=secure_cookie,
+        samesite=samesite_policy,
+        max_age=cookie_max_age,
+        path="/",
+    )
     return {"access_token": access_token, "token_type": "bearer"}
 
 # GET /auth/me - Get details of the currently authenticated user.

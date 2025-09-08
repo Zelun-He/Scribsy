@@ -32,6 +32,12 @@ export interface Note {
   signed_at?: string;
   status: string;
   audio_file?: string;
+  // Transcription and AI processing fields
+  transcript?: string;  // Full transcribed conversation
+  soap_subjective?: string;  // SOAP: Subjective
+  soap_objective?: string;   // SOAP: Objective  
+  soap_assessment?: string;  // SOAP: Assessment
+  soap_plan?: string;        // SOAP: Plan
   // Enhanced with patient information
   patient_first_name?: string;
   patient_last_name?: string;
@@ -74,6 +80,21 @@ export interface RegisterRequest {
 export interface LoginResponse {
   access_token: string;
   token_type: string;
+}
+
+export interface Appointment {
+  id: number;
+  patient_id: number;
+  user_id: number;
+  title?: string;
+  note?: string;
+  scheduled_at: string;
+  notify_before_minutes: number;
+  notified: boolean;
+  status?: string;
+  checked_in_at?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface CreateNoteRequest {

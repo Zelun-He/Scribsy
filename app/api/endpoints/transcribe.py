@@ -9,6 +9,7 @@ from app.services.transcription import transcription_service
 from app.services.s3_service import s3_service
 from pathlib import Path
 from app.services.ai_summary import summarize_note, NoteSummary
+from app.services.preferences import load_user_preferences
 from app.api.endpoints.auth import get_current_user
 from app.db.database import get_db
 import os
@@ -115,8 +116,9 @@ async def transcribe(
 
         if summarize:
             try:
-                summary: NoteSummary = await summarize_note(transcript)
-                response["summary"] = summary.dict()
+                prefs = load_user_preferences(current_user.id)
+                summary: NoteSummary = await summarize_note(transcript, preferences=prefs)
+                response["summary"] = summary.model_dump()
             except Exception as e:
                 print(f"Failed to generate SOAP summary: {e}")
                 # If OpenAI API fails, still return the transcript but with an error message
@@ -158,9 +160,15 @@ async def websocket_live_transcribe(websocket: WebSocket):
             await websocket.send_text(chunk_text)
     except WebSocketDisconnect:
         # On disconnect, generate SOAP summary
-        summary = await summarize_note(transcript)
+        prefs = None
+        try:
+            # WebSocket lacks auth dependency here; skip preferences in this path
+            prefs = None
+        except Exception:
+            prefs = None
+        summary = await summarize_note(transcript, preferences=prefs)
         await websocket.send_json({
             "full_transcript": transcript.strip(),
-            "soap_summary": summary.dict()
+            "soap_summary": summary.model_dump()
         })
         await websocket.close()

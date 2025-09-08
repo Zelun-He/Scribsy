@@ -20,18 +20,25 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { Patient } from '@/types';
+import { calculateAgeFromISO, formatLocalDate } from '@/utils/date';
 
 export default function PatientsPage() {
   const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [filteredPatients, setFilteredPatients] = useState<Patient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [drill, setDrill] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPatients();
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const d = url.searchParams.get('drill');
+      setDrill(d);
+    }
   }, []);
 
   const fetchPatients = async () => {
@@ -58,8 +65,14 @@ export default function PatientsPage() {
       );
     }
 
+    if (drill === 'active') {
+      // Heuristic: consider patients with recent updates as active in the last 30 days
+      const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      filtered = filtered.filter(p => new Date(p.updated_at).getTime() >= cutoff);
+    }
+
     setFilteredPatients(filtered);
-  }, [patients, searchQuery]);
+  }, [patients, searchQuery, drill]);
 
   useEffect(() => {
     filterPatients();
@@ -87,18 +100,7 @@ export default function PatientsPage() {
     });
   };
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
+  const calculateAge = (dateOfBirth: string) => calculateAgeFromISO(dateOfBirth);
 
   if (loading) {
     return (
@@ -212,7 +214,7 @@ export default function PatientsPage() {
                         <div className="flex items-center gap-2">
                           <CalendarIcon className="w-4 h-4 text-gray-400" />
                           <span className="text-gray-600 dark:text-gray-400">
-                            DOB: {formatDate(patient.date_of_birth)} ({calculateAge(patient.date_of_birth)} years old)
+                            DOB: {formatLocalDate(patient.date_of_birth)} ({calculateAge(patient.date_of_birth)} years old)
                           </span>
                         </div>
                       </div>

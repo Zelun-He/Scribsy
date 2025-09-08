@@ -27,6 +27,8 @@ class PatientRead(PatientBase):
     user_id: int
     created_at: datetime
     updated_at: datetime
+    # Optional summary counts
+    
 
     class Config:
         from_attributes = True
@@ -42,6 +44,35 @@ class PatientUpdate(BaseModel):
     state: Optional[str] = None
     zip_code: Optional[str] = None
 
+# Appointment Schemas
+class AppointmentBase(BaseModel):
+    patient_id: int
+    scheduled_at: datetime
+    title: Optional[str] = None
+    note: Optional[str] = None
+    notify_before_minutes: int = 30
+    status: Optional[str] = None
+    checked_in_at: Optional[datetime] = None
+
+class AppointmentCreate(AppointmentBase):
+    pass
+
+class AppointmentRead(AppointmentBase):
+    id: int
+    user_id: int
+    notified: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class AppointmentUpdate(BaseModel):
+    title: Optional[str] = None
+    note: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    notify_before_minutes: Optional[int] = None
+
 class NoteBase(BaseModel):
     patient_id: int
     provider_id: int
@@ -51,6 +82,11 @@ class NoteBase(BaseModel):
     status: str
     signed_at: Optional[datetime] = None
     audio_file: Optional[str] = None  # Path or URL to uploaded audio file
+    transcript: Optional[str] = None  # Full transcribed conversation
+    soap_subjective: Optional[str] = None  # SOAP: Subjective
+    soap_objective: Optional[str] = None  # SOAP: Objective  
+    soap_assessment: Optional[str] = None  # SOAP: Assessment
+    soap_plan: Optional[str] = None  # SOAP: Plan
 
 class NoteCreate(NoteBase):
     pass
@@ -62,6 +98,11 @@ class NoteUpdate(BaseModel):
     signed_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     audio_file: Optional[str] = None  # Path or URL to uploaded audio file
+    transcript: Optional[str] = None  # Full transcribed conversation
+    soap_subjective: Optional[str] = None  # SOAP: Subjective
+    soap_objective: Optional[str] = None  # SOAP: Objective  
+    soap_assessment: Optional[str] = None  # SOAP: Assessment
+    soap_plan: Optional[str] = None  # SOAP: Plan
 
 class NoteRead(NoteBase):
     id: int
@@ -87,10 +128,10 @@ class NoteWithPatientInfo(BaseModel):
     signed_at: Optional[datetime] = None
     audio_file: Optional[str] = None
     
-    # Patient information
-    patient_first_name: str
-    patient_last_name: str
-    patient_date_of_birth: date
+    # Patient information (optional to gracefully handle missing patient records)
+    patient_first_name: Optional[str] = None
+    patient_last_name: Optional[str] = None
+    patient_date_of_birth: Optional[date] = None
     patient_phone_number: Optional[str] = None
     patient_email: Optional[str] = None
 
@@ -107,6 +148,9 @@ class UserRead(UserBase):
     is_admin: Optional[bool] = False
 
     class Config:
+        # Pydantic v2
+        from_attributes = True
+        # Backward compatibility with v1-style config
         orm_mode = True
 
 class Token(BaseModel):

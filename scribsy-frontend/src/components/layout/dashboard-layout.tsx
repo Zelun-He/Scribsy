@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Sidebar } from './sidebar';
 import { useAuth } from '@/lib/auth';
 
 interface DashboardLayoutProps {
@@ -20,24 +19,16 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   }
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-transparent">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Access Denied</h2>
-          <p className="mt-2" style={{ color: 'var(--muted-foreground)' }}>Please log in to access this page.</p>
-        </div>
-      </div>
-    );
+    // Render nothing; auth provider will redirect unauthenticated users elsewhere
+    return null;
   }
 
+  // Sidebar and toggle are handled globally by SidebarFrame in the root layout
   return (
-    <div className="flex h-screen bg-transparent">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-transparent">
-        <div className="p-6">
-          {children}
-        </div>
-      </main>
+    <div className="min-h-screen bg-transparent">
+      <div className="p-6">
+        {children}
+      </div>
     </div>
   );
 };

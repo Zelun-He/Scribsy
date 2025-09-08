@@ -12,6 +12,7 @@ import {
   ArrowLeftOnRectangleIcon 
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth';
+import { Logo } from '@/components/logo';
 
 interface SidebarItem {
   name: string;
@@ -32,33 +33,34 @@ export const Sidebar: React.FC = () => {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex flex-col w-64 bg-white dark:bg-black border-r border-gray-200 dark:border-purple-400 overflow-y-auto sidebar-scrollbar">
-      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200 dark:border-purple-400">
+    <aside
+      className="fixed inset-y-0 left-0 z-40 w-64 flex flex-col bg-[var(--sidebar)] text-[var(--sidebar-foreground)] border-r"
+      style={{ borderColor: 'var(--sidebar-border)' }}
+      aria-label="Sidebar"
+    >
+      <div className="flex items-center justify-center h-16 px-4 border-b border-gray-200 dark:border-gray-800">
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-emerald-600 dark:bg-purple-400 rounded-lg flex items-center justify-center">
-            <span className="text-white dark:text-black font-bold text-lg">S</span>
-          </div>
-          <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-purple-400">Scribsy</span>
+          <Logo size="md" />
+          <span className="ml-2 text-xl font-semibold" style={{ color: 'var(--sidebar-foreground)' }}>Scribsy</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-2 py-4 space-y-2">
+      <nav className="flex-1 px-2 py-4 space-y-2 overflow-y-auto sidebar-scrollbar">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
-              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md border-2 transition-all ${
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
                 isActive
-                  ? 'bg-emerald-50 text-emerald-900 border-emerald-500 dark:bg-purple-900 dark:text-purple-400 dark:border-purple-400'
-                  : 'text-gray-600 hover:bg-emerald-50 hover:text-emerald-900 border-transparent hover:border-emerald-200 dark:text-purple-300 dark:hover:bg-purple-900 dark:hover:text-purple-400 dark:hover:border-purple-400'
+                  ? 'bg-[var(--sidebar-accent)] text-[var(--sidebar-foreground)]'
+                  : 'hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-foreground)]'
               }`}
             >
               <item.icon
-                className={`mr-3 h-5 w-5 flex-shrink-0 ${
-                  isActive ? 'text-emerald-600 dark:text-purple-400' : 'text-gray-400 group-hover:text-emerald-600 dark:text-purple-300 dark:group-hover:text-green-400'
-                }`}
+                className={`mr-3 h-5 w-5 flex-shrink-0`}
+                style={{ color: isActive ? 'var(--sidebar-ring)' : 'var(--sidebar-foreground)' }}
               />
               {item.name}
             </Link>
@@ -66,22 +68,23 @@ export const Sidebar: React.FC = () => {
         })}
       </nav>
 
-      <div className="flex-shrink-0 p-4 border-t border-gray-200 dark:border-purple-400">
+      <div className="flex-shrink-0 p-4" style={{ borderTop: '1px solid var(--sidebar-border)' }}>
         <div className="flex items-center">
           <div className="flex-shrink-0">
-            <div className="w-8 h-8 bg-emerald-200 dark:bg-purple-400 rounded-full flex items-center justify-center">
-              <span className="text-sm font-medium text-emerald-700 dark:text-black">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--sidebar-accent)' }}>
+              <span className="text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>
                 {user?.username?.charAt(0).toUpperCase()}
               </span>
             </div>
           </div>
           <div className="ml-3">
-            <p className="text-sm font-medium text-gray-700 dark:text-purple-400">
+            <p className="text-sm font-medium" style={{ color: 'var(--sidebar-foreground)' }}>
               {user?.username}
             </p>
             <button
               onClick={logout}
-              className="flex items-center text-sm text-gray-500 hover:text-gray-700 dark:text-purple-300 dark:hover:text-purple-400"
+              className="flex items-center text-sm"
+              style={{ color: 'var(--sidebar-foreground)' }}
             >
               <ArrowLeftOnRectangleIcon className="w-4 h-4 mr-1" />
               Logout
@@ -89,6 +92,6 @@ export const Sidebar: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+    </aside>
   );
 };

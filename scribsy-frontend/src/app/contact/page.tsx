@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -93,12 +94,8 @@ Sent from Scribsy Contact Form
         {/* Header */}
         <div className="text-center mb-12">
           <Link href="/" className="inline-flex items-center gap-3 text-2xl font-bold text-gray-900 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L13.5 2.5L16.17 5.17L10.5 10.84L11.92 12.25L17.58 6.59L20.17 9.17L21 9ZM1 9L2.5 7.5L5.17 10.17L10.84 4.5L12.25 5.92L6.59 11.58L9.17 14.17L9 15L7 21V22H17V21L15 15L14.17 14.17L11.5 16.84L5.84 11.17L1 9Z"/>
-              </svg>
-            </div>
-            <span className="text-transparent bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text">SCRIBSY</span>
+            <Logo size="lg" />
+            <span className="text-gray-900">Scribsy</span>
           </Link>
           <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
             Get in Touch

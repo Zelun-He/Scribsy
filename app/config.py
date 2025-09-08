@@ -20,12 +20,23 @@ class Settings(BaseSettings):
     # Authentication Configuration
     secret_key: str = os.getenv("SECRET_KEY", "supersecretkey")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
-    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
+    access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # HIPAA: shorter sessions
+    session_timeout_minutes: int = int(os.getenv("SESSION_TIMEOUT_MINUTES", "15"))  # HIPAA: auto-logout inactive sessions
+    max_session_duration_hours: int = int(os.getenv("MAX_SESSION_DURATION_HOURS", "8"))  # HIPAA: max session length
     
     # Server Configuration
     debug: bool = os.getenv("DEBUG", "False").lower() == "true"
     host: str = os.getenv("HOST", "127.0.0.1")
     port: int = int(os.getenv("PORT", "8000"))
+    # CORS / Hosts
+    # Use explicit local origins by default for better CORS with credentials in dev
+    allowed_origins: str = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://scribsy.vercel.app"
+    )  # comma-separated or "*"
+    allowed_hosts: str = os.getenv("ALLOWED_HOSTS", "*")      # comma-separated or "*"
+    # Default to no HTTPS redirect locally; enable via env in production
+    https_redirect: bool = os.getenv("HTTPS_REDIRECT", "False").lower() == "true"
     
     # File Upload Configuration
     upload_dir: str = os.getenv("UPLOAD_DIR", "uploads")
@@ -45,6 +56,13 @@ class Settings(BaseSettings):
     
     # Whisper Configuration
     whisper_model: str = os.getenv("WHISPER_MODEL", "base")
+
+    # Monitoring / Sentry
+    sentry_dsn: str = os.getenv("SENTRY_DSN", "")
+    sentry_environment: str = os.getenv("SENTRY_ENVIRONMENT", os.getenv("ENVIRONMENT", "production"))
+
+    # Notifications
+    notification_webhook_url: str = os.getenv("NOTIFICATION_WEBHOOK_URL", "")
     
     class Config:
         env_file = ".env"
@@ -66,6 +84,19 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """Check if running in production mode"""
         return not self.debug and self.secret_key != "supersecretkey"
+
+    # Helpers
+    def allowed_origins_list(self) -> list:
+        value = (self.allowed_origins or "").strip()
+        if value == "*" or value == "":
+            return ["*"]
+        return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+    def allowed_hosts_list(self) -> list:
+        value = (self.allowed_hosts or "").strip()
+        if value == "*" or value == "":
+            return ["*"]
+        return [host.strip() for host in value.split(",") if host.strip()]
 
 # Create settings instance
 settings = Settings()

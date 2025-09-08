@@ -1,7 +1,6 @@
 """
 transcription.py: Placeholder for audio transcription service (e.g., Whisper).
 """
-import whisper
 from pathlib import Path
 import logging
 
@@ -23,6 +22,8 @@ class TranscriptionService:
         if self.model is None:
             try:
                 logger.info(f"Loading Whisper model: {self.model_size}")
+                # Import whisper lazily to avoid import-time failures on startup
+                import whisper  # type: ignore
                 self.model = whisper.load_model(self.model_size)
                 logger.info("Whisper model loaded successfully")
             except Exception as e:
@@ -30,6 +31,7 @@ class TranscriptionService:
                 # Try to load the base model as a fallback
                 try:
                     logger.info("Trying to load base model as fallback")
+                    import whisper  # type: ignore
                     self.model = whisper.load_model("base")
                     logger.info("Base model loaded successfully as fallback")
                 except Exception as fallback_error:

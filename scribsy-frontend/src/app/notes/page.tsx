@@ -21,6 +21,8 @@ import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
 
 export default function NotesPage() {
+  // Apply drilldown filters if present
+  const [drill, setDrill] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,6 +33,12 @@ export default function NotesPage() {
 
   useEffect(() => {
     fetchNotes();
+    // Read drill parameter from URL on mount
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const d = url.searchParams.get('drill');
+      setDrill(d);
+    }
   }, []);
 
   const fetchNotes = async () => {
@@ -58,6 +66,10 @@ export default function NotesPage() {
       );
     }
 
+    // Optional: apply drilldown views
+    if (drill === 'accuracy') {
+      filtered = filtered.filter(n => n.status === 'completed' || n.status === 'signed' || !!n.signed_at);
+    }
     // Sort notes
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -73,7 +85,7 @@ export default function NotesPage() {
     });
 
     setFilteredNotes(filtered);
-  }, [notes, searchQuery, sortBy]);
+  }, [notes, searchQuery, sortBy, drill]);
 
   useEffect(() => {
     filterAndSortNotes();
@@ -213,8 +225,8 @@ export default function NotesPage() {
                             Visit #{note.visit_id}
                           </span>
                         </div>
-                        <div className="bg-purple-50 dark:bg-purple-900/20 px-3 py-1 rounded-lg">
-                          <span className="text-sm font-medium text-purple-700 dark:text-purple-300 capitalize">
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1 rounded-lg">
+                          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300 capitalize">
                             {note.note_type}
                           </span>
                         </div>
@@ -285,24 +297,31 @@ export default function NotesPage() {
           </div>
         ) : (
           <Card>
-            <CardContent className="text-center py-12">
-              <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">
-                {searchQuery ? 'No notes found' : 'No notes yet'}
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {searchQuery 
-                  ? 'Try adjusting your search query or filters.' 
-                  : 'Get started by creating your first clinical note.'
-                }
-              </p>
-              <div className="mt-6">
-                <Link href="/notes/new">
-                  <Button>
-                    <DocumentPlusIcon className="w-4 h-4 mr-2" />
-                    Create Note
-                  </Button>
-                </Link>
+            <CardContent className="py-16">
+              <div className="flex flex-col items-center justify-center">
+                <DocumentTextIcon className="h-16 w-16 text-gray-400 mb-3" />
+                <h3 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">
+                  {searchQuery ? 'No notes found' : 'No notes yet'}
+                </h3>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 max-w-lg text-center">
+                  {searchQuery 
+                    ? 'Try adjusting your search query or filters.' 
+                    : 'Get started by creating your first clinical note.'
+                  }
+                </p>
+                <div className="mt-6">
+                  <Link href="/notes/new">
+                    <Button>
+                      <DocumentPlusIcon className="w-4 h-4 mr-2" />
+                      Create Note
+                    </Button>
+                  </Link>
+                </div>
+                <div className="mt-4">
+                  <video className="mx-auto rounded-md shadow" width="320" height="180" autoPlay muted loop playsInline>
+                    <source src="/demo/create-note.mp4" type="video/mp4" />
+                  </video>
+                </div>
               </div>
             </CardContent>
           </Card>

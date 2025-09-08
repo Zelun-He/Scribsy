@@ -1,11 +1,17 @@
 """
 models.py: Defines SQLAlchemy ORM models for the database.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Date
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Date, Boolean
 from sqlalchemy.orm import relationship
 import datetime
 import pytz
 from app.db.database import Base
+
+# Import audit models to ensure they're available during table creation
+from app.audit.models import AuditLog, LoginAttempt, DataRetentionPolicy
+
+# Import nudge models to ensure they're available during table creation
+from app.db.nudge_models import NudgeLog, NotificationPreference, ScheduledNudge, UserStatus, NudgeRule
 
 def get_utc_now():
     """Get current UTC time with timezone info"""
@@ -33,6 +39,8 @@ class Patient(Base):
     
     notes = relationship("Note", back_populates="patient")
     user = relationship("User", back_populates="patients")
+    # Appointments relationship
+    appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
 
 class Note(Base):
     """
@@ -57,8 +65,40 @@ class Note(Base):
     content_type = Column(String, nullable=True)  # MIME type of the audio file
     storage_provider = Column(String, nullable=True, default="local")  # "local" or "s3"
     
+    # Transcription and AI processing fields
+    transcript = Column(Text, nullable=True)  # Full transcribed conversation
+    soap_subjective = Column(Text, nullable=True)  # SOAP: Subjective
+    soap_objective = Column(Text, nullable=True)  # SOAP: Objective  
+    soap_assessment = Column(Text, nullable=True)  # SOAP: Assessment
+    soap_plan = Column(Text, nullable=True)  # SOAP: Plan
+    
     user = relationship("User", back_populates="notes")
     patient = relationship("Patient", back_populates="notes")
+
+class Appointment(Base):
+    """
+    Appointment model representing a scheduled visit for a patient.
+    Notifies medical personnel notify_before_minutes before scheduled_at.
+    """
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    title = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
+    scheduled_at = Column(DateTime(timezone=True), nullable=False)
+    notify_before_minutes = Column(Integer, default=30, nullable=False)
+    notified = Column(Boolean, default=False, nullable=False)
+    # Visit flow
+    status = Column(String, nullable=False, default="scheduled")  # scheduled, checked_in, in_progress, completed, cancelled
+    checked_in_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    patient = relationship("Patient", back_populates="appointments")
+    user = relationship("User")
 
 class User(Base):
     __tablename__ = "users"
@@ -69,5 +109,16 @@ class User(Base):
     is_active = Column(Integer, default=1)
     is_admin = Column(Integer, default=0)  # 0 = regular user, 1 = admin
     
+    # HIPAA Role-based access control
+    role = Column(String, default="provider")  # provider, admin, auditor, read_only
+    last_login = Column(DateTime(timezone=True), nullable=True)
+    failed_login_attempts = Column(Integer, default=0)
+    account_locked_until = Column(DateTime(timezone=True), nullable=True)
+    
     notes = relationship("Note", back_populates="user")
     patients = relationship("Patient", back_populates="user")
+    audit_logs = relationship("AuditLog", back_populates="user")
+    
+    # Nudge/notification relationships
+    notification_preferences = relationship("NotificationPreference", uselist=False, back_populates="user")
+    status = relationship("UserStatus", uselist=False, back_populates="user")
