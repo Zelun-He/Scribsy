@@ -13,7 +13,13 @@
       "Bash(rm:*)",
       "Bash(del \"C:\\Users\\zelun\\Desktop\\Projects\\Scribsy\\scribsy-frontend\\next.config.ts\")",
       "Bash(timeout 10 python:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(tasklist:*)",
+      "Bash(wmic process:*)",
+      "Bash(powershell:*)",
+      "Bash(npx next:*)",
+      "Bash(copy page.tsx page.tsx.backup)",
+      "Bash(node:*)"
     ],
     "deny": []
   }
