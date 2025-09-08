@@ -23,6 +23,8 @@ import {
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Patient } from '@/types';
+import { useToast } from '@/lib/toast';
+import { burstConfetti } from '@/lib/confetti';
 
 interface SOAPNote {
   subjective: string;
@@ -33,6 +35,7 @@ interface SOAPNote {
 
 function NewNotePageContent() {
   const { user } = useAuth();
+  const { show } = useToast();
   const searchParams = useSearchParams();
   const [content, setContent] = useState('');
   const [selectedPatientId, setSelectedPatientId] = useState('');
@@ -307,7 +310,7 @@ function NewNotePageContent() {
       };
 
       await apiClient.createNote(noteData);
-      
+      show('Saved just now');
       router.push('/notes');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create note');
@@ -320,7 +323,7 @@ function NewNotePageContent() {
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-purple-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
             Create New Note
           </h1>
                             <Button
@@ -350,13 +353,13 @@ function NewNotePageContent() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Patient *
                   </label>
                   <select
                     value={selectedPatientId}
                     onChange={(e) => setSelectedPatientId(e.target.value)}
-                    className="w-full h-10 px-3 py-2 text-sm border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 bg-gray-50 dark:bg-gray-800 dark:text-purple-100"
+                    className="w-full h-10 px-3 py-2 text-sm border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-emerald-100"
                     disabled={loadingPatients}
                   >
                     <option value="">{loadingPatients ? 'Loading patients...' : 'Select an existing patient'}</option>
@@ -371,7 +374,7 @@ function NewNotePageContent() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Visit ID (Auto-generated)
                   </label>
                   <Input
@@ -403,8 +406,16 @@ function NewNotePageContent() {
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span className="text-blue-800 dark:text-blue-200">
-                        DOB: {new Date(selectedPatient.date_of_birth).toLocaleDateString()} 
-                        ({new Date().getFullYear() - new Date(selectedPatient.date_of_birth).getFullYear()} years)
+                        {(() => {
+                          const dob = new Date(selectedPatient.date_of_birth);
+                          const today = new Date();
+                          let age = today.getFullYear() - dob.getFullYear();
+                          const hasHadBirthdayThisYear =
+                            today.getMonth() > dob.getMonth() ||
+                            (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
+                          if (!hasHadBirthdayThisYear) age -= 1;
+                          return <>DOB: {dob.toLocaleDateString()} ({age} years)</>;
+                        })()}
                       </span>
                     </div>
                     {selectedPatient.phone_number && (
@@ -445,7 +456,7 @@ function NewNotePageContent() {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       First Name
                     </label>
                     <Input
@@ -456,7 +467,7 @@ function NewNotePageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       Last Name
                     </label>
                     <Input
@@ -467,7 +478,7 @@ function NewNotePageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       Date of Birth
                     </label>
                     <Input
@@ -478,7 +489,7 @@ function NewNotePageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       Phone Number
                     </label>
                     <Input
@@ -489,7 +500,7 @@ function NewNotePageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       Email Address
                     </label>
                     <Input
@@ -500,7 +511,7 @@ function NewNotePageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                       Address
                     </label>
                     <Input
@@ -515,13 +526,13 @@ function NewNotePageContent() {
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Note Type *
                   </label>
                   <select
                     value={noteType}
                     onChange={(e) => setNoteType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 dark:bg-gray-800 dark:text-emerald-100"
                     required
                   >
                     <option value="">Select note type</option>
@@ -537,10 +548,10 @@ function NewNotePageContent() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Status
                   </label>
-                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
                     Pending Review (Default)
                   </div>
                 </div>
@@ -673,7 +684,7 @@ function NewNotePageContent() {
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Enter your clinical notes here..."
                 rows={8}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-purple-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-purple-500 dark:bg-gray-800 dark:text-purple-100"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 dark:bg-gray-800 dark:text-emerald-100"
               />
             </CardContent>
           </Card>
@@ -689,7 +700,7 @@ function NewNotePageContent() {
               </CardHeader>
               <CardContent>
                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 dark:text-purple-300 whitespace-pre-wrap">
+                  <p className="text-sm text-gray-700 dark:text-emerald-300 whitespace-pre-wrap">
                     {transcription}
                   </p>
                 </div>
@@ -709,10 +720,10 @@ function NewNotePageContent() {
               <CardContent>
                 <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
                   <div className="space-y-2">
-                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Subjective:</span> {soapNote.subjective}</div>
-                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Objective:</span> {soapNote.objective}</div>
-                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Assessment:</span> {soapNote.assessment}</div>
-                    <div><span className="font-semibold text-purple-700 dark:text-purple-300">Plan:</span> {soapNote.plan}</div>
+                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Subjective:</span> {soapNote.subjective}</div>
+                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Objective:</span> {soapNote.objective}</div>
+                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Assessment:</span> {soapNote.assessment}</div>
+                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Plan:</span> {soapNote.plan}</div>
                   </div>
                 </div>
               </CardContent>

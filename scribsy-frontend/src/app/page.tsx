@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect } from "react";
 import Link from "next/link";
+import { Brand } from '@/components/brand';
 
 export default function Home() {
   useEffect(() => {
@@ -26,14 +27,7 @@ export default function Home() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm z-50 py-4 transition-all">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-3 text-2xl font-bold text-gray-900">
-            <div className="w-11 h-11 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-xl flex items-center justify-center text-white shadow-md">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L13.5 2.5L16.17 5.17L10.5 10.84L11.92 12.25L17.58 6.59L20.17 9.17L21 9ZM1 9L2.5 7.5L5.17 10.17L10.84 4.5L12.25 5.92L6.59 11.58L9.17 14.17L9 15L7 21V22H17V21L15 15L14.17 14.17L11.5 16.84L5.84 11.17L1 9Z"/>
-              </svg>
-            </div>
-            <span className="bg-gradient-to-r from-emerald-600 to-emerald-700 bg-clip-text text-transparent">SCRIBSY</span>
-          </div>
+          <Brand size="lg" />
           <nav className="hidden md:flex gap-8 list-none items-center text-gray-700 text-base font-medium">
             <li><a href="#features" className="hover:text-emerald-600 transition-colors">Features</a></li>
             <li><a href="#how-it-works" className="hover:text-emerald-600 transition-colors">How It Works</a></li>

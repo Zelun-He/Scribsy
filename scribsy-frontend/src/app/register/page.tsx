@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth';
+import { Logo } from '@/components/logo';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -57,8 +58,8 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gray-50">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto w-12 h-12 bg-emerald-600 rounded-lg flex items-center justify-center mb-4">
-            <span className="text-white font-bold text-xl">S</span>
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <Logo size="lg" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
             Create your account

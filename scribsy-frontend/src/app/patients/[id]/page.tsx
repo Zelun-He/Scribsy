@@ -19,7 +19,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { Patient, Note } from '@/types';
+import { calculateAgeFromISO, formatLocalDate } from '@/utils/date';
+import { Patient, Note, Appointment } from '@/types';
 
 export default function PatientProfilePage() {
   const params = useParams();
@@ -27,9 +28,28 @@ export default function PatientProfilePage() {
   const { user, isLoading: authLoading } = useAuth();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [notesLoading, setNotesLoading] = useState(true);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Appointment create form state
+  const [showApptForm, setShowApptForm] = useState(false);
+  const [apptTitle, setApptTitle] = useState('Follow-up');
+  const [apptNote, setApptNote] = useState('');
+  const toLocalInput = (d: Date) => {
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const mm = pad(d.getMonth() + 1);
+    const dd = pad(d.getDate());
+    const hh = pad(d.getHours());
+    const mi = pad(d.getMinutes());
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  };
+  const defaultWhen = new Date();
+  defaultWhen.setHours(defaultWhen.getHours() + 24);
+  const [apptWhen, setApptWhen] = useState(toLocalInput(defaultWhen));
 
   useEffect(() => {
     console.log('Patient profile page loaded with params:', params);
@@ -50,6 +70,7 @@ export default function PatientProfilePage() {
       console.log('Fetching data for patient ID:', params.id);
       fetchPatient(params.id as string);
       fetchPatientNotes(params.id as string);
+      fetchAppointments(params.id as string);
     } else {
       console.log('No patient ID found in params');
       setError('No patient ID provided');
@@ -89,6 +110,17 @@ export default function PatientProfilePage() {
     }
   };
 
+  const fetchAppointments = async (patientId: string) => {
+    try {
+      const appts = await apiClient.getPatientAppointments(parseInt(patientId));
+      setAppointments(appts);
+    } catch (err) {
+      console.error('Error fetching appointments:', err);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
@@ -101,18 +133,15 @@ export default function PatientProfilePage() {
     });
   };
 
-  const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    
-    return age;
-  };
+  const calculateAge = (dateOfBirth: string) => calculateAgeFromISO(dateOfBirth);
+
+  // Appointments helpers
+  const now = new Date();
+  const upcomingAppts = appointments
+    .filter(a => new Date(a.scheduled_at) >= now)
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
+  const nextAppt = upcomingAppts[0];
+  const otherAppts = upcomingAppts.slice(1);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -189,7 +218,7 @@ export default function PatientProfilePage() {
                 {patient.first_name} {patient.last_name}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Patient ID: #{patient.id} • {calculateAge(patient.date_of_birth)} years old
+                Patient ID: #{patient.id} • {calculateAge(patient.date_of_birth)} years old • DOB: {formatLocalDate(patient.date_of_birth)}
               </p>
             </div>
           </div>
@@ -202,8 +231,8 @@ export default function PatientProfilePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Patient Details */}
-          <div className="lg:col-span-1">
+          {/* Patient Details + Appointments (left column) */}
+          <div className="lg:col-span-1 space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
@@ -272,9 +301,183 @@ export default function PatientProfilePage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Appointments (moved here under Patient Information) */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <CalendarIcon className="w-5 h-5 mr-2" />
+                    Appointments ({upcomingAppts.length})
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    {showApptForm && (
+                      <button
+                        onClick={() => setShowApptForm(false)}
+                        className="px-3 py-2 text-sm rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200"
+                      >
+                        Close
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <CardDescription>
+                  Manage scheduled visits for {patient.first_name} {patient.last_name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {showApptForm && (
+                  <div className="mb-4 p-3 border rounded-md border-gray-200 dark:border-gray-700">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Title</label>
+                        <input
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                          value={apptTitle}
+                          onChange={(e) => setApptTitle(e.target.value)}
+                          placeholder="Follow-up"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">When</label>
+                        <input
+                          type="datetime-local"
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                          value={apptWhen}
+                          onChange={(e) => setApptWhen(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Note (optional)</label>
+                        <textarea
+                          className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
+                          rows={2}
+                          value={apptNote}
+                          onChange={(e) => setApptNote(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setShowApptForm(false)}
+                          className="px-3 py-2 text-sm rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            // Convert local datetime-local to ISO string
+                            const local = new Date(apptWhen);
+                            apiClient.createAppointment({
+                              patient_id: patient.id,
+                              scheduled_at: local.toISOString(),
+                              title: apptTitle || 'Appointment',
+                              note: apptNote || '',
+                            }).then(() => {
+                              setShowApptForm(false);
+                              setApptNote('');
+                              fetchAppointments(String(patient.id));
+                            });
+                          }}
+                          className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {appointmentsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                  </div>
+                ) : upcomingAppts.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Next appointment featured */}
+                    {nextAppt && (
+                      <div className="border border-emerald-300 dark:border-emerald-800 rounded-lg p-3 bg-emerald-50/50 dark:bg-emerald-900/10">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-semibold text-gray-900 dark:text-gray-100">Next: {nextAppt.title || 'Appointment'}</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300">{new Date(nextAppt.scheduled_at).toLocaleString()}</div>
+                            {nextAppt.note && <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{nextAppt.note}</div>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                const dt = new Date(nextAppt.scheduled_at);
+                                dt.setMinutes(dt.getMinutes() + 30);
+                                apiClient.updateAppointment(nextAppt.id, { scheduled_at: dt.toISOString() })
+                                  .then((updated) => setAppointments((prev) => prev.map((a) => a.id === nextAppt.id ? updated : a)));
+                              }}
+                              className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
+                            >
+                              +30m
+                            </button>
+                            <button
+                              onClick={() => apiClient.deleteAppointment(nextAppt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== nextAppt.id)))}
+                              className="px-3 py-1 text-xs rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Other upcoming appointments */}
+                    {otherAppts.length > 0 && (
+                      <div className="space-y-3">
+                        {otherAppts.map((appt) => (
+                          <div key={appt.id} className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                            <div>
+                              <div className="font-medium text-gray-900 dark:text-gray-100">{appt.title || 'Appointment'}</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">{new Date(appt.scheduled_at).toLocaleString()}</div>
+                              {appt.note && <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{appt.note}</div>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => {
+                                  const dt = new Date(appt.scheduled_at);
+                                  dt.setMinutes(dt.getMinutes() + 30);
+                                  apiClient.updateAppointment(appt.id, { scheduled_at: dt.toISOString() })
+                                    .then((updated) => setAppointments((prev) => prev.map((a) => a.id === appt.id ? updated : a)));
+                                }}
+                                className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
+                              >
+                                +30m
+                              </button>
+                              <button
+                                onClick={() => apiClient.deleteAppointment(appt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== appt.id)))}
+                                className="px-3 py-1 text-xs rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <CalendarIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      No appointments yet
+                    </h3>
+                    <button
+                      onClick={() => setShowApptForm(true)}
+                      className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      Schedule
+                    </button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Notes History */}
+          {/* Notes History (right column) */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>

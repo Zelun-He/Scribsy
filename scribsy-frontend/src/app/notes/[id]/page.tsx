@@ -20,11 +20,14 @@ import {
 import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
 import { useAuth } from '@/lib/auth';
+import { useToast } from '@/lib/toast';
+import { burstConfetti } from '@/lib/confetti';
 
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { show } = useToast();
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -32,18 +35,47 @@ export default function NotePage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    // Wait for auth to initialize to ensure Authorization header is available
+    if (authLoading) return;
     if (params.id) {
       fetchNote(params.id as string);
     }
-  }, [params.id]);
+  }, [params.id, authLoading]);
 
   const fetchNote = async (noteId: string) => {
     try {
       const fetchedNote = await apiClient.getNote(parseInt(noteId));
       setNote(fetchedNote);
       setError('');
-    } catch {
-      setError('Failed to fetch note');
+    } catch (err) {
+      // Fallback: fetch notes list and find the one by id to avoid any single-note endpoint issues
+      try {
+        const allNotes = await apiClient.getNotes({ limit: 1000 });
+        const found = allNotes.find(n => n.id === parseInt(noteId));
+        if (found) {
+          // Try to enrich with patient info, but do not fail if it errors
+          try {
+            const patient = await apiClient.getPatient(found.patient_id);
+            setNote({
+              ...found,
+              patient_first_name: patient.first_name,
+              patient_last_name: patient.last_name,
+              patient_date_of_birth: patient.date_of_birth,
+              patient_phone_number: patient.phone_number,
+              patient_email: patient.email,
+            } as Note);
+          } catch {
+            setNote(found as Note);
+          }
+          setError('');
+        } else {
+          const message = err instanceof Error ? err.message : 'Failed to fetch note';
+          setError(message);
+        }
+      } catch (listErr) {
+        const message = listErr instanceof Error ? listErr.message : 'Failed to fetch note';
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -70,6 +102,10 @@ export default function NotePage() {
       const updatedNote = await apiClient.updateNote(note.id, { status: newStatus });
       setNote(updatedNote);
       setError('');
+      if (newStatus === 'finalized') {
+        show('Note signed successfully');
+        burstConfetti();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
@@ -113,7 +149,7 @@ export default function NotePage() {
     });
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
@@ -127,7 +163,7 @@ export default function NotePage() {
     return (
       <DashboardLayout>
         <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-md p-4">
+          <div className="bg-red-50 dark:bg-red-900/10 border border-red-800/40 dark:border-red-800 rounded-md p-4">
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           </div>
           <div className="mt-4">
@@ -247,11 +283,11 @@ export default function NotePage() {
                     #{note.visit_id}
                   </div>
                 </div>
-                <div className="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-1">
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg">
+                  <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300 mb-1">
                     Note Type
                   </div>
-                  <div className="text-2xl font-bold text-purple-900 dark:text-purple-100 capitalize">
+                  <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 capitalize">
                     {note.note_type}
                   </div>
                 </div>
@@ -308,27 +344,32 @@ export default function NotePage() {
           </CardContent>
         </Card>
 
-        {/* Note Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <DocumentTextIcon className="w-5 h-5 mr-2" />
-              Clinical Notes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="prose dark:prose-invert max-w-none">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {note.content}
-                </p>
+        {/* Full Transcript - Show if transcript exists */}
+        {note.transcript && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <DocumentTextIcon className="w-5 h-5 mr-2" />
+                Full Transcript
+              </CardTitle>
+              <CardDescription>
+                Complete transcribed conversation from audio recording
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="prose dark:prose-invert max-w-none">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono text-sm">
+                    {note.transcript}
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* SOAP Note - Only show if SOAP note exists in the future */}
-        {/* {note.soap_note && (
+        {/* SOAP Note - Show if any SOAP fields exist */}
+        {(note.soap_subjective || note.soap_objective || note.soap_assessment || note.soap_plan) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -340,14 +381,87 @@ export default function NotePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
-                <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono">
-                  {note.soap_note}
-                </pre>
+              <div className="space-y-6">
+                {note.soap_subjective && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-2 uppercase tracking-wide">
+                      Subjective
+                    </h4>
+                    <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {note.soap_subjective}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {note.soap_objective && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2 uppercase tracking-wide">
+                      Objective
+                    </h4>
+                    <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {note.soap_objective}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {note.soap_assessment && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2 uppercase tracking-wide">
+                      Assessment
+                    </h4>
+                    <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {note.soap_assessment}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {note.soap_plan && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-purple-700 dark:text-purple-300 mb-2 uppercase tracking-wide">
+                      Plan
+                    </h4>
+                    <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4">
+                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                        {note.soap_plan}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        )} */}
+        )}
+
+        {/* Clinical Notes - Always show as fallback */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <DocumentTextIcon className="w-5 h-5 mr-2" />
+              Clinical Notes
+            </CardTitle>
+            <CardDescription>
+              {note.transcript || (note.soap_subjective || note.soap_objective || note.soap_assessment || note.soap_plan) 
+                ? 'Additional clinical notes and observations'
+                : 'Clinical notes and observations'
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="prose dark:prose-invert max-w-none">
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {note.content}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Actions */}
         <div className="flex justify-center gap-4 py-6">

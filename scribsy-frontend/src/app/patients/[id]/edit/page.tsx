@@ -78,17 +78,22 @@ export default function EditPatientPage() {
     setError('');
 
     // Validate required fields
+    console.log('Frontend: Form validation - firstName:', firstName, 'lastName:', lastName, 'dateOfBirth:', dateOfBirth);
+    
     if (!firstName || !lastName || !dateOfBirth) {
+      console.log('Frontend: Validation failed - missing required fields');
       setError('Please fill in all required fields: First Name, Last Name, and Date of Birth');
       setSaveLoading(false);
       return;
     }
+    
+    console.log('Frontend: Validation passed, proceeding with update');
 
     try {
       const patientData = {
         first_name: firstName,
         last_name: lastName,
-        date_of_birth: dateOfBirth,
+        date_of_birth: dateOfBirth, // Always include DOB, never set to undefined
         phone_number: phoneNumber || undefined,
         email: email || undefined,
         address: address || undefined,
@@ -97,7 +102,12 @@ export default function EditPatientPage() {
         zip_code: zipCode || undefined,
       };
 
+      console.log('Frontend: Submitting patient update with data:', patientData);
+      console.log('Frontend: Patient ID:', params.id);
+      console.log('Frontend: Date of Birth value:', dateOfBirth, typeof dateOfBirth);
+
       await apiClient.updatePatient(parseInt(params.id as string), patientData);
+      console.log('Frontend: Update API call successful');
       router.push(`/patients/${params.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update patient');
@@ -196,7 +206,7 @@ export default function EditPatientPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     First Name *
                   </label>
                   <Input
@@ -208,7 +218,7 @@ export default function EditPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Last Name *
                   </label>
                   <Input
@@ -221,7 +231,7 @@ export default function EditPatientPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                   Date of Birth *
                 </label>
                 <Input
@@ -245,7 +255,7 @@ export default function EditPatientPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Phone Number
                   </label>
                   <Input
@@ -256,7 +266,7 @@ export default function EditPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     Email Address
                   </label>
                   <Input
@@ -280,7 +290,7 @@ export default function EditPatientPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                   Street Address
                 </label>
                 <Input
@@ -292,7 +302,7 @@ export default function EditPatientPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     City
                   </label>
                   <Input
@@ -303,7 +313,7 @@ export default function EditPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     State
                   </label>
                   <Input
@@ -314,7 +324,7 @@ export default function EditPatientPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-purple-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
                     ZIP Code
                   </label>
                   <Input

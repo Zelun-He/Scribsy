@@ -24,13 +24,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Function to handle authentication failures
   const handleAuthFailure = useCallback(() => {
+    // Quietly clear session; let pages decide how to handle unauth state
     apiClient.clearToken();
     setUser(null);
-    // Redirect to access denied page for expired sessions
-    if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
-      router.push('/access-denied');
-    }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -76,25 +73,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     apiClient.clearToken();
+    // Clear server-side cookies
+    apiClient.logoutServer().catch(() => {});
     setUser(null);
     // Redirect to landing page after logout
     router.push('/');
   };
 
-  // Set up periodic auth check to handle expired tokens
+  // Set up periodic auth check and sliding refresh to handle expired tokens
   useEffect(() => {
     if (!user) return;
 
     const checkAuthStatus = async () => {
       try {
-        await apiClient.getCurrentUser();
+        // Try to refresh token to extend session while the app is active
+        try {
+          await apiClient.refreshSession();
+        } catch {
+          // Fallback: try /me; if still 401, try using stored token header
+          try {
+            await apiClient.getCurrentUser();
+          } catch {
+            // no-op; handleAuthFailure will run below
+          }
+        }
       } catch {
         // Token is invalid, handle auth failure
         handleAuthFailure();
       }
     };
 
-    // Check auth status every 5 minutes
+    // Refresh every 5 minutes to maintain session while active
     const interval = setInterval(checkAuthStatus, 5 * 60 * 1000);
     
     return () => clearInterval(interval);

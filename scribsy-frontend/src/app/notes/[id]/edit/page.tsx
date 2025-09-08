@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
+import { useToast } from '@/lib/toast';
 
 export default function EditNotePage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function EditNotePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const { show } = useToast();
 
   useEffect(() => {
     if (params.id) {
@@ -53,7 +55,7 @@ export default function EditNotePage() {
       const updatedNote = await apiClient.updateNote(note.id, {
         content,
       });
-      
+      show('Saved just now');
       router.push(`/notes/${updatedNote.id.toString()}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update note');

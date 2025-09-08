@@ -65,7 +65,7 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="flex items-center gap-4">
           <Cog6ToothIcon className="w-8 h-8 text-gray-400" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-purple-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
             Settings
           </h1>
         </div>
@@ -150,19 +150,19 @@ export default function SettingsPage() {
                       onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         theme === option.value
-                          ? 'border-emerald-500 bg-emerald-50 dark:border-purple-500 dark:bg-purple-900/20'
+                          ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/20'
                           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
-                      <Icon className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-purple-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                      <Icon className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-emerald-400" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                         {option.label}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-sm text-gray-500 dark:text-purple-400">
+              <p className="text-sm text-gray-500 dark:text-emerald-400">
                 System theme will automatically switch between light and dark modes based on your device settings.
               </p>
             </div>
@@ -184,10 +184,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Email Notifications
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Receive email updates about your notes
                   </p>
                 </div>
@@ -203,10 +203,10 @@ export default function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Push Notifications
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Receive push notifications for important updates
                   </p>
                 </div>
@@ -238,10 +238,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Data Export
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Download a copy of your clinical notes
                   </p>
                 </div>
@@ -252,10 +252,10 @@ export default function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Change Password
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Update your account password
                   </p>
                 </div>
@@ -281,10 +281,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-purple-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Sign Out
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Sign out of your account on this device
                   </p>
                 </div>
@@ -298,7 +298,7 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-medium text-red-600 dark:text-red-400">
                     Delete Account
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-purple-400">
+                  <p className="text-sm text-gray-500 dark:text-emerald-400">
                     Permanently delete your account and all data
                   </p>
                 </div>

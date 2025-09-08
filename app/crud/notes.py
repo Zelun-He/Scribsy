@@ -43,7 +43,7 @@ def create_note(db: Session, note: schemas.NoteCreate) -> models.Note:
     if not note.visit_id:
         note.visit_id = generate_visit_id(db, note.patient_id)
     
-    db_note = models.Note(**note.dict())
+    db_note = models.Note(**note.model_dump())
     db.add(db_note)
     db.commit()
     db.refresh(db_note)

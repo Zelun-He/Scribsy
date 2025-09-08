@@ -1,0 +1,1 @@
+# Audit logging module for HIPAA compliance

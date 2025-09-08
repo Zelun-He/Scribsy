@@ -1,12 +1,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/lib/auth';
+import { Logo } from '@/components/logo';
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -17,13 +19,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { login, user } = useAuth();
   const router = useRouter();
+  const { setTheme } = useTheme();
 
   // If user is already logged in, redirect to dashboard
   useEffect(() => {
+    // Force light theme on the login page
+    setTheme('light');
     if (user) {
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [user, router, setTheme]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,8 +56,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
-          <div className="mx-auto w-12 h-12 bg-emerald-600 rounded-lg flex items-center justify-center mb-4">
-            <span className="text-white font-bold text-xl">S</span>
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <Logo size="lg" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900">
             Sign in to Scribsy
