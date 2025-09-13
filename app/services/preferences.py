@@ -19,7 +19,6 @@ DEFAULT_PREFS: Dict[str, Any] = {
     "clinical_terms": True,
     "expand_abbreviations": False,
     "ros_sections": [],
-    "pe_sections": [],
     "template_text": "",
 }
 

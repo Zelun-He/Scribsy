@@ -9,13 +9,17 @@ import {
   UserIcon, 
   MoonIcon, 
   SunIcon, 
-  ComputerDesktopIcon,
   BellIcon,
   ShieldCheckIcon,
-  Cog6ToothIcon 
+  Cog6ToothIcon,
+  LockClosedIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '@/lib/auth';
 import { useTheme } from 'next-themes';
+import { getBaselineMinutes, setBaselineMinutes } from '@/lib/metrics';
+import { WorkingHoursSettings } from '@/components/ui/working-hours-settings';
+import { apiClient } from '@/lib/api';
+import { useToast } from '@/lib/toast';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
@@ -24,9 +28,17 @@ export default function SettingsPage() {
     username: user?.username || '',
     email: user?.email || '',
   });
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [baseline, setBaseline] = useState<number>(getBaselineMinutes());
+  const [exporting, setExporting] = useState(false);
+  const { show } = useToast();
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,6 +58,13 @@ export default function SettingsPage() {
     }
   };
 
+  const handleBaselineSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBaselineMinutes(baseline);
+    setSuccess('Baseline updated');
+    setTimeout(() => setSuccess(''), 2000);
+  };
+
   const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setProfileData(prev => ({
       ...prev,
@@ -53,10 +72,63 @@ export default function SettingsPage() {
     }));
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setError('New passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      await apiClient.changePassword(passwordData.currentPassword, passwordData.newPassword);
+      setSuccess('Password changed successfully!');
+      setPasswordData({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error: any) {
+      setError(error.message || 'Failed to change password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordDataChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPasswordData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleExportData = async (format: 'json' | 'csv' | 'zip' = 'zip') => {
+    setExporting(true);
+    try {
+      const result = await apiClient.exportUserData(format);
+      show(`Data exported successfully as ${result.filename}`);
+    } catch (error) {
+      console.error('Export failed:', error);
+      show('Failed to export data. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const themeOptions = [
     { value: 'light', label: 'Light', icon: SunIcon },
     { value: 'dark', label: 'Dark', icon: MoonIcon },
-    { value: 'system', label: 'System', icon: ComputerDesktopIcon },
   ];
 
   return (
@@ -128,6 +200,62 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Password Change */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <LockClosedIcon className="w-5 h-5 mr-2" />
+              Change Password
+            </CardTitle>
+            <CardDescription>
+              Update your account password
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              <Input
+                label="Current Password"
+                name="currentPassword"
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={handlePasswordDataChange}
+                placeholder="Enter your current password"
+                required
+              />
+              
+              <Input
+                label="New Password"
+                name="newPassword"
+                type="password"
+                value={passwordData.newPassword}
+                onChange={handlePasswordDataChange}
+                placeholder="Enter your new password"
+                required
+              />
+
+              <Input
+                label="Confirm New Password"
+                name="confirmPassword"
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={handlePasswordDataChange}
+                placeholder="Confirm your new password"
+                required
+              />
+
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  loading={loading}
+                >
+                  {loading ? 'Changing Password...' : 'Change Password'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         {/* Theme Settings */}
         <Card>
           <CardHeader>
@@ -141,13 +269,13 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 {themeOptions.map((option) => {
                   const Icon = option.icon;
                   return (
                     <button
                       key={option.value}
-                      onClick={() => setTheme(option.value as 'light' | 'dark' | 'system')}
+                      onClick={() => setTheme(option.value as 'light' | 'dark')}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         theme === option.value
                           ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/20'
@@ -163,7 +291,7 @@ export default function SettingsPage() {
                 })}
               </div>
               <p className="text-sm text-gray-500 dark:text-emerald-400">
-                System theme will automatically switch between light and dark modes based on your device settings.
+                Choose between light and dark themes for your interface.
               </p>
             </div>
           </CardContent>
@@ -223,6 +351,37 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* Productivity / Time-savings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Cog6ToothIcon className="w-5 h-5 mr-2" />
+              Productivity
+            </CardTitle>
+            <CardDescription>
+              Configure baseline minutes per note to estimate time saved
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleBaselineSave} className="flex items-end gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
+                  Baseline minutes per note
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={240}
+                  value={baseline}
+                  onChange={(e)=> setBaseline(parseInt(e.target.value||'15',10))}
+                  className="w-40 h-10 px-3 py-2 text-sm border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-emerald-100"
+                />
+              </div>
+              <Button type="submit">Save</Button>
+            </form>
+          </CardContent>
+        </Card>
+
         {/* Privacy & Security */}
         <Card>
           <CardHeader>
@@ -236,18 +395,41 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="space-y-3">
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
                     Data Export
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-emerald-400">
-                    Download a copy of your clinical notes
+                    Download a copy of your clinical notes, patients, and account data
                   </p>
                 </div>
-                <Button variant="secondary" size="sm">
-                  Export Data
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={() => handleExportData('zip')}
+                    disabled={exporting}
+                  >
+                    {exporting ? 'Exporting...' : 'Complete Export (ZIP)'}
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={() => handleExportData('json')}
+                    disabled={exporting}
+                  >
+                    JSON
+                  </Button>
+                  <Button 
+                    variant="secondary" 
+                    size="sm"
+                    onClick={() => handleExportData('csv')}
+                    disabled={exporting}
+                  >
+                    CSV
+                  </Button>
+                </div>
               </div>
               
               <div className="flex items-center justify-between">
@@ -266,6 +448,9 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Working Hours Settings */}
+        <WorkingHoursSettings />
 
         {/* Account Actions */}
         <Card>

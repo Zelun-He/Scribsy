@@ -151,7 +151,12 @@ export default function DashboardClient() {
           }
         });
         const patientEncounters = activePatients.size;
-        const timeSaved = notes.length * 15;
+        
+        // Calculate actual time saved from note timing data
+        const timeSaved = notes.reduce((total, note) => {
+          return total + (note.time_saved_minutes || 0);
+        }, 0);
+        
         const completedNotes = notes.filter(note => 
           note.status === 'completed' || note.status === 'signed' || note.signed_at
         ).length;
@@ -295,7 +300,7 @@ export default function DashboardClient() {
               <p className="text-green-100 mb-6 text-lg">
                 Ready to create your next clinical note? Let&apos;s make a difference today.
               </p>
-              <Link href="/notes/new">
+              <Link href="/notes/new?from_action=true">
                 <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
                   <DocumentPlus className="w-5 h-5 mr-2" />
                   Create New Note

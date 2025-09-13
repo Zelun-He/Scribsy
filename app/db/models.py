@@ -1,7 +1,7 @@
 """
 models.py: Defines SQLAlchemy ORM models for the database.
 """
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Date, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Date, Boolean, Float
 from sqlalchemy.orm import relationship
 import datetime
 import pytz
@@ -36,6 +36,9 @@ class Patient(Base):
     zip_code = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
+    
+    # Tenant isolation
+    tenant_id = Column(String, nullable=False, default="default", index=True)  # Tenant identifier
     
     notes = relationship("Note", back_populates="patient")
     user = relationship("User", back_populates="patients")
@@ -72,8 +75,40 @@ class Note(Base):
     soap_assessment = Column(Text, nullable=True)  # SOAP: Assessment
     soap_plan = Column(Text, nullable=True)  # SOAP: Plan
     
-    user = relationship("User", back_populates="notes")
+    # AI accuracy tracking
+    original_content = Column(Text, nullable=True)  # Original AI-generated content
+    accuracy_score = Column(Float, nullable=True, default=100.0)  # Accuracy percentage (0-100)
+    content_changes_count = Column(Integer, nullable=True, default=0)  # Number of times content was modified
+    
+    # Note creation method and timing tracking
+    creation_method = Column(String, nullable=False, default="handwritten")  # handwritten, ai_assisted, ai_generated, voice_transcription
+    creation_started_at = Column(DateTime(timezone=True), nullable=True)  # When note creation began
+    creation_completed_at = Column(DateTime(timezone=True), nullable=True)  # When note was saved
+    baseline_time_minutes = Column(Integer, nullable=True)  # Expected time for this creation method
+    actual_time_minutes = Column(Integer, nullable=True)  # Actual time taken
+    time_saved_minutes = Column(Integer, nullable=True)  # Time saved vs baseline
+    
+    # Edit lock and signing protection
+    locked_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    locked_at = Column(DateTime(timezone=True), nullable=True)
+    lock_expires_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Audio retention and secure delete
+    audio_retention_days = Column(Integer, nullable=True, default=30)  # Default 30 days
+    audio_deleted_at = Column(DateTime(timezone=True), nullable=True)
+    audio_secure_deleted = Column(Boolean, default=False)
+    
+    # Tenant isolation
+    tenant_id = Column(String, nullable=False, default="default", index=True)  # Tenant identifier
+    
+    user = relationship("User", foreign_keys=[provider_id], back_populates="notes")
     patient = relationship("Patient", back_populates="notes")
+    locked_by_user = relationship("User", foreign_keys=[locked_by_user_id])
+    # Relationships for collaboration
+    history_entries = relationship("NoteHistory", back_populates="note", cascade="all, delete-orphan")
+    # AI provenance and coding
+    provenance = relationship("NoteProvenance", back_populates="note", cascade="all, delete-orphan")
+    codes = relationship("NoteCodeExtraction", back_populates="note", cascade="all, delete-orphan")
 
 class Appointment(Base):
     """
@@ -100,6 +135,70 @@ class Appointment(Base):
     patient = relationship("Patient", back_populates="appointments")
     user = relationship("User")
 
+
+class NoteHistory(Base):
+    __tablename__ = "note_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, ForeignKey("notes.id"), index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    username = Column(String, nullable=False)
+    action = Column(String, nullable=False)  # e.g., UPDATE
+    summary = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+
+    note = relationship("Note", back_populates="history_entries")
+    user = relationship("User")
+
+class NoteProvenance(Base):
+    __tablename__ = "note_provenance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, ForeignKey("notes.id"), index=True, nullable=False)
+    section = Column(String, nullable=True)  # subjective/objective/assessment/plan/content
+    sentence_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    transcript_start_ms = Column(Integer, nullable=True)
+    transcript_end_ms = Column(Integer, nullable=True)
+    audio_start_ms = Column(Integer, nullable=True)
+    audio_end_ms = Column(Integer, nullable=True)
+    confidence = Column(Float, nullable=True)  # 0..1
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+
+    note = relationship("Note", back_populates="provenance")
+
+class NoteCodeExtraction(Base):
+    __tablename__ = "note_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, ForeignKey("notes.id"), index=True, nullable=False)
+    system = Column(String, nullable=False)  # ICD10, SNOMED, CPT, RxNorm, LOINC, HCC
+    code = Column(String, nullable=False)
+    display = Column(String, nullable=True)
+    confidence = Column(Float, nullable=True)  # 0..1
+    status = Column(String, nullable=False, default="suggested")  # suggested/accepted/rejected
+    source_span = Column(String, nullable=True)  # optional reference text range
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+
+    note = relationship("Note", back_populates="codes")
+
+
+class NoteComment(Base):
+    __tablename__ = "note_comments"
+    __table_args__ = {'extend_existing': True}
+    
+    id = Column(Integer, primary_key=True, index=True)
+    note_id = Column(Integer, ForeignKey("notes.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    username = Column(String, nullable=False)  # Store username directly for performance
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now, nullable=False)
+    is_resolved = Column(Boolean, default=False)
+    
+    note = relationship("Note")
+    user = relationship("User")
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -115,10 +214,40 @@ class User(Base):
     failed_login_attempts = Column(Integer, default=0)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)
     
-    notes = relationship("Note", back_populates="user")
+    # Tenant isolation
+    tenant_id = Column(String, nullable=False, default="default", index=True)  # Tenant identifier
+    
+    # Working hours tracking
+    work_start_time = Column(String, default="09:00")  # Format: "HH:MM"
+    work_end_time = Column(String, default="17:00")   # Format: "HH:MM"
+    timezone = Column(String, default="UTC")          # User's timezone
+    working_days = Column(String, default="1,2,3,4,5")  # Comma-separated: 1=Monday, 7=Sunday
+    
+    notes = relationship("Note", foreign_keys="Note.provider_id", back_populates="user")
     patients = relationship("Patient", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user")
     
     # Nudge/notification relationships
     notification_preferences = relationship("NotificationPreference", uselist=False, back_populates="user")
     status = relationship("UserStatus", uselist=False, back_populates="user")
+    
+    # Password reset tokens
+    password_reset_tokens = relationship("PasswordResetToken", back_populates="user", cascade="all, delete-orphan")
+
+class PasswordResetToken(Base):
+    """
+    Model for storing password reset verification tokens
+    """
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token = Column(String, unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now, nullable=False)
+    
+    # Tenant isolation
+    tenant_id = Column(String, nullable=False, default="default", index=True)
+    
+    user = relationship("User", back_populates="password_reset_tokens")

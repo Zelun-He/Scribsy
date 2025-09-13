@@ -42,6 +42,16 @@
 }
 .animate-slide-in { animation: slide-in 0.18s ease-out; }
 
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 .dark {
   --background: #121212;
   --foreground: #e5e5e5;

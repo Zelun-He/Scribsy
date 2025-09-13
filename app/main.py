@@ -19,6 +19,10 @@ from app.api.endpoints.preferences import router as preferences_router
 from app.api.endpoints.nudge import router as nudge_router
 from app.api.endpoints.admin import router as admin_router
 from app.api.endpoints.legal import router as legal_router
+from app.api.endpoints.working_hours import router as working_hours_router
+from app.api.endpoints.export import router as export_router
+from app.api.endpoints.audio_retention import router as audio_retention_router
+from app.api.endpoints.tenant_management import router as tenant_management_router
 from app.utils.exceptions import ScribsyException, handle_scribsy_exception
 from app.utils.logging import logger, log_error
 from dotenv import load_dotenv
@@ -264,6 +268,10 @@ app.include_router(preferences_router)
 app.include_router(nudge_router)
 app.include_router(admin_router)
 app.include_router(legal_router)
+app.include_router(working_hours_router)
+app.include_router(export_router)
+app.include_router(audio_retention_router)
+app.include_router(tenant_management_router)
 
 @app.on_event("startup")
 def on_startup():

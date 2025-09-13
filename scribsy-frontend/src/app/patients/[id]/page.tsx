@@ -38,6 +38,8 @@ export default function PatientProfilePage() {
   const [showApptForm, setShowApptForm] = useState(false);
   const [apptTitle, setApptTitle] = useState('Follow-up');
   const [apptNote, setApptNote] = useState('');
+  const [apptType, setApptType] = useState<'Appointment' | 'Follow-up'>('Follow-up');
+  const [titleTouched, setTitleTouched] = useState(false);
   const toLocalInput = (d: Date) => {
     const pad = (n: number) => n.toString().padStart(2, '0');
     const yyyy = d.getFullYear();
@@ -50,6 +52,10 @@ export default function PatientProfilePage() {
   const defaultWhen = new Date();
   defaultWhen.setHours(defaultWhen.getHours() + 24);
   const [apptWhen, setApptWhen] = useState(toLocalInput(defaultWhen));
+  // Reschedule modal state
+  const [reschedOpen, setReschedOpen] = useState(false);
+  const [reschedAppt, setReschedAppt] = useState<Appointment | null>(null);
+  const [reschedWhen, setReschedWhen] = useState('');
 
   useEffect(() => {
     console.log('Patient profile page loaded with params:', params);
@@ -157,6 +163,26 @@ export default function PatientProfilePage() {
     }
   };
 
+  // Reschedule helpers
+  const openResched = (appt: Appointment) => {
+    const d = new Date(appt.scheduled_at);
+    setReschedAppt(appt);
+    setReschedWhen(toLocalInput(d));
+    setReschedOpen(true);
+  };
+  const closeResched = () => { setReschedOpen(false); setReschedAppt(null); };
+  const saveResched = async () => {
+    if (!reschedAppt) return;
+    try {
+      const iso = new Date(reschedWhen).toISOString();
+      const updated = await apiClient.updateAppointment(reschedAppt.id, { scheduled_at: iso });
+      setAppointments(prev => prev.map(a => a.id === updated.id ? updated : a));
+      closeResched();
+    } catch (e) {
+      console.error('Failed to reschedule', e);
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <DashboardLayout>
@@ -248,11 +274,7 @@ export default function PatientProfilePage() {
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4 text-gray-400" />
                       <span className="text-gray-600 dark:text-gray-400">
-                        Born: {new Date(patient.date_of_birth).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
+                        Born: {formatLocalDate(patient.date_of_birth)}
                       </span>
                     </div>
                   </div>
@@ -311,14 +333,12 @@ export default function PatientProfilePage() {
                     Appointments ({upcomingAppts.length})
                   </CardTitle>
                   <div className="flex items-center gap-2">
-                    {showApptForm && (
-                      <button
-                        onClick={() => setShowApptForm(false)}
-                        className="px-3 py-2 text-sm rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200"
-                      >
-                        Close
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setShowApptForm((v)=>!v)}
+                      className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      {showApptForm ? 'Close' : 'New'}
+                    </button>
                   </div>
                 </div>
                 <CardDescription>
@@ -330,12 +350,25 @@ export default function PatientProfilePage() {
                   <div className="mb-4 p-3 border rounded-md border-gray-200 dark:border-gray-700">
                     <div className="grid grid-cols-1 gap-3">
                       <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Type</label>
+                        <div className="inline-flex items-center gap-2 mb-2">
+                          {(['Appointment','Follow-up'] as const).map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => { setApptType(t); if (!titleTouched || apptTitle === 'Follow-up' || apptTitle === 'Appointment') setApptTitle(t); }}
+                              className={`px-3 py-1 text-xs rounded-md border ${apptType===t? 'bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-stone-700 dark:text-gray-200'}`}
+                              type="button"
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
                         <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Title</label>
                         <input
                           className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm"
                           value={apptTitle}
-                          onChange={(e) => setApptTitle(e.target.value)}
-                          placeholder="Follow-up"
+                          onChange={(e) => { setTitleTouched(true); setApptTitle(e.target.value); }}
+                          placeholder="Appointment title"
                         />
                       </div>
                       <div>
@@ -370,7 +403,7 @@ export default function PatientProfilePage() {
                             apiClient.createAppointment({
                               patient_id: patient.id,
                               scheduled_at: local.toISOString(),
-                              title: apptTitle || 'Appointment',
+                              title: apptTitle || apptType,
                               note: apptNote || '',
                             }).then(() => {
                               setShowApptForm(false);
@@ -404,15 +437,10 @@ export default function PatientProfilePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => {
-                                const dt = new Date(nextAppt.scheduled_at);
-                                dt.setMinutes(dt.getMinutes() + 30);
-                                apiClient.updateAppointment(nextAppt.id, { scheduled_at: dt.toISOString() })
-                                  .then((updated) => setAppointments((prev) => prev.map((a) => a.id === nextAppt.id ? updated : a)));
-                              }}
+                              onClick={() => openResched(nextAppt)}
                               className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
                             >
-                              +30m
+                              Reschedule
                             </button>
                             <button
                               onClick={() => apiClient.deleteAppointment(nextAppt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== nextAppt.id)))}
@@ -437,15 +465,10 @@ export default function PatientProfilePage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => {
-                                  const dt = new Date(appt.scheduled_at);
-                                  dt.setMinutes(dt.getMinutes() + 30);
-                                  apiClient.updateAppointment(appt.id, { scheduled_at: dt.toISOString() })
-                                    .then((updated) => setAppointments((prev) => prev.map((a) => a.id === appt.id ? updated : a)));
-                                }}
+                                onClick={() => openResched(appt)}
                                 className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
                               >
-                                +30m
+                                Reschedule
                               </button>
                               <button
                                 onClick={() => apiClient.deleteAppointment(appt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== appt.id)))}
@@ -486,12 +509,6 @@ export default function PatientProfilePage() {
                     <DocumentTextIcon className="w-5 h-5 mr-2" />
                     Clinical Notes ({notes.length})
                   </CardTitle>
-                  <Link href={`/notes/new?patient_id=${patient.id}`}>
-                    <Button size="sm">
-                      <DocumentTextIcon className="w-4 h-4 mr-2" />
-                      New Note
-                    </Button>
-                  </Link>
                 </div>
                 <CardDescription>
                   Complete medical record history for {patient.first_name} {patient.last_name}
@@ -583,6 +600,30 @@ export default function PatientProfilePage() {
           </div>
         </div>
       </div>
+      {reschedOpen && reschedAppt && (
+        <div className="fixed inset-0 z-[90]">
+          <div className="absolute inset-0 bg-black/40" onClick={closeResched} />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-stone-200 dark:border-gray-800 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <h3 className="text-lg font-semibold text-stone-800 dark:text-gray-100">Reschedule Appointment</h3>
+              <button className="text-stone-500 hover:text-stone-700" onClick={closeResched} aria-label="Close">×</button>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-xs text-stone-500 dark:text-gray-400 mb-1">New date & time</label>
+              <input
+                type="datetime-local"
+                value={reschedWhen}
+                onChange={(e)=>setReschedWhen(e.target.value)}
+                className="w-full rounded-md border border-stone-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-stone-800 dark:text-gray-100 px-3 py-2"
+              />
+            </div>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button onClick={closeResched} className="px-4 py-2 rounded-md border border-stone-200 dark:border-gray-700 text-stone-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-[#1A1A1A]">Cancel</button>
+              <button onClick={saveResched} className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

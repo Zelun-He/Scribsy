@@ -22,7 +22,7 @@
   - Note creation with audio file: ✅
   - Note retrieval: ✅
 - Fixed database foreign key relationships
-- Server running on port 8002
+- Server running on port 8000
 
 ### 4. Error Handling & Logging
 - Added comprehensive logging system (`app/utils/logging.py`)
