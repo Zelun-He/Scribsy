@@ -953,7 +953,7 @@ export default function DashboardPage() {
                         <>
                           <div className="grid grid-cols-3 text-sm p-2 bg-stone-50 dark:bg-[#151515]">
                             <div>Total saved</div>
-                            <div className="text-center font-medium">{timeSavedForCard}m</div>
+                            <div className="text-center font-medium">{Math.round(animatedStats.timeSaved)}m</div>
                             <div className="text-right pr-2 text-stone-500">{baselineMinutes}m baseline</div>
                           </div>
                           <div className="grid grid-cols-3 text-sm p-2 bg-stone-50 dark:bg-[#151515]">
@@ -1101,7 +1101,7 @@ export default function DashboardPage() {
                 <TrendingUp className="w-5 h-5 text-green-500" />
               </div>
               <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1" title={timeSavedTooltip}>
-                {loading ? '...' : `${timeSavedForCard}m`}
+                {loading ? '...' : `${Math.round(animatedStats.timeSaved)}m`}
               </div>
               <p className="text-stone-600 dark:text-gray-300 text-sm">Time Saved</p>
               <div className="mt-4 flex items-end gap-1 h-10">
@@ -1649,7 +1649,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="p-3 rounded-lg border border-stone-200 dark:border-gray-800">
                         <div className="text-xs text-stone-500 dark:text-gray-400">Time saved</div>
-                        <div className="text-lg font-semibold text-stone-800 dark:text-gray-100">{timeSavedForCard}m</div>
+                        <div className="text-lg font-semibold text-stone-800 dark:text-gray-100">{Math.round(animatedStats.timeSaved)}m</div>
                       </div>
                     </div>
                   </div>
