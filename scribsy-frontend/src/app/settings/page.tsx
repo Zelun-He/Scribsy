@@ -86,6 +86,7 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     
+    
 
     e.preventDefault();
     setError('');
