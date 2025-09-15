@@ -6,12 +6,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/lib/api';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,12 +37,18 @@ export default function ForgotPasswordPage() {
       return;
     }
 
+    setError('');
+    setShowConfirm(true);
+  };
+
+  const confirmResetRequest = async () => {
     setLoading(true);
     setError('');
 
     try {
       await apiClient.requestPasswordReset(email);
       setSuccess(true);
+      setShowConfirm(false);
     } catch (error: any) {
       setError(error.message || 'Failed to send reset email. Please try again.');
     } finally {
@@ -128,6 +145,29 @@ export default function ForgotPasswordPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Password Reset Confirmation Dialog */}
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send Password Reset Email?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to send a password reset email to <strong>{email}</strong>? 
+              You will receive an email with instructions to reset your password.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmResetRequest}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
+            >
+              {loading ? 'Sending...' : 'Yes, Send Email'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

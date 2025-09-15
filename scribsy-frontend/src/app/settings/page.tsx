@@ -20,6 +20,17 @@ import { getBaselineMinutes, setBaselineMinutes } from '@/lib/metrics';
 import { WorkingHoursSettings } from '@/components/ui/working-hours-settings';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function SettingsPage() {
   const { user, logout } = useAuth();
@@ -38,6 +49,7 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState('');
   const [baseline, setBaseline] = useState<number>(getBaselineMinutes());
   const [exporting, setExporting] = useState(false);
+  const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const { show } = useToast();
 
   const handleProfileSubmit = async (e: React.FormEvent) => {
@@ -74,21 +86,27 @@ export default function SettingsPage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setSuccess('');
 
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setError('New passwords do not match');
-      setLoading(false);
       return;
     }
 
     if (passwordData.newPassword.length < 6) {
       setError('New password must be at least 6 characters long');
-      setLoading(false);
       return;
     }
+
+    // Show confirmation dialog
+    setShowPasswordConfirm(true);
+  };
+
+  const confirmPasswordChange = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
 
     try {
       await apiClient.changePassword(passwordData.currentPassword, passwordData.newPassword);
@@ -98,6 +116,7 @@ export default function SettingsPage() {
         newPassword: '',
         confirmPassword: '',
       });
+      setShowPasswordConfirm(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
       setError(error.message || 'Failed to change password');
@@ -255,6 +274,28 @@ export default function SettingsPage() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Password Change Confirmation Dialog */}
+        <AlertDialog open={showPasswordConfirm} onOpenChange={setShowPasswordConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirm Password Change</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to change your password? This action cannot be undone and you will need to use your new password for all future logins.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmPasswordChange}
+                disabled={loading}
+                className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+              >
+                {loading ? 'Changing Password...' : 'Yes, Change Password'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Theme Settings */}
         <Card>

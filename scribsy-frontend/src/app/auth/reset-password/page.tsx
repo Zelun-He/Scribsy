@@ -6,6 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { apiClient } from '@/lib/api';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 export default function ResetPasswordPage() {
@@ -16,6 +26,7 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -45,12 +56,18 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    setError('');
+    setShowConfirm(true);
+  };
+
+  const confirmPasswordReset = async () => {
     setLoading(true);
     setError('');
 
     try {
-      await apiClient.verifyPasswordReset(token, newPassword);
+      await apiClient.verifyPasswordReset(token!, newPassword);
       setSuccess(true);
+      setShowConfirm(false);
     } catch (error: any) {
       setError(error.message || 'Failed to reset password. Please try again.');
     } finally {
@@ -163,6 +180,28 @@ export default function ResetPasswordPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Password Reset Confirmation Dialog */}
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Password Reset</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reset your password? This action cannot be undone and you will need to use your new password for all future logins.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmPasswordReset}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+            >
+              {loading ? 'Resetting...' : 'Yes, Reset Password'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
