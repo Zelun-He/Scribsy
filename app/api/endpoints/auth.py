@@ -5,12 +5,17 @@ from app.db import schemas, models
 from app.crud import notes as crud_notes
 from app.db.database import get_db
 from app.audit.logger import HIPAAAuditLogger
+from app.services.email_service import email_service
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 import os
+import secrets
+import logging
 
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
@@ -226,4 +231,193 @@ def refresh_session(request: Request, response: Response, current_user=Depends(g
 # Returns: UserRead schema
 @router.get("/me", response_model=schemas.UserRead)
 def read_users_me(current_user: schemas.UserRead = Depends(get_current_user)):
-    return current_user 
+    return current_user
+
+# POST /auth/request-password-reset - Request password reset via email verification
+# No authentication required.
+# Request body: PasswordResetRequest (email)
+# Returns: PasswordResetResponse
+@router.post("/request-password-reset", response_model=schemas.PasswordResetResponse)
+def request_password_reset(
+    request_data: schemas.PasswordResetRequest,
+    db: Session = Depends(get_db)
+):
+    """Request password reset via email verification"""
+    try:
+        # Find user by email
+        user = db.query(models.User).filter(models.User.email == request_data.email).first()
+        
+        # Always return success message for security (don't reveal if email exists)
+        success_message = "If an account with that email exists, a password reset link has been sent."
+        
+        if not user:
+            return schemas.PasswordResetResponse(
+                message=success_message,
+                success=True
+            )
+        
+        # Generate secure token
+        reset_token = secrets.token_urlsafe(32)
+        
+        # Set expiration time (1 hour from now)
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+        
+        # Create password reset token record
+        reset_token_record = models.PasswordResetToken(
+            user_id=user.id,
+            token=reset_token,
+            expires_at=expires_at,
+            tenant_id=user.tenant_id
+        )
+        
+        # Invalidate any existing tokens for this user
+        db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.used == False
+        ).update({"used": True})
+        
+        db.add(reset_token_record)
+        db.commit()
+        
+        # Generate reset URL (in production, this should be your frontend URL)
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        reset_url = f"{frontend_url}/auth/reset-password?token={reset_token}"
+        
+        # Send verification email
+        email_sent = email_service.send_password_reset_email(
+            user_email=user.email,
+            username=user.username,
+            reset_token=reset_token,
+            reset_url=reset_url
+        )
+        
+        if not email_sent:
+            logger.warning(f"Failed to send password reset email to {user.email}")
+        
+        return schemas.PasswordResetResponse(
+            message=success_message,
+            success=True
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in password reset request: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while processing your request. Please try again later."
+        )
+
+# POST /auth/verify-password-reset - Verify token and reset password
+# No authentication required.
+# Request body: PasswordResetVerify (token, new_password)
+# Returns: PasswordResetResponse
+@router.post("/verify-password-reset", response_model=schemas.PasswordResetResponse)
+def verify_password_reset(
+    request_data: schemas.PasswordResetVerify,
+    db: Session = Depends(get_db)
+):
+    """Verify reset token and update password"""
+    try:
+        # Validate password strength
+        if len(request_data.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+        if len(request_data.new_password) > 100:
+            raise HTTPException(status_code=400, detail="Password must be less than 100 characters")
+        
+        # Find valid reset token
+        reset_token_record = db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.token == request_data.token,
+            models.PasswordResetToken.used == False,
+            models.PasswordResetToken.expires_at > datetime.utcnow()
+        ).first()
+        
+        if not reset_token_record:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid or expired reset token. Please request a new password reset."
+            )
+        
+        # Get user
+        user = db.query(models.User).filter(models.User.id == reset_token_record.user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update password
+        new_hashed_password = crud_notes.get_password_hash(request_data.new_password)
+        user.hashed_password = new_hashed_password
+        
+        # Mark token as used
+        reset_token_record.used = True
+        
+        # Log the password change
+        HIPAAAuditLogger.log_password_change(
+            db=db,
+            user_id=user.id,
+            username=user.username,
+            success=True
+        )
+        
+        db.commit()
+        
+        return schemas.PasswordResetResponse(
+            message="Password has been successfully reset. You can now log in with your new password.",
+            success=True
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in password reset verification: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while resetting your password. Please try again later."
+        )
+
+# POST /auth/change-password - Change password for authenticated user
+# Requires authentication.
+# Request body: PasswordChangeRequest (current_password, new_password)
+# Returns: PasswordResetResponse
+@router.post("/change-password", response_model=schemas.PasswordResetResponse)
+def change_password(
+    request_data: schemas.PasswordChangeRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Change password for authenticated user"""
+    try:
+        # Validate new password strength
+        if len(request_data.new_password) < 6:
+            raise HTTPException(status_code=400, detail="New password must be at least 6 characters long")
+        if len(request_data.new_password) > 100:
+            raise HTTPException(status_code=400, detail="New password must be less than 100 characters")
+        
+        # Verify current password
+        if not crud_notes.verify_password(request_data.current_password, current_user.hashed_password):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+        
+        # Update password
+        new_hashed_password = crud_notes.get_password_hash(request_data.new_password)
+        current_user.hashed_password = new_hashed_password
+        
+        # Log the password change
+        HIPAAAuditLogger.log_password_change(
+            db=db,
+            user_id=current_user.id,
+            username=current_user.username,
+            success=True
+        )
+        
+        db.commit()
+        
+        return schemas.PasswordResetResponse(
+            message="Password has been successfully changed.",
+            success=True
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in password change: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while changing your password. Please try again later."
+        ) 

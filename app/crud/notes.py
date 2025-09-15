@@ -93,7 +93,7 @@ def update_note(db: Session, note_id: int, note: schemas.NoteUpdate) -> Optional
     """
     db_note = get_note(db, note_id)
     if db_note:
-        for field, value in note.dict(exclude_unset=True).items():
+        for field, value in note.model_dump(exclude_unset=True).items():
             setattr(db_note, field, value)
         db_note.updated_at = datetime.utcnow()
         db.commit()

@@ -160,6 +160,7 @@ def read_patient(
 
 # POST /patients/ - Create a new patient
 @router.post("/", response_model=schemas.PatientRead)
+@router.post("", response_model=schemas.PatientRead, include_in_schema=False)
 def create_patient(
     patient: schemas.PatientCreateRequest,
     db: Session = Depends(get_db),
@@ -251,6 +252,17 @@ def create_patient(
         )
         print(f"Patient creation error: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Failed to create patient: {str(e)}")
+
+# Alternate explicit create path to avoid slash ambiguity in some proxies
+@router.post("/create", response_model=schemas.PatientRead)
+@router.post("/create/", response_model=schemas.PatientRead, include_in_schema=False)
+def create_patient_alt(
+    patient: schemas.PatientCreateRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+    request: Request = None
+):
+    return create_patient(patient, db, current_user, request)
 
 # PUT /patients/{patient_id} - Update a patient
 @router.put("/{patient_id}", response_model=schemas.PatientRead)

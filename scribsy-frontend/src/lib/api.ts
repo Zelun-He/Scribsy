@@ -8,7 +8,9 @@ import {
   Appointment,
   CreateNoteRequest, 
   TranscriptionResult,
-  ApiError 
+  ApiError,
+  NoteCode,
+  NoteProvenance,
 } from '@/types';
 
 // Default to backend dev port 8000 unless overridden. When running on localhost, prefer Next proxy /api
@@ -232,6 +234,44 @@ class ApiClient {
     return result;
   }
 
+  // Password reset endpoints
+  async requestPasswordReset(email: string): Promise<{ message: string; success: boolean }> {
+    const response = await fetch(`${this.baseURL}/auth/request-password-reset`, {
+      method: 'POST',
+      headers: this.getJsonHeaders(),
+      body: JSON.stringify({ email }),
+      credentials: 'include',
+    });
+
+    return this.handleResponse<{ message: string; success: boolean }>(response);
+  }
+
+  async verifyPasswordReset(token: string, newPassword: string): Promise<{ message: string; success: boolean }> {
+    const response = await fetch(`${this.baseURL}/auth/verify-password-reset`, {
+      method: 'POST',
+      headers: this.getJsonHeaders(),
+      body: JSON.stringify({ token, new_password: newPassword }),
+      credentials: 'include',
+    });
+
+    return this.handleResponse<{ message: string; success: boolean }>(response);
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string; success: boolean }> {
+    this.refreshTokenFromStorage();
+    const response = await fetch(`${this.baseURL}/auth/change-password`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      body: JSON.stringify({ 
+        current_password: currentPassword, 
+        new_password: newPassword 
+      }),
+      credentials: 'include',
+    });
+
+    return this.handleResponse<{ message: string; success: boolean }>(response);
+  }
+
   // Notes endpoints
   async getNotes(params?: {
     skip?: number;
@@ -319,41 +359,213 @@ class ApiClient {
     throw new Error('Failed to fetch note');
   }
 
+  async listComments(noteId: number): Promise<Array<{id:number;note_id:number;user_id:number;username:string;body:string;created_at:string;}>> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, { headers: this.getHeaders(), credentials: 'include' });
+    return this.handleResponse(resp);
+  }
+
+  async addComment(noteId: number, body: string): Promise<{id:number;note_id:number;user_id:number;username:string;body:string;created_at:string;}> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
+      method: 'POST',
+      headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+      credentials: 'include',
+      body: JSON.stringify({ body }),
+    });
+    return this.handleResponse(resp);
+  }
+
+  async listHistory(noteId: number): Promise<Array<{id:number;note_id:number;user_id:number;username:string;action:string;summary:string;created_at:string;}>> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/history`, { headers: this.getHeaders(), credentials: 'include' });
+    return this.handleResponse(resp);
+  }
+
+  // Export endpoints
+  async exportNoteCCD(id: number): Promise<string> {
+    const resp = await fetch(`${this.baseURL}/notes/${id}/export/ccd`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!resp.ok) throw new Error(`Failed to export CCD: ${resp.status}`);
+    return resp.text();
+  }
+
+  async exportNotePlain(id: number): Promise<string> {
+    const resp = await fetch(`${this.baseURL}/notes/${id}/export/plain`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!resp.ok) throw new Error(`Failed to export note: ${resp.status}`);
+    return resp.text();
+  }
+
+  async exportNotePDF(id: number): Promise<Blob> {
+    const resp = await fetch(`${this.baseURL}/notes/${id}/export/pdf`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!resp.ok) {
+      if (resp.status === 503) throw new Error('PDF_UNAVAILABLE');
+      throw new Error(`Failed to export PDF: ${resp.status}`);
+    }
+    return resp.blob();
+  }
+
+  async exportNoteAudio(id: number): Promise<Blob> {
+    const resp = await fetch(`${this.baseURL}/notes/${id}/export/audio`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    if (!resp.ok) {
+      throw new Error(`Failed to export audio: ${resp.status}`);
+    }
+    return resp.blob();
+  }
+
+  // Provenance & Codes
+  async listProvenance(noteId: number): Promise<NoteProvenance[]> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/provenance`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<NoteProvenance[]>(resp);
+  }
+
+  async listCodes(noteId: number): Promise<NoteCode[]> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<NoteCode[]>(resp);
+  }
+
+  async acceptCode(noteId: number, codeId: number): Promise<NoteCode> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes/${codeId}/accept`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<NoteCode>(resp);
+  }
+
+  async rejectCode(noteId: number, codeId: number): Promise<NoteCode> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes/${codeId}/reject`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<NoteCode>(resp);
+  }
+
+  // Comments
+  async getNoteComments(noteId: number): Promise<Array<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<Array<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>>(resp);
+  }
+
+  async createNoteComment(noteId: number, content: string, isResolved: boolean = false): Promise<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ content, is_resolved: isResolved }),
+    });
+    return this.handleResponse<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>(resp);
+  }
+
+  async updateNoteComment(noteId: number, commentId: number, content?: string, isResolved?: boolean): Promise<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments/${commentId}`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify({ content, is_resolved: isResolved }),
+    });
+    return this.handleResponse<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>(resp);
+  }
+
+  async deleteNoteComment(noteId: number, commentId: number): Promise<{ok: boolean}> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments/${commentId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<{ok: boolean}>(resp);
+  }
+
+  // Change History
+  async getNoteHistory(noteId: number): Promise<Array<{id: number; note_id: number; user_id: number; username: string; action: string; summary: string; created_at: string}>> {
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/history`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<Array<{id: number; note_id: number; user_id: number; username: string; action: string; summary: string; created_at: string}>>(resp);
+  }
+
   async createNote(noteData: CreateNoteRequest): Promise<Note> {
+    // Prefer JSON endpoint when no audio_file is included
+    if (!noteData.audio_file) {
+      try {
+        const response = await fetch(`${this.baseURL}/notes/create-json`, {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify({
+            patient_id: noteData.patient_id,
+            provider_id: noteData.provider_id,
+            visit_id: noteData.visit_id,
+            note_type: noteData.note_type,
+            content: noteData.content,
+            status: noteData.status,
+            signed_at: noteData.signed_at,
+          }),
+          credentials: 'include',
+        });
+        if (response.ok) {
+          return this.handleResponse<Note>(response);
+        }
+        // Fallback in case server doesn't recognize JSON route
+        if (response.status === 404 || response.status === 405) {
+          // continue to multipart fallback below
+        } else {
+          return this.handleResponse<Note>(response);
+        }
+      } catch (_err) {
+        // Fallback to multipart below
+      }
+    }
+
+    // Fallback to multipart when audio is present
     const formData = new FormData();
-    
     formData.append('patient_id', noteData.patient_id.toString());
     formData.append('provider_id', noteData.provider_id.toString());
-    if (noteData.visit_id) {
-      formData.append('visit_id', noteData.visit_id.toString());
-    }
+    if (noteData.visit_id) formData.append('visit_id', noteData.visit_id.toString());
     formData.append('note_type', noteData.note_type);
     formData.append('content', noteData.content);
     formData.append('status', noteData.status);
-    
-    if (noteData.signed_at) {
-      formData.append('signed_at', noteData.signed_at);
-    }
-    
-    if (noteData.audio_file) {
-      formData.append('audio_file', noteData.audio_file);
-    }
-    
-    if (noteData.auto_transcribe !== undefined) {
-      formData.append('auto_transcribe', noteData.auto_transcribe.toString());
-    }
-    
-    if (noteData.auto_summarize !== undefined) {
-      formData.append('auto_summarize', noteData.auto_summarize.toString());
-    }
+    if (noteData.signed_at) formData.append('signed_at', noteData.signed_at);
+    if (noteData.audio_file) formData.append('audio_file', noteData.audio_file);
+    if (noteData.auto_transcribe !== undefined) formData.append('auto_transcribe', noteData.auto_transcribe.toString());
+    if (noteData.auto_summarize !== undefined) formData.append('auto_summarize', noteData.auto_summarize.toString());
 
-    const response = await fetch(`${this.baseURL}/notes/`, {
+    let response = await fetch(`${this.baseURL}/notes/`, {
       method: 'POST',
       headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
       body: formData,
       credentials: 'include',
     });
-
+    if (!response.ok && (response.status === 404 || response.status === 405)) {
+      // As a last resort, bypass proxy and hit backend directly in dev
+      try {
+        const direct = await fetch(`http://127.0.0.1:8000/notes/`, {
+          method: 'POST',
+          headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
+          body: formData,
+          credentials: 'include',
+        });
+        response = direct;
+      } catch {}
+    }
     return this.handleResponse<Note>(response);
   }
 
@@ -376,6 +588,80 @@ class ApiClient {
     });
 
     return this.handleResponse<{ ok: boolean }>(response);
+  }
+
+  // Note Creation Timing Methods
+  async startNoteTiming(noteId: number, creationMethod: string, baselineMinutes?: number): Promise<{
+    message: string;
+    creation_method: string;
+    baseline_minutes: number;
+    started_at: string;
+  }> {
+    const params = new URLSearchParams({
+      creation_method: creationMethod,
+    });
+    if (baselineMinutes !== undefined) {
+      params.append('baseline_minutes', baselineMinutes.toString());
+    }
+
+    const response = await fetch(`${this.baseURL}/notes/${noteId}/start-timing?${params}`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse(response);
+  }
+
+  async completeNoteTiming(noteId: number): Promise<{
+    message: string;
+    creation_method: string;
+    baseline_minutes: number;
+    actual_minutes: number;
+    time_saved_minutes: number;
+    efficiency_percentage: number;
+    completed_at: string;
+  }> {
+    const response = await fetch(`${this.baseURL}/notes/${noteId}/complete-timing`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse(response);
+  }
+
+  async getNoteTimingStats(method?: string, days: number = 30): Promise<{
+    total_notes: number;
+    date_range: {
+      start: string;
+      end: string;
+      days: number;
+    };
+    methods: {
+      [method: string]: {
+        total_notes: number;
+        total_baseline_minutes: number;
+        total_actual_minutes: number;
+        total_time_saved_minutes: number;
+        avg_baseline_minutes: number;
+        avg_actual_minutes: number;
+        avg_time_saved_minutes: number;
+        avg_efficiency_percentage: number;
+      };
+    };
+  }> {
+    const params = new URLSearchParams({
+      days: days.toString(),
+    });
+    if (method) {
+      params.append('method', method);
+    }
+
+    const response = await fetch(`${this.baseURL}/notes/timing-stats?${params}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse(response);
   }
 
   // Transcription endpoint
@@ -442,14 +728,99 @@ class ApiClient {
     state?: string;
     zip_code?: string;
   }): Promise<Patient> {
-    const response = await fetch(`${this.baseURL}/patients/`, {
-      method: 'POST',
-      headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-      body: JSON.stringify(patientData),
-      credentials: 'include',
-    });
+    // Try without trailing slash first (some proxies strip it)
+    const attempts: Array<{ url: string; init: RequestInit }> = [
+      {
+        url: `${this.baseURL}/patients`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `${this.baseURL}/patients/`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `${this.baseURL}/patients/create`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `${this.baseURL}/patients/create/`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      // Direct dev fallback
+      {
+        url: `http://127.0.0.1:8000/patients`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `http://127.0.0.1:8000/patients/`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `http://127.0.0.1:8000/patients/create`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+      {
+        url: `http://127.0.0.1:8000/patients/create/`,
+        init: {
+          method: 'POST',
+          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
+          body: JSON.stringify(patientData),
+          credentials: 'include',
+        },
+      },
+    ];
 
-    return this.handleResponse<Patient>(response);
+    let lastResp: Response | null = null;
+    for (const a of attempts) {
+      try {
+        const r = await fetch(a.url, a.init);
+        lastResp = r;
+        if (r.ok) return this.handleResponse<Patient>(r);
+        if (!(r.status === 404 || r.status === 405)) {
+          // propagate other errors with body
+          return this.handleResponse<Patient>(r);
+        }
+      } catch {
+        continue;
+      }
+    }
+    if (lastResp) return this.handleResponse<Patient>(lastResp);
+    throw new Error('Failed to create patient');
   }
 
   async updatePatient(id: number, patientData: Partial<{
@@ -515,7 +886,7 @@ class ApiClient {
   async getPatientAppointments(patientId: number): Promise<Appointment[]> {
     const response = await fetch(`${this.baseURL}/patients/${patientId}/appointments`, {
       headers: this.getHeaders(),
-      credentials: 'omit',
+      credentials: 'include',
     });
     return this.handleResponse<Appointment[]>(response);
   }
@@ -523,7 +894,7 @@ class ApiClient {
   async getUpcomingAppointments(withinHours: number = 168): Promise<Appointment[]> {
     const response = await this.doFetch(`${this.baseURL}/patients/appointments/upcoming?within_hours=${withinHours}`, {
       headers: this.getHeaders(),
-      credentials: this.isLocalDev ? 'omit' : 'include',
+      credentials: 'include',
     });
     return this.handleResponse<Appointment[]>(response);
   }
@@ -539,7 +910,7 @@ class ApiClient {
         note: appt.note,
         notify_before_minutes: appt.notify_before_minutes ?? 30,
       }),
-      credentials: this.isLocalDev ? 'omit' : 'include',
+      credentials: 'include',
     });
     return this.handleResponse<Appointment>(response);
   }
@@ -549,7 +920,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(update),
-      credentials: this.isLocalDev ? 'omit' : 'include',
+      credentials: 'include',
     });
     return this.handleResponse<Appointment>(response);
   }
@@ -567,7 +938,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/patients/appointments/${appointmentId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: this.isLocalDev ? 'omit' : 'include',
+      credentials: 'include',
     });
     return this.handleResponse<{ ok: boolean }>(response);
   }
@@ -777,6 +1148,148 @@ class ApiClient {
       credentials: 'include',
     });
     return this.handleResponse(response);
+  }
+
+  // Working Hours Management
+  async getWorkingHours(): Promise<{
+    work_start_time: string;
+    work_end_time: string;
+    timezone: string;
+    working_days: number[];
+    is_workday: boolean;
+    time_until_end: number | null;
+    pending_notes_count: number;
+  }> {
+    this.refreshTokenFromStorage();
+    // Use direct backend URL to avoid Next.js proxy trailing slash issues
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/working-hours/`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    
+    return this.handleResponse(resp);
+  }
+
+  async updateWorkingHours(workingHours: {
+    work_start_time: string;
+    work_end_time: string;
+    timezone: string;
+    working_days: number[];
+  }): Promise<{
+    work_start_time: string;
+    work_end_time: string;
+    timezone: string;
+    working_days: number[];
+    is_workday: boolean;
+    time_until_end: number | null;
+    pending_notes_count: number;
+  }> {
+    this.refreshTokenFromStorage();
+    // Use direct backend URL to avoid Next.js proxy trailing slash issues
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/working-hours/`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      credentials: 'include',
+      body: JSON.stringify(workingHours),
+    });
+    return this.handleResponse(resp);
+  }
+
+  async getFinalizationWarning(): Promise<{
+    should_warn: boolean;
+    reason: string;
+    minutes_remaining?: number;
+    pending_notes_count?: number;
+  }> {
+    this.refreshTokenFromStorage();
+    // Use direct backend URL to avoid Next.js proxy trailing slash issues
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/working-hours/finalization-warning`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse(resp);
+  }
+
+  async getPendingNotesToday(): Promise<Array<{
+    id: number;
+    title: string;
+    status: string;
+    created_at: string;
+    patient_id: number;
+  }>> {
+    this.refreshTokenFromStorage();
+    // Use direct backend URL to avoid Next.js proxy trailing slash issues
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/working-hours/pending-notes-today`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse(resp);
+  }
+
+  // Export functionality
+  async exportUserData(format: 'json' | 'csv' | 'zip' = 'zip') {
+    this.refreshTokenFromStorage();
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/export/data?format=${format}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    
+    if (!resp.ok) {
+      throw new Error(`Export failed: ${resp.statusText}`);
+    }
+    
+    // Create download link
+    const blob = await resp.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Get filename from Content-Disposition header or create default
+    const contentDisposition = resp.headers.get('Content-Disposition');
+    let filename = `scribsy_export_${new Date().toISOString().split('T')[0]}`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return { success: true, filename };
+  }
+
+  // Audio download functionality
+  async downloadAudioFile(noteId: number) {
+    this.refreshTokenFromStorage();
+    const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
+    const resp = await fetch(`${backendURL}/export/audio/${noteId}`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    
+    if (!resp.ok) {
+      throw new Error(`Failed to get audio file: ${resp.statusText}`);
+    }
+    
+    const audioInfo = await resp.json();
+    
+    // For now, we'll show the audio info
+    // In a full implementation, you'd download the actual file
+    return {
+      success: true,
+      audioInfo,
+      message: 'Audio file info retrieved. Full download implementation needed.'
+    };
   }
 }
 

@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
 import { Note, Appointment, Patient } from '@/types';
 import { useToast } from '@/lib/toast';
+import { getNoteSessions, getBaselineMinutes } from '@/lib/metrics';
 import { burstConfetti } from '@/lib/confetti';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-// import DictationWidget from '@/components/dictation-widget';
+import { FinalizationWarning } from '@/components/ui/finalization-warning';
+import { useFinalizationWarning } from '@/hooks/use-finalization-warning';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 // SVG Icons as React components
 const DocumentPlus = ({ className }: { className?: string }) => (
@@ -127,6 +130,10 @@ export default function DashboardPage() {
   const [loadingUpcoming, setLoadingUpcoming] = useState(true);
   const [patients, setPatients] = useState<{[key: number]: Patient}>({});
   const [allNotes, setAllNotes] = useState<Note[]>([]);
+  
+  // Finalization warning
+  const { warning, loading: warningLoading, dismissWarning } = useFinalizationWarning();
+  const [showFinalizationDialog, setShowFinalizationDialog] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState<'week' | 'day'>('week');
@@ -138,18 +145,35 @@ export default function DashboardPage() {
     noteAccuracy: 0
   });
   const [panelView, setPanelView] = useState<'appointments' | 'recent'>('appointments');
-  const [kpiRanges, setKpiRanges] = useState<{notes: '7'|'14'|'30'; time: '7'|'14'|'30'; patients: '7'|'14'|'30'; accuracy: '7'|'14'|'30';}>({ notes: '7', time: '7', patients: '7', accuracy: '7' });
+  const [kpiRanges, setKpiRanges] = useState<{notes: '7'|'14'|'all'; time: '7'|'14'|'all'; patients: '7'|'14'|'all'; accuracy: '7'|'14'|'all';}>({ notes: '7', time: '7', patients: '7', accuracy: '7' });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeKpi, setActiveKpi] = useState<'notes' | 'time' | 'patients' | 'accuracy' | null>(null);
   const [openCombobox, setOpenCombobox] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const { show } = useToast();
+
+  const showAlertDialog = (title: string, description: string, onConfirm: () => void) => {
+    setAlertDialogConfig({ title, description, onConfirm });
+    setAlertDialogOpen(true);
+  };
   const [kpiOrder, setKpiOrder] = useState<Array<'notes'|'time'|'patients'|'accuracy'>>(['notes','time','patients','accuracy']);
   const [dragApptId, setDragApptId] = useState<number | null>(null);
   const [dragOverDate, setDragOverDate] = useState<Date | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerNotes, setDrawerNotes] = useState<Note[]>([]);
   const [drawerSpark, setDrawerSpark] = useState<number[]>([]);
+  // Per-row delta map for patients drawer (patientId -> delta%)
+  const [patientDeltaMap, setPatientDeltaMap] = useState<Record<number, number>>({});
+  // Long-press state
+  const [quickApptMenu, setQuickApptMenu] = useState<{ open: boolean; appt: Appointment | null; x: number; y: number }>({ open: false, appt: null, x: 0, y: 0 });
+  const pressTimerRef = useRef<number | null>(null);
+  const baselineMinutes = useMemo(() => getBaselineMinutes(), []);
+  const sessions = useMemo(() => getNoteSessions(user?.id ?? null), [user]);
+  const [checkingApptId, setCheckingApptId] = useState<number | null>(null);
+  const [remindingApptId, setRemindingApptId] = useState<number | null>(null);
+  const [reminded, setReminded] = useState<Record<number, number>>({});
+  const drawerSparkMax = useMemo(() => (drawerSpark && drawerSpark.length ? Math.max(...drawerSpark) : 1), [drawerSpark]);
   const [kpiDelta, setKpiDelta] = useState<{notes:number; time:number; patients:number; accuracy:number}>({notes:0,time:0,patients:0,accuracy:0});
   // Reschedule confirmation modal state
   const [rescheduleOpen, setRescheduleOpen] = useState(false);
@@ -160,6 +184,23 @@ export default function DashboardPage() {
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotTab, setCopilotTab] = useState<'summary'|'templates'|'checklists'|'insights'|'preferences'>('summary');
   const [aiPrefs, setAiPrefs] = useState<any>(null);
+  const [alertDialogOpen, setAlertDialogOpen] = useState(false);
+  const [alertDialogConfig, setAlertDialogConfig] = useState<{
+    title: string;
+    description: string;
+    onConfirm: () => void;
+  }>({ title: '', description: '', onConfirm: () => {} });
+  // Rotating inspiration
+  const inspirationMessages = useMemo(() => [
+    "Ready to create your next clinical note? Let's make a difference today.",
+    'Small steps, big impact. Your next note helps someone heal.',
+    'Clarity saves time. Let\'s capture a great note together.',
+    'Every patient story matters — document it with care.',
+    'Precision today means better outcomes tomorrow. You\'ve got this.',
+    'Thank you for what you do.',
+  ], []);
+  const [inspoMessage, setInspoMessage] = useState<string>(inspirationMessages[0]);
+  const hasRotatedInspo = useRef(false);
   
 
   // Redirect to login if not authenticated
@@ -169,6 +210,20 @@ export default function DashboardPage() {
       router.push('/access-denied');
     }
   }, [user, authLoading, router]);
+
+  // Show finalization warning dialog when warning is detected
+  useEffect(() => {
+    if (warning && !showFinalizationDialog && user) {
+      setShowFinalizationDialog(true);
+    }
+  }, [warning, showFinalizationDialog, user]);
+
+  // Clear finalization dialog when user logs out
+  useEffect(() => {
+    if (!user) {
+      setShowFinalizationDialog(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -200,8 +255,10 @@ export default function DashboardPage() {
         
         const patientEncounters = activePatients.size;
         
-        // Calculate time saved (assuming 15 minutes saved per note)
-        const timeSaved = notes.length * 15;
+        // Calculate time saved from actual note timing data
+        const timeSaved = notes.reduce((total, note) => {
+          return total + (note.time_saved_minutes || 0);
+        }, 0);
         
         // Calculate note accuracy - percentage of completed/signed notes
         const completedNotes = notes.filter(note => 
@@ -258,7 +315,21 @@ export default function DashboardPage() {
       }
     };
     fetchUpcoming();
-  }, [user]);
+    // Rotate inspiration once per login/session (guard against React StrictMode double-effect)
+    if (!user || hasRotatedInspo.current) return;
+    hasRotatedInspo.current = true;
+    try {
+      const key = `inspoIndex:${user.id}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      const prev = raw ? parseInt(raw, 10) : -1;
+      const next = isNaN(prev) ? 0 : (prev + 1) % inspirationMessages.length;
+      if (typeof window !== 'undefined') window.localStorage.setItem(key, String(next));
+      setInspoMessage(inspirationMessages[next]);
+    } catch {
+      // Fallback to random if storage unavailable
+      setInspoMessage(inspirationMessages[Math.floor(Math.random()*inspirationMessages.length)]);
+    }
+  }, [user, inspirationMessages]);
 
   // Animate stats when they load
   useEffect(() => {
@@ -329,12 +400,22 @@ export default function DashboardPage() {
   };
 
   // KPI helpers
-  const setCardRange = (card: 'notes'|'time'|'patients'|'accuracy', range: '7'|'14'|'30') => {
+  const setCardRange = (card: 'notes'|'time'|'patients'|'accuracy', range: '7'|'14'|'all') => {
     setKpiRanges(prev => ({ ...prev, [card]: range }));
   };
-  const getRangeDates = (range: '7'|'14'|'30') => {
-    const days = parseInt(range, 10);
+  const getRangeDates = (range: '7'|'14'|'all') => {
     const now = new Date();
+    if (range === 'all') {
+      const from = new Date(1970, 0, 1);
+      const to = now;
+      // Use a default window for sparkline buckets when showing all-time
+      const days = 30;
+      // No meaningful prior period for all-time; set to epoch window as placeholder
+      const prevTo = new Date(from.getTime());
+      const prevFrom = new Date(from.getTime());
+      return { from, to, prevFrom, prevTo, days };
+    }
+    const days = parseInt(range, 10);
     const to = now;
     const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     const prevTo = new Date(from.getTime());
@@ -342,8 +423,17 @@ export default function DashboardPage() {
     return { from, to, prevFrom, prevTo, days };
   };
 
+  const rangeLabel = (range: '7'|'14'|'all') => range === 'all' ? 'All time' : `Last ${range} days`;
+
   const calcAccuracy = (arr: Note[]) => {
     if (!arr.length) return 0;
+    // Use the accuracy_score field if available, otherwise fall back to completion-based calculation
+    const notesWithAccuracy = arr.filter(n => n.accuracy_score !== undefined && n.accuracy_score !== null);
+    if (notesWithAccuracy.length > 0) {
+      const totalAccuracy = notesWithAccuracy.reduce((sum, n) => sum + (n.accuracy_score || 0), 0);
+      return Math.round(totalAccuracy / notesWithAccuracy.length);
+    }
+    // Fallback to completion-based calculation for notes without accuracy_score
     const done = arr.filter(n => n.status === 'completed' || n.status === 'signed' || !!n.signed_at).length;
     return Math.round((done / arr.length) * 100);
   };
@@ -369,9 +459,16 @@ export default function DashboardPage() {
   }, [kpiRanges.notes, allNotes]);
   const timeSavedForCard = useMemo(() => {
     const { from, to } = getRangeDates(kpiRanges.time);
-    const count = allNotes.filter(n => inRange(new Date(n.created_at), from, to)).length;
-    return count * 15;
-  }, [kpiRanges.time, allNotes]);
+    const baselineMs = baselineMinutes * 60000;
+    const minutes = sessions
+      .filter(s => s && typeof s.startedAt === 'number' && typeof s.savedAt === 'number' && s.startedAt >= from.getTime() && s.startedAt <= to.getTime())
+      .reduce((acc, s) => {
+        const duration = Math.max(0, (s as any).durationMs ?? (s.savedAt - s.startedAt));
+        const savedMs = Math.max(0, baselineMs - duration);
+        return acc + Math.round(savedMs / 60000);
+      }, 0);
+    return minutes;
+  }, [kpiRanges.time, sessions, baselineMinutes]);
   const patientsCountForCard = useMemo(() => {
     const { from, to } = getRangeDates(kpiRanges.patients);
     const ids = new Set(allNotes.filter(n => inRange(new Date(n.created_at), from, to)).map(n => n.patient_id));
@@ -383,9 +480,37 @@ export default function DashboardPage() {
     return calcAccuracy(arr);
   }, [kpiRanges.accuracy, allNotes]);
 
+  // Time saved tooltip breakdown (recent sessions in range)
+  const timeSavedRows = useMemo(() => {
+    const { from, to } = getRangeDates(kpiRanges.time);
+    const baselineMs = baselineMinutes * 60000;
+    const rows = sessions
+      .filter(s => s && typeof s.startedAt === 'number' && s.startedAt >= from.getTime() && s.startedAt <= to.getTime())
+      .map(s => {
+        const duration = Math.max(0, (s as any).durationMs ?? (s.savedAt - s.startedAt));
+        const actualMin = Math.max(0, Math.round(duration / 60000));
+        const savedMin = Math.max(0, Math.round((baselineMs - duration) / 60000));
+        return { noteId: s.noteId, actualMin, savedMin, startedAt: s.startedAt };
+      })
+      .sort((a, b) => b.startedAt - a.startedAt);
+    return rows;
+  }, [kpiRanges.time, sessions, baselineMinutes]);
+  const timeSavedTooltip = useMemo(() => {
+    if (!timeSavedRows.length) return 'No measured sessions in range';
+    const lines = timeSavedRows.slice(0, 6).map(r => `#${r.noteId}: +${r.savedMin}m (baseline ${baselineMinutes}m, actual ${r.actualMin}m)`);
+    return `Time saved breakdown\n${lines.join('\n')}`;
+  }, [timeSavedRows, baselineMinutes]);
+  const timeSavedStats = useMemo(() => {
+    const count = timeSavedRows.length;
+    const totalActual = timeSavedRows.reduce((acc, r) => acc + r.actualMin, 0);
+    const avgActual = count ? Math.round(totalActual / count) : 0;
+    return { count, totalActual, avgActual };
+  }, [timeSavedRows]);
+
   // Deltas for tooltips (per-card ranges)
   useEffect(() => {
     if (!user) return;
+    if (kpiRanges.notes === 'all') { setKpiDelta(prev => ({ ...prev, notes: 0 })); return; }
     const { from, to, prevFrom, prevTo } = getRangeDates(kpiRanges.notes);
     const fetchBoth = async () => {
       try {
@@ -405,6 +530,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (kpiRanges.time === 'all') { setKpiDelta(prev => ({ ...prev, time: 0 })); return; }
     const { from, to, prevFrom, prevTo } = getRangeDates(kpiRanges.time);
     const fetchBoth = async () => {
       try {
@@ -424,6 +550,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (kpiRanges.patients === 'all') { setKpiDelta(prev => ({ ...prev, patients: 0 })); return; }
     const { from, to, prevFrom, prevTo } = getRangeDates(kpiRanges.patients);
     const fetchBoth = async () => {
       try {
@@ -445,6 +572,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) return;
+    if (kpiRanges.accuracy === 'all') { setKpiDelta(prev => ({ ...prev, accuracy: 0 })); return; }
     const { from, to, prevFrom, prevTo } = getRangeDates(kpiRanges.accuracy);
     const fetchBoth = async () => {
       try {
@@ -465,16 +593,43 @@ export default function DashboardPage() {
   // Load drawer data
   useEffect(() => {
     if (!drawerOpen || !activeKpi || !user) return;
-    const { from, to, days } = getRangeDates(kpiRanges[activeKpi]);
+    const { from, to, prevFrom, prevTo, days } = getRangeDates(kpiRanges[activeKpi]);
     const load = async () => {
       setDrawerLoading(true);
       try {
         const curr = await apiClient.getNotes({ limit: 1000, created_from: from.toISOString(), created_to: to.toISOString() });
         setDrawerNotes(curr);
         setDrawerSpark(buildSpark(curr, days));
+
+        // Compute per-patient deltas when viewing patients drawer
+        if (activeKpi === 'patients' && kpiRanges.patients !== 'all') {
+          const prev = await apiClient.getNotes({ limit: 1000, created_from: prevFrom.toISOString(), created_to: prevTo.toISOString() });
+          const countByPatient = (arr: Note[]) => {
+            const map: Record<number, number> = {};
+            for (const n of arr) {
+              const pid = (n.patient_id as unknown) as number;
+              if (pid != null) map[pid] = (map[pid] || 0) + 1;
+            }
+            return map;
+          };
+          const currCounts = countByPatient(curr);
+          const prevCounts = countByPatient(prev);
+          const ids = new Set<number>([...Object.keys(currCounts), ...Object.keys(prevCounts)].map((x) => parseInt(x as string, 10)));
+          const deltas: Record<number, number> = {};
+          ids.forEach((id) => {
+            const c = currCounts[id] || 0;
+            const p = prevCounts[id] || 0;
+            const base = p === 0 ? (c === 0 ? 1 : c) : p;
+            deltas[id] = Math.round(((c - p) / base) * 100);
+          });
+          setPatientDeltaMap(deltas);
+        } else if (activeKpi === 'patients' && kpiRanges.patients === 'all') {
+          setPatientDeltaMap({});
+        }
       } catch {
         setDrawerNotes([]);
         setDrawerSpark([]);
+        if (activeKpi === 'patients') setPatientDeltaMap({});
       } finally {
         setDrawerLoading(false);
       }
@@ -489,6 +644,7 @@ export default function DashboardPage() {
     show('Televisit opened in a new tab');
   };
   const checkIn = async (appt: Appointment) => {
+    setCheckingApptId(appt.id);
     try {
       const updated = await apiClient.checkInAppointment(appt.id);
       setUpcoming(prev => prev.map(a => a.id === appt.id ? updated : a));
@@ -496,16 +652,22 @@ export default function DashboardPage() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to check in';
       show(msg);
+    } finally {
+      setCheckingApptId(null);
     }
   };
 
   const remindIn10 = async (appt: Appointment) => {
+    setRemindingApptId(appt.id);
     try {
       await apiClient.remindAppointment(appt.id, 10);
+      setReminded(prev => ({ ...prev, [appt.id]: Date.now() }));
       show('Reminder set for 10 minutes');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to set reminder';
       show(msg);
+    } finally {
+      setRemindingApptId(null);
     }
   };
 
@@ -516,6 +678,11 @@ export default function DashboardPage() {
         e.preventDefault();
         setCommandOpen(v => !v);
       }
+      if ((e.shiftKey && (e.key === '?' || e.key === '/'))) {
+        e.preventDefault();
+        setShortcutsOpen(true);
+      }
+      if (e.key === 'Escape') setShortcutsOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -563,6 +730,18 @@ export default function DashboardPage() {
     
     return days;
   };
+  const patientRows = useMemo(() => {
+    if (activeKpi !== 'patients' || !drawerNotes || !drawerNotes.length) return [] as Array<{ patientId: number; count: number }>;
+    const counts: Record<number, number> = {};
+    for (const n of drawerNotes) {
+      const pid = n.patient_id as unknown as number;
+      if (pid != null) counts[pid] = (counts[pid] || 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([patientId, count]) => ({ patientId: parseInt(patientId, 10), count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [activeKpi, drawerNotes]);
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
@@ -584,6 +763,26 @@ export default function DashboardPage() {
       e.dataTransfer.dropEffect = 'move';
     } catch {}
     e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'appt', id: appt.id }));
+  };
+
+  // Long-press helpers
+  const openQuickMenu = (appt: Appointment, clientX: number, clientY: number) => {
+    setQuickApptMenu({ open: true, appt, x: clientX, y: clientY });
+  };
+  const closeQuickMenu = () => setQuickApptMenu({ open: false, appt: null, x: 0, y: 0 });
+  const onApptPressStart = (appt: Appointment, e: any) => {
+    const t = e?.touches?.[0];
+    const p = t ? { x: t.clientX, y: t.clientY } : { x: e.clientX || 0, y: e.clientY || 0 };
+    if (pressTimerRef.current) window.clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = window.setTimeout(() => {
+      openQuickMenu(appt, p.x, p.y);
+    }, 550);
+  };
+  const onApptPressEnd = () => {
+    if (pressTimerRef.current) {
+      window.clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
   };
 
   const handleNewApptDragStart = (e: React.DragEvent) => {
@@ -690,14 +889,15 @@ export default function DashboardPage() {
   // Don't render dashboard if user is not authenticated
   if (authLoading || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+      <div className="min-h-screen flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading dashboard">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600" aria-hidden="true"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
+    <>
+      <div className="min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
           {/* KPI Drawer */}
           {drawerOpen && (
@@ -711,15 +911,20 @@ export default function DashboardPage() {
                 <div className="mb-4 inline-flex items-center rounded-full border px-1 py-0.5 text-xs">
                   <button className={`px-2 py-0.5 rounded-full ${activeKpi && kpiRanges[activeKpi]==='7'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=> activeKpi && setCardRange(activeKpi,'7')}>7d</button>
                   <button className={`px-2 py-0.5 rounded-full ${activeKpi && kpiRanges[activeKpi]==='14'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=> activeKpi && setCardRange(activeKpi,'14')}>14d</button>
-                  <button className={`px-2 py-0.5 rounded-full ${activeKpi && kpiRanges[activeKpi]==='30'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=> activeKpi && setCardRange(activeKpi,'30')}>30d</button>
+                  <button className={`px-2 py-0.5 rounded-full ${activeKpi && kpiRanges[activeKpi]==='all'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=> activeKpi && setCardRange(activeKpi,'all')}>All</button>
                 </div>
-                {/* Simple sparkline */}
+                {/* Sparkline */}
                 <div className="h-16 flex items-end gap-1 mb-4">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className="w-2 flex-1 bg-emerald-100 dark:bg-gray-800 rounded" style={{ height: `${20 + (i * 7) % 60}%` }} />
-                  ))}
+                  {drawerSpark && drawerSpark.length > 0 ? (
+                    drawerSpark.map((v, i) => {
+                      const pct = Math.max(4, Math.round((v / (drawerSparkMax || 1)) * 100));
+                      return <div key={i} className="w-2 flex-1 bg-emerald-100 dark:bg-gray-800 rounded" style={{ height: `${pct}%` }} />
+                    })
+                  ) : (
+                    <div className="text-xs text-stone-500">No data</div>
+                  )}
                 </div>
-                {/* Placeholder table */}
+                {/* Drilldown table */}
                 <div className="border border-stone-200 dark:border-gray-800 rounded-md overflow-hidden">
                   <div className="grid grid-cols-3 text-xs font-medium bg-stone-50 dark:bg-[#1A1A1A] p-2 text-stone-600 dark:text-gray-300">
                     <div>Item</div>
@@ -727,13 +932,61 @@ export default function DashboardPage() {
                     <div className="text-right pr-2">Δ vs prior</div>
                   </div>
                   <div className="divide-y divide-stone-200 dark:divide-gray-800">
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="grid grid-cols-3 text-sm p-2">
-                        <div>#{i+1}</div>
-                        <div className="text-center">{activeKpi==='time'? `${5+i}m` : activeKpi==='accuracy'? `${90+i}%` : 1+i}</div>
-                        <div className="text-right pr-2 text-emerald-600">+{i}%</div>
-                      </div>
-                    ))}
+                    {activeKpi === 'patients' ? (
+                      patientRows.length === 0 ? (
+                        <div className="text-sm p-2 text-stone-500">No data</div>
+                      ) : (
+                        patientRows.map((row) => (
+                          <div key={row.patientId} className="grid grid-cols-3 text-sm p-2">
+                            <div>Patient #{row.patientId}</div>
+                            <div className="text-center">{row.count} note{row.count !== 1 ? 's' : ''}</div>
+                            <div className="text-right pr-2 text-emerald-600">
+                              {kpiRanges.patients === 'all' ? '—' : ((patientDeltaMap[row.patientId] ?? 0) >= 0 ? `+${patientDeltaMap[row.patientId] ?? 0}%` : `${patientDeltaMap[row.patientId]}%`)}
+                            </div>
+                          </div>
+                        ))
+                      )
+                    ) : activeKpi === 'time' ? (
+                      timeSavedRows.length === 0 ? (
+                        <div className="text-sm p-2 text-stone-500">No measured sessions in range</div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-3 text-sm p-2 bg-stone-50 dark:bg-[#151515]">
+                            <div>Total saved</div>
+                            <div className="text-center font-medium">{Math.round(animatedStats.timeSaved)}m</div>
+                            <div className="text-right pr-2 text-stone-500">{baselineMinutes}m baseline</div>
+                          </div>
+                          <div className="grid grid-cols-3 text-sm p-2 bg-stone-50 dark:bg-[#151515]">
+                            <div>Avg actual</div>
+                            <div className="text-center">{timeSavedStats.avgActual}m</div>
+                            <div className="text-right pr-2 text-stone-500">{timeSavedStats.count} sessions</div>
+                          </div>
+                          {timeSavedRows.slice(0, 12).map((r, idx) => (
+                            <div key={`${r.noteId}-${idx}`} className="grid grid-cols-3 text-sm p-2">
+                              <div>Note #{r.noteId}</div>
+                              <div className="text-center">+{r.savedMin}m saved</div>
+                              <div className="text-right pr-2 text-stone-500">{r.actualMin}m actual</div>
+                            </div>
+                          ))}
+                        </>
+                      )
+                    ) : (
+                      (drawerNotes && drawerNotes.length > 0 ? drawerNotes.slice(0, 8) : []).map((n) => (
+                        <div key={n.id} className="grid grid-cols-3 text-sm p-2">
+                          <div>Note #{n.id}</div>
+                          <div className="text-center">
+                            {activeKpi === 'accuracy' ? (
+                              (n.status === 'signed' || n.signed_at) ? 'Signed' : (n.status === 'completed' ? 'Completed' : 'Pending')
+                            ) : (
+                              formatDate(n.created_at)
+                            )}
+                          </div>
+                          <div className="text-right pr-2 text-emerald-600">
+                            {n.time_saved_minutes ? `+${n.time_saved_minutes}m` : '—'}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -746,11 +999,9 @@ export default function DashboardPage() {
                 <h1 className="text-3xl font-bold mb-2">
                   Welcome back, {user?.username || 'Dr. Smith'}!
                 </h1>
-                <p className="text-green-100 mb-6 text-lg">
-                  Ready to create your next clinical note? Let&apos;s make a difference today.
-                </p>
+                <p className="text-green-100 mb-6 text-lg">{inspoMessage}</p>
                 <div className="flex items-center gap-3">
-                  <Link href="/notes/new">
+                  <Link href="/notes/new?from_action=true">
                     <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
                       <DocumentPlus className="w-5 h-5 mr-2" />
                       Create New Note
@@ -767,12 +1018,12 @@ export default function DashboardPage() {
                   </button>
                 </div>
               </div>
-              <div className={`hidden md:flex items-center gap-4`}> 
+              <div className={`hidden md:block`}> 
                 {/* Patient Stats Card */}
-                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 text-center min-w-[140px]">
-                  <Heart className="w-6 h-6 mx-auto mb-2 text-green-100 dark:text-emerald-100" />
-                  <p className="text-xs text-green-100 dark:text-emerald-100">Caring for</p>
-                  <p className="text-xl font-bold">{loading ? '...' : animatedStats.patientEncounters}</p>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
+                  <Heart className="w-8 h-8 mx-auto mb-2 text-green-100 dark:text-emerald-100" />
+                  <p className="text-sm text-green-100 dark:text-emerald-100">Caring for</p>
+                  <p className="text-2xl font-bold">{loading ? '...' : animatedStats.patientEncounters}</p>
                   <p className="text-xs text-green-100 dark:text-emerald-100">active patients</p>
                 </div>
 
@@ -810,10 +1061,10 @@ export default function DashboardPage() {
               <div className="mb-3 inline-flex items-center rounded-full border px-1 py-0.5 text-xs">
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.notes==='7'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('notes','7');}}>7d</button>
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.notes==='14'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('notes','14');}}>14d</button>
-                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.notes==='30'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('notes','30');}}>30d</button>
+                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.notes==='all'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('notes','all');}}>All</button>
               </div>
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-emerald-100 p-3 rounded-lg" title={`Δ ${kpiDelta.notes}% vs prior`}>
+                <div className="bg-emerald-100 p-3 rounded-lg" title={`${kpiRanges.notes==='all' ? 'All-time' : `Δ ${kpiDelta.notes}% vs prior`}`}>
                   <FileText className="w-6 h-6 text-emerald-600" />
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
@@ -825,7 +1076,7 @@ export default function DashboardPage() {
               <div className="mt-4 h-2 bg-stone-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, animatedStats.totalNotes || 0)}%` }} />
               </div>
-              <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Last {kpiRanges.notes} days</div>
+              <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">{rangeLabel(kpiRanges.notes)}</div>
             </div>
 
             {/* Time Card */}
@@ -841,16 +1092,16 @@ export default function DashboardPage() {
               <div className="mb-3 inline-flex items-center rounded-full border px-1 py-0.5 text-xs">
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.time==='7'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('time','7');}}>7d</button>
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.time==='14'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('time','14');}}>14d</button>
-                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.time==='30'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('time','30');}}>30d</button>
+                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.time==='all'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('time','all');}}>All</button>
               </div>
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-blue-100 p-3 rounded-lg" title={`Δ ${kpiDelta.time}% vs prior`}>
+                <div className="bg-blue-100 p-3 rounded-lg" title={`${kpiRanges.time==='all' ? 'All-time' : `Δ ${kpiDelta.time}% vs prior`}`}>
                   <Clock className="w-6 h-6 text-blue-600" />
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
               </div>
-              <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1">
-                {loading ? '...' : `${timeSavedForCard}m`}
+              <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1" title={timeSavedTooltip}>
+                {loading ? '...' : `${Math.round(animatedStats.timeSaved)}m`}
               </div>
               <p className="text-stone-600 dark:text-gray-300 text-sm">Time Saved</p>
               <div className="mt-4 flex items-end gap-1 h-10">
@@ -858,7 +1109,15 @@ export default function DashboardPage() {
                   <div key={i} className="w-2 flex-1 bg-emerald-100 dark:bg-gray-800 rounded" style={{ height: `${20 + (i * 4) % 30}%` }} />
                 ))}
               </div>
-              <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Last {kpiRanges.time} days</div>
+              <div className="mt-2 flex items-center justify-between text-xs">
+                <span className="text-green-600 dark:text-emerald-400">{rangeLabel(kpiRanges.time)}</span>
+                <button
+                  className="text-emerald-700 dark:text-emerald-400 hover:underline"
+                  onClick={(e)=>{ e.stopPropagation(); setActiveKpi('time'); setDrawerOpen(true); }}
+                >
+                  View details
+                </button>
+              </div>
             </div>
 
             {/* Patients Card */}
@@ -874,10 +1133,10 @@ export default function DashboardPage() {
               <div className="mb-3 inline-flex items-center rounded-full border px-1 py-0.5 text-xs">
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.patients==='7'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('patients','7');}}>7d</button>
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.patients==='14'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('patients','14');}}>14d</button>
-                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.patients==='30'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('patients','30');}}>30d</button>
+                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.patients==='all'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('patients','all');}}>All</button>
               </div>
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-amber-100 p-3 rounded-lg" title={`Δ ${kpiDelta.patients}% vs prior`}>
+                <div className="bg-amber-100 p-3 rounded-lg" title={`${kpiRanges.patients==='all' ? 'All-time' : `Δ ${kpiDelta.patients}% vs prior`}`}>
                   <Users className="w-6 h-6 text-amber-600" />
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
@@ -889,7 +1148,7 @@ export default function DashboardPage() {
               <div className="mt-4 h-2 bg-stone-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <div className="h-full bg-amber-500 rounded-full" style={{ width: `${Math.min(100, animatedStats.patientEncounters || 0)}%` }} />
               </div>
-              <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Last {kpiRanges.patients} days</div>
+              <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">{rangeLabel(kpiRanges.patients)}</div>
             </div>
 
             {/* Accuracy Card */}
@@ -905,10 +1164,10 @@ export default function DashboardPage() {
               <div className="mb-3 inline-flex items-center rounded-full border px-1 py-0.5 text-xs">
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.accuracy==='7'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('accuracy','7');}}>7d</button>
                 <button className={`px-2 py-0.5 rounded-full ${kpiRanges.accuracy==='14'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('accuracy','14');}}>14d</button>
-                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.accuracy==='30'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('accuracy','30');}}>30d</button>
+                <button className={`px-2 py-0.5 rounded-full ${kpiRanges.accuracy==='all'?'bg-emerald-100 text-emerald-700':''}`} onClick={(e)=>{e.stopPropagation();setCardRange('accuracy','all');}}>All</button>
               </div>
               <div className="flex items-center justify-between mb-4">
-                <div className="bg-emerald-100 p-3 rounded-lg" title={`Δ ${kpiDelta.accuracy}% vs prior`}>
+                <div className="bg-emerald-100 p-3 rounded-lg" title={`${kpiRanges.accuracy==='all' ? 'All-time' : `Δ ${kpiDelta.accuracy}% vs prior`}`}>
                   <BarChart3 className="w-6 h-6 text-emerald-600" />
                 </div>
                 <TrendingUp className="w-5 h-5 text-green-500" />
@@ -925,7 +1184,7 @@ export default function DashboardPage() {
                       strokeDasharray={`${accuracyForCard}, 100`} d="M18 2a16 16 0 1 1 0 32 16 16 0 0 1 0-32z" />
                   </svg>
                 </div>
-                <div className="text-xs text-green-600 dark:text-emerald-400">Last {kpiRanges.accuracy} days</div>
+                <div className="text-xs text-green-600 dark:text-emerald-400">{rangeLabel(kpiRanges.accuracy)}</div>
               </div>
             </div>
           </div>
@@ -1091,8 +1350,8 @@ export default function DashboardPage() {
                       {upcoming.length === 0 ? (
                         <div className="text-center py-10">
                           <p className="text-stone-500 dark:text-gray-400 text-sm mb-4">No upcoming appointments</p>
-                          <Link href="/patients/new">
-                            <button className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">Add or Import</button>
+                          <Link href="/appointments/new">
+                            <button className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700">Schedule Appointment</button>
                           </Link>
                           <div className="mt-4">
                             <video className="mx-auto rounded-md shadow" width="280" height="158" autoPlay muted loop playsInline>
@@ -1104,7 +1363,17 @@ export default function DashboardPage() {
                         upcoming.map((appt) => {
                           const patient = patients[appt.patient_id];
                           return (
-                            <div key={appt.id} className="p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-400 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5" draggable onDragStart={(e)=>handleApptDragStart(appt, e)}>
+                            <div
+                              key={appt.id}
+                              className="p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-400 hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+                              draggable
+                              onDragStart={(e)=>handleApptDragStart(appt, e)}
+                              onMouseDown={(e)=>onApptPressStart(appt, e)}
+                              onMouseUp={onApptPressEnd}
+                              onMouseLeave={onApptPressEnd}
+                              onTouchStart={(e)=>onApptPressStart(appt, e)}
+                              onTouchEnd={onApptPressEnd}
+                            >
                               <div className="flex items-start justify-between mb-2">
                                 <div className="flex-1">
                                   <h4 className="font-semibold text-stone-800 dark:text-emerald-100 text-sm leading-tight">
@@ -1151,21 +1420,26 @@ export default function DashboardPage() {
                                   Televisit
                                 </button>
                                 <button 
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-stone-200 dark:border-gray-600 text-xs font-medium text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-800/30 transition-all duration-200 hover:shadow-sm" 
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all duration-200 hover:shadow-sm ${appt.status==='checked_in' ? 'border-green-300 text-green-700 bg-green-50 dark:text-emerald-300 dark:bg-emerald-900/20' : 'border-stone-200 dark:border-gray-600 text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-800/30'}`} 
                                   title="Check-in Patient" 
-                                  onClick={(e)=>{e.preventDefault(); e.stopPropagation(); checkIn(appt);}}
+                                  onClick={(e)=>{e.preventDefault(); e.stopPropagation(); if(appt.status!=='checked_in') checkIn(appt);}}
+                                  disabled={checkingApptId===appt.id || appt.status==='checked_in'}
                                 >
                                   <CheckCircle className="w-3.5 h-3.5" />
-                                  Check-in
+                                  {checkingApptId===appt.id ? 'Checking…' : (appt.status==='checked_in' ? 'Checked in' : 'Check-in')}
                                 </button>
                                 <button 
                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-stone-200 dark:border-gray-600 text-xs font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-800/30 transition-all duration-200 hover:shadow-sm" 
                                   title="Set 10 minute reminder" 
                                   onClick={(e)=>{e.preventDefault(); e.stopPropagation(); remindIn10(appt);}}
+                                  disabled={remindingApptId===appt.id}
                                 >
                                   <Bell className="w-3.5 h-3.5" />
-                                  Remind 10m
+                                  {remindingApptId===appt.id ? 'Scheduling…' : 'Remind 10m'}
                                 </button>
+                                {reminded[appt.id] && (
+                                  <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-300">Reminder set</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -1247,6 +1521,22 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Quick Actions Context Menu */}
+          {quickApptMenu.open && quickApptMenu.appt && (
+            <div className="fixed inset-0 z-[88]" onClick={()=>setQuickApptMenu({ open:false, appt:null, x:0, y:0 })}>
+              <div
+                className="absolute bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-stone-200 dark:border-gray-800 text-sm"
+                style={{ left: Math.max(8, Math.min(window.innerWidth - 220, quickApptMenu.x - 110)), top: Math.max(8, Math.min(window.innerHeight - 160, quickApptMenu.y + 8)) }}
+                onClick={(e)=>e.stopPropagation()}
+              >
+                <button className="block w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={()=>{ window.location.href=`/notes/new?patient_id=${quickApptMenu.appt!.patient_id}`; setQuickApptMenu({ open:false, appt:null, x:0, y:0 }); }}>Start Note</button>
+                <button className="block w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={()=>{ startTelevisit(quickApptMenu.appt!); setQuickApptMenu({ open:false, appt:null, x:0, y:0 }); }}>Start Televisit</button>
+                <button className="block w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={()=>{ checkIn(quickApptMenu.appt!); setQuickApptMenu({ open:false, appt:null, x:0, y:0 }); }}>Check-in</button>
+                <button className="block w-full text-left px-4 py-2 hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={()=>{ remindIn10(quickApptMenu.appt!); setQuickApptMenu({ open:false, appt:null, x:0, y:0 }); }}>Remind in 10m</button>
+              </div>
+            </div>
+          )}
+
           {/* AI Copilot Drawer */}
           {copilotOpen && (
             <div className="fixed inset-0 z-[85]">
@@ -1261,7 +1551,7 @@ export default function DashboardPage() {
                 <div className="mb-4 inline-flex items-center rounded-full border border-stone-200 dark:border-gray-800 px-1 py-0.5 text-xs">
                   <button className={`px-3 py-1 rounded-full ${copilotTab==='summary'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=>setCopilotTab('summary')}>Summary</button>
                   <button className={`px-3 py-1 rounded-full ${copilotTab==='templates'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=>setCopilotTab('templates')}>Templates</button>
-                  <button className={`px-3 py-1 rounded-full ${copilotTab==='checklists'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=>setCopilotTab('checklists')}>ROS/PE</button>
+                  <button className={`px-3 py-1 rounded-full ${copilotTab==='checklists'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=>setCopilotTab('checklists')}>ROS</button>
                   <button className={`px-3 py-1 rounded-full ${copilotTab==='insights'?'bg-emerald-100 text-emerald-700':''}`} onClick={()=>setCopilotTab('insights')}>Insights</button>
                 </div>
 
@@ -1314,37 +1604,24 @@ export default function DashboardPage() {
                               checked={Array.isArray(aiPrefs?.ros_sections) ? aiPrefs.ros_sections.includes(item) : false}
                               onChange={async (e)=>{
                                 if (e.target.checked) {
-                                  if(!window.confirm(`Confirm enable ROS setting: ${item}?`)) { return; }
+                                  showAlertDialog(
+                                    'Confirm ROS Setting',
+                                    `Are you sure you want to enable ${item} in the Review of Systems?`,
+                                    async () => {
+                                      const next = new Set(aiPrefs?.ros_sections || []);
+                                      next.add(item);
+                                      const updated = { ...(aiPrefs||{}), ros_sections: Array.from(next) };
+                                      setAiPrefs(updated);
+                                      try { await apiClient.updatePreferences({ ros_sections: Array.from(next) }); show('Saved'); } catch { show('Failed to save'); }
+                                    }
+                                  );
+                                  return;
                                 }
                                 const next = new Set(aiPrefs?.ros_sections || []);
-                                if (e.target.checked) next.add(item); else next.delete(item);
+                                next.delete(item);
                                 const updated = { ...(aiPrefs||{}), ros_sections: Array.from(next) };
                                 setAiPrefs(updated);
                                 try { await apiClient.updatePreferences({ ros_sections: Array.from(next) }); show('Saved'); } catch { show('Failed to save'); }
-                              }}
-                            /> {item}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-stone-800 dark:text-gray-100 mb-2">Physical Exam</div>
-                      <div className="grid grid-cols-2 gap-2 text-sm text-stone-700 dark:text-gray-200">
-                        {['General','HEENT','Neck','Cardiac','Lungs','Abdomen','Extremities','Neuro','Skin'].map(item => (
-                          <label key={item} className="inline-flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              className="rounded border-stone-300 dark:border-gray-700"
-                              checked={Array.isArray(aiPrefs?.pe_sections) ? aiPrefs.pe_sections.includes(item) : false}
-                              onChange={async (e)=>{
-                                if (e.target.checked) {
-                                  if(!window.confirm(`Confirm enable PE setting: ${item}?`)) { return; }
-                                }
-                                const next = new Set(aiPrefs?.pe_sections || []);
-                                if (e.target.checked) next.add(item); else next.delete(item);
-                                const updated = { ...(aiPrefs||{}), pe_sections: Array.from(next) };
-                                setAiPrefs(updated);
-                                try { await apiClient.updatePreferences({ pe_sections: Array.from(next) }); show('Saved'); } catch { show('Failed to save'); }
                               }}
                             /> {item}
                           </label>
@@ -1372,12 +1649,33 @@ export default function DashboardPage() {
                       </div>
                       <div className="p-3 rounded-lg border border-stone-200 dark:border-gray-800">
                         <div className="text-xs text-stone-500 dark:text-gray-400">Time saved</div>
-                        <div className="text-lg font-semibold text-stone-800 dark:text-gray-100">{timeSavedForCard}m</div>
+                        <div className="text-lg font-semibold text-stone-800 dark:text-gray-100">{Math.round(animatedStats.timeSaved)}m</div>
                       </div>
                     </div>
                   </div>
                 )}
 
+              </div>
+            </div>
+          )}
+
+          {/* Keyboard Shortcuts Overlay */}
+          {shortcutsOpen && (
+            <div className="fixed inset-0 z-[96] flex items-start justify-center pt-24" onClick={()=>setShortcutsOpen(false)}>
+              <div className="absolute inset-0 bg-black/40" />
+              <div className="relative bg-white dark:bg-gray-900 w-full max-w-lg rounded-xl shadow-2xl border border-stone-200 dark:border-gray-800 overflow-hidden" onClick={(e)=>e.stopPropagation()}>
+                <div className="p-4 border-b border-stone-200 dark:border-gray-800 flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-stone-800 dark:text-gray-100">Keyboard Shortcuts</h4>
+                  <button className="text-stone-500 hover:text-stone-700" onClick={()=>setShortcutsOpen(false)} aria-label="Close">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="p-4 grid grid-cols-1 gap-2 text-sm">
+                  <div className="flex items-center justify-between"><span>Open Command Palette</span><kbd className="px-2 py-1 bg-stone-100 dark:bg-[#1A1A1A] rounded">Ctrl / ⌘ + K</kbd></div>
+                  <div className="flex items-center justify-between"><span>Shortcuts Overlay</span><kbd className="px-2 py-1 bg-stone-100 dark:bg-[#1A1A1A] rounded">Shift + /</kbd></div>
+                  <div className="flex items-center justify-between"><span>Toggle Right Panel</span><kbd className="px-2 py-1 bg-stone-100 dark:bg-[#1A1A1A] rounded">T</kbd></div>
+                  <div className="flex items-center justify-between"><span>New Note</span><kbd className="px-2 py-1 bg-stone-100 dark:bg-[#1A1A1A] rounded">N</kbd></div>
+                </div>
               </div>
             </div>
           )}
@@ -1425,5 +1723,33 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {/* Alert Dialog for AI Copilot Confirmations */}
+      <AlertDialog open={alertDialogOpen} onOpenChange={setAlertDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{alertDialogConfig.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {alertDialogConfig.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              alertDialogConfig.onConfirm();
+              setAlertDialogOpen(false);
+            }}>
+              Continue
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Finalization Warning Dialog */}
+      <FinalizationWarning 
+        isOpen={showFinalizationDialog}
+        onClose={() => setShowFinalizationDialog(false)}
+      />
+    </>
   );
 }

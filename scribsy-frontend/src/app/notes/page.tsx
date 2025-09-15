@@ -15,7 +15,11 @@ import {
   FunnelIcon,
   CheckCircleIcon,
   ClockIcon,
-  DocumentCheckIcon
+  DocumentCheckIcon,
+  ArrowDownTrayIcon,
+  SpeakerWaveIcon,
+  ShareIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
@@ -105,6 +109,56 @@ export default function NotesPage() {
     }
   };
 
+  const exportNotePDF = async (noteId: number) => {
+    try {
+      const blob = await apiClient.exportNotePDF(noteId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `note-${noteId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to export PDF:', e);
+    }
+  };
+
+  const exportNoteAudio = async (noteId: number) => {
+    try {
+      const blob = await apiClient.exportNoteAudio(noteId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `note-${noteId}-audio${blob.type.includes('mp3') ? '.mp3' : blob.type.includes('wav') ? '.wav' : '.audio'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to export audio:', e);
+    }
+  };
+
+  const shareNote = async (note: Note) => {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `Note ${note.id}`,
+          text: `Medical note for ${note.patient_first_name} ${note.patient_last_name}`,
+          url: window.location.origin + `/notes/${note.id}`
+        });
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(`${window.location.origin}/notes/${note.id}`);
+        alert('Note link copied to clipboard');
+      }
+    } catch (error) {
+      console.error('Failed to share note:', error);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -162,7 +216,7 @@ export default function NotesPage() {
           <h1 className="text-2xl font-bold text-gray-900">
             Notes History
           </h1>
-          <Link href="/notes/new">
+          <Link href="/notes/new?from_action=true">
             <Button>
               <DocumentPlusIcon className="w-4 h-4 mr-2" />
               New Note
@@ -251,8 +305,37 @@ export default function NotesPage() {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => exportNotePDF(note.id)}
+                        title="Export PDF"
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                      >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                      </Button>
+                      {note.audio_file && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => exportNoteAudio(note.id)}
+                          title="Export Audio"
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <SpeakerWaveIcon className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => shareNote(note)}
+                        title="Share Note"
+                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                      >
+                        <ShareIcon className="w-4 h-4" />
+                      </Button>
                       <Link href={`/notes/${note.id}/edit`}>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" title="Edit Note">
                           <PencilIcon className="w-4 h-4" />
                         </Button>
                       </Link>
@@ -262,6 +345,7 @@ export default function NotesPage() {
                         onClick={() => deleteNote(note.id)}
                         disabled={deleteLoading === note.id.toString()}
                         className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        title="Delete Note"
                       >
                         {deleteLoading === note.id.toString() ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>

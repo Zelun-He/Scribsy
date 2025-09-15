@@ -21,3 +21,5 @@ def reset_my_prefs(current_user = Depends(get_current_user)) -> Dict[str, Any]:
     return reset_user_preferences(current_user.id)
 
 
+
+

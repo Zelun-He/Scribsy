@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -14,6 +14,7 @@ import {
 import { apiClient } from '@/lib/api';
 import { Note } from '@/types';
 import { useToast } from '@/lib/toast';
+import { recordNoteSession } from '@/lib/metrics';
 
 export default function EditNotePage() {
   const params = useParams();
@@ -24,6 +25,11 @@ export default function EditNotePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const { show } = useToast();
+  const draftKey = useMemo(() => (note?.id ? `draft:edit:${note.id}` : 'draft:edit:anon'), [note]);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(Date.now());
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (params.id) {
@@ -44,6 +50,49 @@ export default function EditNotePage() {
     }
   };
 
+  // Restore local draft when note loads
+  useEffect(() => {
+    if (!note) return;
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(draftKey) : null;
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft && typeof draft.content === 'string' && draft.content) {
+          setContent(draft.content);
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note]);
+
+  // Debounced local draft autosave
+  useEffect(() => {
+    if (!note) return;
+    setDraftSaving(true);
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(() => {
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(draftKey, JSON.stringify({ content }));
+          setDraftSavedAt(Date.now());
+        }
+      } catch {}
+      setDraftSaving(false);
+    }, 800);
+    return () => {
+      if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    };
+  }, [content, draftKey, note]);
+
+  // Tick for relative time label
+  useEffect(() => {
+    if (!draftSavedAt) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [draftSavedAt]);
+
+  const savedLabel = draftSaving ? 'Saving…' : (draftSavedAt ? `Saved ${Math.max(0, Math.round((nowTick - draftSavedAt) / 1000))}s ago` : '');
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!note) return;
@@ -52,9 +101,12 @@ export default function EditNotePage() {
     setError('');
 
     try {
+      const startedAt = Date.now();
       const updatedNote = await apiClient.updateNote(note.id, {
         content,
       });
+      const savedAt = Date.now();
+      try { recordNoteSession(null, updatedNote.id, 'edit', startedAt, savedAt); } catch {}
       show('Saved just now');
       router.push(`/notes/${updatedNote.id.toString()}`);
     } catch (err) {
@@ -134,13 +186,18 @@ export default function EditNotePage() {
               Edit Note
             </h1>
           </div>
-          <Button
-            onClick={handleSubmit}
-            disabled={saving}
-            loading={saving}
-          >
-            {saving ? 'Saving...' : 'Save Changes'}
-          </Button>
+          <div className="flex items-center gap-3">
+            {savedLabel && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">{savedLabel}</span>
+            )}
+            <Button
+              onClick={handleSubmit}
+              disabled={saving}
+              loading={saving}
+            >
+              {saving ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
         </div>
 
         {error && (

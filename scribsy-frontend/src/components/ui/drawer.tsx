@@ -35,3 +35,4 @@ export const Drawer: React.FC<DrawerProps> = ({ open, onOpenChange, side = 'righ
 
 // Simple CSS animation via tailwind layer (to be included in globals)
 
+

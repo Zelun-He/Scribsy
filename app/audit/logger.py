@@ -182,6 +182,33 @@ class HIPAAAuditLogger:
             
         except Exception as e:
             audit_logger.critical(f"LOGIN_AUDIT_FAILURE: {str(e)}")
+    
+    @staticmethod
+    def log_password_change(
+        db: Session,
+        user_id: int,
+        username: str,
+        success: bool = True,
+        error_message: Optional[str] = None
+    ):
+        """
+        Log password change events for security monitoring
+        """
+        try:
+            HIPAAAuditLogger.log_action(
+                db=db,
+                user_id=user_id,
+                username=username,
+                action_type="PASSWORD_CHANGE",
+                resource_type="user",
+                resource_id=user_id,
+                description=f"Password change for user {username}",
+                success=success,
+                error_message=error_message
+            )
+            
+        except Exception as e:
+            audit_logger.critical(f"PASSWORD_CHANGE_AUDIT_FAILURE: {str(e)}")
 
 # Helper function to get PHI field names from patient data
 def get_phi_fields(patient_data: Dict[str, Any]) -> List[str]:

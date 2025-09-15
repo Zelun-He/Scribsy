@@ -95,9 +95,14 @@ async def summarize_note(user_message: str, db: Optional[Session] = None,
     # Optional RAG service; guard import to avoid hard dependency
     rag_service = None
     try:
-        from app.services.rag_service import rag_service as _rag_service
-        rag_service = _rag_service
-    except Exception:
+        # Try to import RAG service if it exists
+        import importlib.util
+        spec = importlib.util.find_spec("app.services.rag_service")
+        if spec is not None:
+            from app.services.rag_service import rag_service as _rag_service  # type: ignore
+            rag_service = _rag_service
+    except (ImportError, ModuleNotFoundError):
+        # RAG service is optional, continue without it
         rag_service = None
     
     # Build system prompt with user preferences

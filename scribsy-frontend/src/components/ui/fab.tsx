@@ -21,10 +21,9 @@ export const Fab: React.FC = () => {
     <div className="fixed bottom-6 right-6 z-[70]">
       {open && (
         <div className="mb-3 flex flex-col items-end gap-2">
-          <Action label="New SOAP" onClick={() => router.push('/notes/new')} />
-          <Action label="Dictate" onClick={() => router.push('/notes/new?dictate=1')} />
-          <Action label="Import PDF" onClick={() => router.push('/notes/new?import=pdf')} />
-          <Action label="Schedule follow-up" onClick={() => router.push('/patients')} />
+          <Action label="New SOAP" onClick={() => router.push('/notes/new?from_action=true')} />
+          <Action label="Import PDF" onClick={() => router.push('/notes/new?import=pdf&from_action=true')} />
+          <Action label="Schedule Appointment" onClick={() => router.push('/appointments/new')} />
         </div>
       )}
       <button
@@ -39,5 +38,6 @@ export const Fab: React.FC = () => {
     </div>
   );
 };
+
 
 

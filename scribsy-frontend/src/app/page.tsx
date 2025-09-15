@@ -64,8 +64,8 @@ export default function Home() {
               into Professional SOAP Notes
             </h1>
             <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-2xl">
-              Revolutionize your clinical workflow with AI-powered transcription and documentation. 
-              Convert patient conversations into structured, professional clinical notes in seconds.
+              Complete clinical documentation platform with patient management, AI-powered transcription, 
+              and structured SOAP note generation. Manage patients, create notes, and streamline your workflow.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-12">
               <Link href="/register" className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-10 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-emerald-800 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2" style={{ textDecoration: 'none' }}>
@@ -161,8 +161,8 @@ export default function Home() {
               <span className="text-transparent bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text"> Scribsy</span>
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Streamline your clinical documentation workflow with cutting-edge AI technology 
-              designed specifically for healthcare professionals.
+              Complete patient management and clinical documentation platform with AI-powered features, 
+              comprehensive patient database, and professional note generation capabilities.
             </p>
           </div>
           
@@ -173,13 +173,13 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Voice-to-Text Transcription</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Patient Management</h3>
               <p className="text-gray-600 leading-relaxed mb-6">
-                Advanced speech recognition technology converts patient conversations into accurate, 
-                structured text with medical terminology precision.
+                Comprehensive patient database with demographics, contact information, and medical history. 
+                Search, manage, and track patient information efficiently.
               </p>
               <div className="flex items-center text-emerald-600 font-medium">
-                <span>99.9% Accuracy Rate</span>
+                <span>Complete Patient Profiles</span>
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -192,13 +192,13 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">AI-Generated SOAP Notes</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Clinical Note Management</h3>
               <p className="text-gray-600 leading-relaxed mb-6">
-                Automatically structure transcriptions into professional SOAP format with 
-                Subjective, Objective, Assessment, and Plan sections.
+                Create, edit, and manage clinical notes with audio attachments. 
+                Link notes to patients and organize your documentation workflow.
               </p>
               <div className="flex items-center text-blue-600 font-medium">
-                <span>2-Minute Generation</span>
+                <span>Audio & Text Notes</span>
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -211,13 +211,13 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">HIPAA Compliant Security</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Dashboard & Analytics</h3>
               <p className="text-gray-600 leading-relaxed mb-6">
-                Enterprise-grade security with end-to-end encryption ensures patient data 
-                remains protected and compliant with healthcare regulations.
+                Comprehensive dashboard with patient statistics, note tracking, and workflow analytics. 
+                Monitor your practice performance and productivity metrics.
               </p>
               <div className="flex items-center text-amber-600 font-medium">
-                <span>Bank-Level Security</span>
+                <span>Real-time Analytics</span>
                 <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -227,23 +227,23 @@ export default function Home() {
 
           <div className="bg-gradient-to-r from-emerald-600 to-green-700 rounded-2xl p-12 text-center text-white">
             <h3 className="text-3xl lg:text-4xl font-bold mb-4">
-              Save 75% of Your Documentation Time
+              Streamline Your Clinical Workflow
             </h3>
             <p className="text-xl text-emerald-100 mb-8 max-w-2xl mx-auto">
-              Join thousands of healthcare professionals who have revolutionized their workflow with Scribsy AI.
+              Complete patient management and documentation platform designed for modern healthcare practices.
             </p>
             <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-200 mb-2">15min</div>
-                <div className="text-emerald-100">Average time saved per note</div>
+                <div className="text-4xl font-bold text-emerald-200 mb-2">100%</div>
+                <div className="text-emerald-100">HIPAA Compliant</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-200 mb-2">50K+</div>
-                <div className="text-emerald-100">Notes generated daily</div>
+                <div className="text-4xl font-bold text-emerald-200 mb-2">24/7</div>
+                <div className="text-emerald-100">Secure Access</div>
               </div>
               <div className="text-center">
-                <div className="text-4xl font-bold text-emerald-200 mb-2">98%</div>
-                <div className="text-emerald-100">User satisfaction rate</div>
+                <div className="text-4xl font-bold text-emerald-200 mb-2">Real-time</div>
+                <div className="text-emerald-100">Patient Management</div>
               </div>
             </div>
           </div>
@@ -258,8 +258,8 @@ export default function Home() {
               How <span className="text-transparent bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text">Scribsy</span> Works
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Transform your clinical documentation process in three simple steps. 
-              From patient encounter to professional SOAP note in under 2 minutes.
+              Complete clinical workflow management in three simple steps. 
+              From patient registration to comprehensive documentation and analytics.
             </p>
           </div>
 
@@ -273,10 +273,10 @@ export default function Home() {
                 </div>
                 <div className="absolute -top-4 -right-4 w-8 h-8 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center font-bold text-lg">1</div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Record or Upload</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Manage Patients</h3>
               <p className="text-gray-600 leading-relaxed">
-                Start recording your patient encounter directly in Scribsy or upload existing audio files. 
-                Our system supports all major audio formats with crystal-clear recognition.
+                Create comprehensive patient profiles with demographics, contact information, and medical history. 
+                Search and manage your patient database efficiently.
               </p>
             </div>
 
@@ -289,10 +289,10 @@ export default function Home() {
                 </div>
                 <div className="absolute -top-4 -right-4 w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold text-lg">2</div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">AI Processing</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Create Notes</h3>
               <p className="text-gray-600 leading-relaxed">
-                Our advanced AI engine analyzes the audio, extracts key medical information, 
-                and structures it according to clinical standards and medical best practices.
+                Create clinical notes with text content and audio attachments. Link notes to patients 
+                and organize your documentation with comprehensive note management features.
               </p>
             </div>
 
@@ -305,10 +305,10 @@ export default function Home() {
                 </div>
                 <div className="absolute -top-4 -right-4 w-8 h-8 bg-green-100 text-green-700 rounded-full flex items-center justify-center font-bold text-lg">3</div>
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Professional SOAP Note</h3>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Track & Analyze</h3>
               <p className="text-gray-600 leading-relaxed">
-                Receive a professionally formatted SOAP note ready for review and integration 
-                into your EHR system. Edit, customize, and finalize with ease.
+                Monitor your practice with comprehensive dashboard analytics, patient statistics, 
+                and workflow insights. Track productivity and optimize your clinical operations.
               </p>
             </div>
           </div>
@@ -317,30 +317,30 @@ export default function Home() {
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-6">
-                  Ready to Transform Your Practice?
+                  Ready to Streamline Your Practice?
                 </h3>
                 <p className="text-lg text-gray-600 mb-8 leading-relaxed">
-                  Join over 10,000 healthcare professionals who have already revolutionized their 
-                  clinical documentation workflow with Scribsy AI. Start your free trial today.
+                  Get started with Scribsy's complete patient management and clinical documentation platform. 
+                  Manage patients, create notes, and track your practice performance.
                 </p>
                 <div className="space-y-4 mb-8">
                   <div className="flex items-center gap-3">
                     <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-gray-700">No setup required - start documenting immediately</span>
+                    <span className="text-gray-700">Complete patient management system</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-gray-700">14-day free trial with full feature access</span>
+                    <span className="text-gray-700">Clinical note creation and management</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <svg className="w-6 h-6 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
-                    <span className="text-gray-700">Cancel anytime, no long-term contracts</span>
+                    <span className="text-gray-700">HIPAA compliant and secure</span>
                   </div>
                 </div>
                 <Link href="/register" className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-xl hover:from-emerald-700 hover:to-emerald-800 transition-all transform hover:-translate-y-1" style={{ textDecoration: 'none' }}>
@@ -358,8 +358,8 @@ export default function Home() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <h4 className="text-2xl font-bold text-gray-900 mb-2">2 Minutes</h4>
-                    <p className="text-gray-600">Average processing time from audio to SOAP note</p>
+                    <h4 className="text-2xl font-bold text-gray-900 mb-2">Complete</h4>
+                    <p className="text-gray-600">Patient management and documentation platform</p>
                   </div>
                 </div>
                 <div className="absolute -top-4 -right-4 w-12 h-12 bg-emerald-200 rounded-full opacity-60"></div>
@@ -384,8 +384,8 @@ export default function Home() {
                 <span className="text-transparent bg-gradient-to-r from-emerald-400 to-green-400 bg-clip-text">SCRIBSY</span>
               </div>
               <p className="text-gray-300 text-lg leading-relaxed mb-6 max-w-md">
-                Revolutionizing clinical documentation with AI-powered transcription and SOAP note generation 
-                for healthcare professionals worldwide.
+                Complete patient management and clinical documentation platform with comprehensive features 
+                for modern healthcare practices.
               </p>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2">

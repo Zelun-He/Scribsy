@@ -25,7 +25,7 @@ export const CommandPalette: React.FC = () => {
   const items = useMemo(() => ([
     { value: 'new-note', label: 'New note', action: () => router.push('/notes/new') },
     { value: 'find-patient', label: 'Find patient', action: () => router.push('/patients') },
-    { value: 'start-dictation', label: 'Start dictation', action: () => {/* stub for now */} },
+    { value: 'start-dictation', label: 'Start dictation', action: () => router.push('/notes/new?start_dictation=1') },
     { value: 'toggle-theme', label: 'Toggle dark mode', action: () => setTheme(theme === 'dark' ? 'light' : 'dark') },
   ]), [router, setTheme, theme]);
 

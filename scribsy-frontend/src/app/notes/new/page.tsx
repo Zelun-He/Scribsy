@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, Suspense } from 'react';
+import React, { useState, useRef, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,13 +18,17 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
-  CalendarIcon
+  CalendarIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Patient } from '@/types';
 import { useToast } from '@/lib/toast';
 import { burstConfetti } from '@/lib/confetti';
+import { recordNoteSession } from '@/lib/metrics';
+import { TimingControl } from '@/components/ui/timing-control';
+import { formatDateOfBirthWithAge } from '@/utils/date';
 
 interface SOAPNote {
   subjective: string;
@@ -51,6 +55,7 @@ function NewNotePageContent() {
   const [soapNote, setSoapNote] = useState<SOAPNote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [createdNoteId, setCreatedNoteId] = useState<number | null>(null);
   
   // Patient management
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -82,6 +87,19 @@ function NewNotePageContent() {
         if (patientIdParam) {
           setSelectedPatientId(patientIdParam);
         }
+        
+        // Check if this is coming from an action button (like New SOAP)
+        const fromAction = searchParams.get('from_action');
+        const clearPatientData = fromAction === 'true' || fromAction === '1';
+        
+        // Always start fresh - no draft restoration for new notes
+        // Clear any existing draft data to ensure clean start
+        if (typeof window !== 'undefined') {
+          try {
+            const draftKey = user?.id ? `draft:new:${user.id}` : 'draft:new:anon';
+            window.localStorage.removeItem(draftKey);
+          } catch {}
+        }
       } catch (error) {
         console.error('Failed to fetch patients:', error);
       } finally {
@@ -91,6 +109,15 @@ function NewNotePageContent() {
 
     fetchPatients();
   }, [searchParams]);
+
+  // Auto-start dictation if requested via query
+  useEffect(() => {
+    const shouldStart = searchParams.get('start_dictation') === '1';
+    if (shouldStart && !isRecording) {
+      startRecording().catch(() => {});
+    }
+  }, [searchParams, isRecording]);
+
 
   // Update selected patient when patient ID changes
   useEffect(() => {
@@ -149,6 +176,17 @@ function NewNotePageContent() {
     if (audioPlayerRef.current) {
       audioPlayerRef.current.pause();
       setIsPlaying(false);
+    }
+  };
+
+  const downloadAudio = () => {
+    if (audioFile && audioUrl) {
+      const link = document.createElement('a');
+      link.href = audioUrl;
+      link.download = `recording_${new Date().toISOString().split('T')[0]}.wav`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -276,6 +314,7 @@ function NewNotePageContent() {
     }
 
     try {
+      const startedAt = Date.now();
       // Prepare the content - include manual content, transcription, and SOAP note if available
       let finalContent = content || transcription || '';
       
@@ -309,7 +348,10 @@ function NewNotePageContent() {
         ...(audioFile && { audio_file: audioFile })
       };
 
-      await apiClient.createNote(noteData);
+      const created = await apiClient.createNote(noteData);
+      const savedAt = Date.now();
+      try { recordNoteSession(user?.id ?? null, created.id, 'new', startedAt, savedAt); } catch {}
+      setCreatedNoteId(created.id);
       show('Saved just now');
       router.push('/notes');
     } catch (err) {
@@ -326,13 +368,15 @@ function NewNotePageContent() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
             Create New Note
           </h1>
-                            <Button
-                    onClick={handleSubmit}
-                    disabled={loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
-                    loading={loading}
-                  >
-            {loading ? 'Saving...' : 'Save Note'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSubmit}
+              disabled={loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
+              loading={loading}
+            >
+              {loading ? 'Saving...' : 'Save Note'}
+            </Button>
+          </div>
         </div>
 
         {error && (
@@ -406,16 +450,7 @@ function NewNotePageContent() {
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span className="text-blue-800 dark:text-blue-200">
-                        {(() => {
-                          const dob = new Date(selectedPatient.date_of_birth);
-                          const today = new Date();
-                          let age = today.getFullYear() - dob.getFullYear();
-                          const hasHadBirthdayThisYear =
-                            today.getMonth() > dob.getMonth() ||
-                            (today.getMonth() === dob.getMonth() && today.getDate() >= dob.getDate());
-                          if (!hasHadBirthdayThisYear) age -= 1;
-                          return <>DOB: {dob.toLocaleDateString()} ({age} years)</>;
-                        })()}
+                        DOB: {formatDateOfBirthWithAge(selectedPatient.date_of_birth)}
                       </span>
                     </div>
                     {selectedPatient.phone_number && (
@@ -559,6 +594,9 @@ function NewNotePageContent() {
             </CardContent>
           </Card>
 
+          {/* Timing Control - Only show after note is created */}
+          {createdNoteId && <TimingControl noteId={createdNoteId} className="mb-6" />}
+
           {/* Audio Recording Section */}
           <Card>
             <CardHeader>
@@ -644,6 +682,15 @@ function NewNotePageContent() {
                           <PauseIcon className="w-4 h-4" />
                         </Button>
                       )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={downloadAudio}
+                        title="Download audio file"
+                      >
+                        <ArrowDownTrayIcon className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                   <audio

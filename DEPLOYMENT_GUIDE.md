@@ -80,10 +80,25 @@ This guide will walk you through deploying your Scribsy application to productio
 3. **Get connection string**
 4. **Update backend environment variables**
 
-## 🔧 **Step 4: Update Frontend Configuration**
+## 🔧 **Step 4: Update Environment Variables for Production**
 
-After getting your backend URL, update the frontend environment:
+### **Backend Environment Variables (Railway/Render)**
+⚠️ **CRITICAL**: Before deploying to production, update these settings:
 
+```bash
+# Security Settings (REQUIRED for production)
+DEBUG=False                    # ⚠️ MUST be False in production
+SECRET_KEY=your-super-secure-secret-key-here
+ALLOWED_ORIGINS=https://your-frontend-domain.com
+
+# Database
+DATABASE_URL=your-production-database-url
+
+# Other settings
+ENVIRONMENT=production
+```
+
+### **Frontend Environment Variables (Vercel)**
 1. **Go to Vercel dashboard**
 2. **Select your project**
 3. **Go to Settings → Environment Variables**
@@ -95,15 +110,25 @@ After getting your backend URL, update the frontend environment:
 
 ## 🚀 **Step 5: Test Your Deployment**
 
+### **Pre-Deployment Checklist**
+- [ ] `DEBUG=False` in production environment
+- [ ] Strong `SECRET_KEY` set
+- [ ] `ALLOWED_ORIGINS` configured for your frontend domain
+- [ ] Production database URL configured
+- [ ] Frontend API URL points to production backend
+
+### **Post-Deployment Testing**
 1. **Test backend endpoints**:
    ```bash
    curl https://your-backend-url.com/
+   curl https://your-backend-url.com/docs
    ```
 
 2. **Test frontend**:
    - Visit your Vercel URL
    - Try to register/login
    - Test core functionality
+   - Verify rate limiting works (should be 10 requests/second in production)
 
 ## 📱 **Step 6: Set Up Custom Domain (Optional)**
 
