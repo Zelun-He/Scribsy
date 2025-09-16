@@ -24,10 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Function to handle authentication failures
   const handleAuthFailure = useCallback(() => {
-    // Quietly clear session; let pages decide how to handle unauth state
     apiClient.clearToken();
     setUser(null);
-  }, []);
+    // Redirect to access denied page for expired sessions
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
+      router.push('/access-denied');
+    }
+  }, [router]);
 
   useEffect(() => {
     const initAuth = async () => {

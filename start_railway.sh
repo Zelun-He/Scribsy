@@ -20,6 +20,16 @@ except Exception as e:
 
 # Initialize database
 echo "Initializing database..."
+if [ "$RESET_DATABASE" = "true" ]; then
+    echo "Resetting database due to RESET_DATABASE flag..."
+    python -c "
+from app.db.database import engine
+from app.db.models import Base
+print('Dropping all tables...')
+Base.metadata.drop_all(bind=engine)
+print('All tables dropped.')
+"
+fi
 python init_db.py
 
 # Start the application with gunicorn for production
