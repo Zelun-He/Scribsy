@@ -217,12 +217,20 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await fetch(`${this.baseURL}/auth/me`, {
-      headers: this.getHeaders(),
-      credentials: 'include',
-    });
+    try {
+      const response = await fetch(`${this.baseURL}/auth/me`, {
+        headers: this.getHeaders(),
+        credentials: 'include',
+      });
 
-    return this.handleResponse<User>(response);
+      return this.handleResponse<User>(response);
+    } catch (error) {
+      // Handle CORS or network errors gracefully
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error('Network error: Unable to connect to server');
+      }
+      throw error;
+    }
   }
 
   async refreshSession(): Promise<LoginResponse> {
