@@ -66,3 +66,33 @@ async def migrate_database(db: Session = Depends(get_db)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Migration error: {str(e)}")
+
+@router.post("/fix-database")
+async def fix_database():
+    """
+    Simple endpoint to fix the database schema.
+    This runs the fix_database.py script.
+    """
+    try:
+        import subprocess
+        import sys
+        
+        # Run the fix script
+        result = subprocess.run([sys.executable, "fix_database.py"], 
+                              capture_output=True, text=True, cwd="/app")
+        
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "message": "Database fix completed",
+                "output": result.stdout
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Database fix failed",
+                "error": result.stderr
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fix error: {str(e)}")
