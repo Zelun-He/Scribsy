@@ -281,6 +281,41 @@ def on_startup():
     try:
         init_db()
         logger.info("Database initialized (tables ensured)")
+        
+        # Run one-time migration to fix missing columns
+        try:
+            from sqlalchemy import text
+            from app.db.database import engine
+            
+            migrations = [
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP WITH TIME ZONE;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
+            ]
+            
+            with engine.connect() as conn:
+                trans = conn.begin()
+                try:
+                    for migration in migrations:
+                        try:
+                            conn.execute(text(migration))
+                        except Exception as e:
+                            if "already exists" not in str(e).lower():
+                                logger.warning(f"Migration warning: {e}")
+                    trans.commit()
+                    logger.info("Database migration completed successfully")
+                except Exception as e:
+                    trans.rollback()
+                    logger.error(f"Migration failed: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Migration error: {e}")
+            
     except Exception as e:
         log_error(e, context="DB init on startup")
 
