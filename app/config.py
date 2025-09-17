@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Use explicit local origins by default for better CORS with credentials in dev
     allowed_origins: str = os.getenv(
         "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://scribsy.vercel.app,https://scribsy-frontend.vercel.app"
+        "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001,https://scribsy.vercel.app,https://scribsy-frontend.vercel.app,https://scribsy-a9zn2hp2k-zelun-hes-projects.vercel.app"
     )  # comma-separated or "*"
     allowed_hosts: str = os.getenv("ALLOWED_HOSTS", "*")      # comma-separated or "*"
     # Default to no HTTPS redirect locally; enable via env in production
