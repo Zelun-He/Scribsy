@@ -92,39 +92,16 @@ async def general_exception_handler(request: Request, exc: Exception):
 if settings.https_redirect and not settings.debug:
     app.add_middleware(HTTPSRedirectMiddleware)
 
-# CORS - configured via env with dynamic Vercel URL support
+# CORS - configured via env
 allowed_origins = settings.allowed_origins_list()
-
-# Add dynamic Vercel URL support
-def is_vercel_url(origin: str) -> bool:
-    """Check if the origin is a Vercel deployment URL"""
-    return origin and (
-        origin.startswith("https://scribsy") and origin.endswith(".vercel.app") or
-        origin.startswith("https://scribsy-frontend") and origin.endswith(".vercel.app")
-    )
-
-# Custom CORS middleware that allows Vercel URLs dynamically
-from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-
-class DynamicCORSMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        origin = request.headers.get("origin")
-        
-        # Check if origin is allowed or is a Vercel URL
-        if origin in allowed_origins or is_vercel_url(origin):
-            # Add CORS headers
-            response = await call_next(request)
-            response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, User-Agent"
-            return response
-        else:
-            # Use default CORS middleware
-            return await call_next(request)
-
-app.add_middleware(DynamicCORSMiddleware)
+allow_credentials = False if "*" in allowed_origins else True
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=allow_credentials,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "User-Agent"],
+)
 
 # Basic rate limiting (per IP)
 # Use higher limits in DEBUG/local dev to accommodate dashboard burst requests
@@ -307,38 +284,46 @@ def on_startup():
     """Initialize database tables on application startup."""
     try:
         init_db()
-        logger.info("Database initialized (tables ensured)")
+        # Reduced logging for Railway rate limits
+        # logger.info("Database initialized (tables ensured)")
         
-        # Run one-time migration to fix missing columns
+        # Run one-time migration to fix missing columns (reduced logging)
         try:
             from sqlalchemy import text
             from app.db.database import engine
             
-            migrations = [
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP WITH TIME ZONE;",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP WITH TIME ZONE;",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
-                "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
-            ]
-            
+            # Check if migration is needed by checking if role column exists
             with engine.connect() as conn:
-                trans = conn.begin()
                 try:
-                    for migration in migrations:
-                        try:
-                            conn.execute(text(migration))
-                        except Exception as e:
-                            if "already exists" not in str(e).lower():
-                                logger.warning(f"Migration warning: {e}")
-                    trans.commit()
-                    logger.info("Database migration completed successfully")
-                except Exception as e:
-                    trans.rollback()
-                    logger.error(f"Migration failed: {e}")
+                    result = conn.execute(text("SELECT role FROM users LIMIT 1"))
+                    # If this succeeds, columns already exist
+                    # logger.info("Database schema up to date")
+                except Exception:
+                    # Columns don't exist, run migration
+                    migrations = [
+                        "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'provider';",
+                        "ALTER TABLE users ADD COLUMN last_login TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;",
+                        "ALTER TABLE users ADD COLUMN account_locked_until TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN work_start_time VARCHAR DEFAULT '09:00';",
+                        "ALTER TABLE users ADD COLUMN work_end_time VARCHAR DEFAULT '17:00';",
+                        "ALTER TABLE users ADD COLUMN timezone VARCHAR DEFAULT 'UTC';",
+                        "ALTER TABLE users ADD COLUMN working_days VARCHAR DEFAULT '1,2,3,4,5';",
+                    ]
+                    
+                    trans = conn.begin()
+                    try:
+                        for migration in migrations:
+                            try:
+                                conn.execute(text(migration))
+                            except Exception:
+                                # Ignore duplicate column errors silently
+                                pass
+                        trans.commit()
+                        # logger.info("Database migration completed")
+                    except Exception as e:
+                        trans.rollback()
+                        logger.error(f"Migration failed: {e}")
                     
         except Exception as e:
             logger.error(f"Migration error: {e}")
