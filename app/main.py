@@ -336,8 +336,9 @@ def root():
     logger.info("Root endpoint accessed")
     return {
         "message": "Welcome to Scribsy API",
-        "documentation": "http://127.0.0.1:8000/docs",
-        "health": "OK"
+        "documentation": "https://scribsy-production.up.railway.app/docs",
+        "health": "OK",
+        "version": "1.1"
     }
 
 # Liveness probe
