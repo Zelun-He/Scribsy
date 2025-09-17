@@ -16,9 +16,12 @@ import {
 // Default to backend dev port 8000 unless overridden. When running on localhost, prefer Next proxy /api
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/api' : 'http://127.0.0.1:8000');
 
+
+
 class ApiClient {
   private baseURL: string;
-  private token: string | null = null; // kept for backward compatibility
+  private token: string | null = null; // kept for backward co
+  // mpatibility
   private authFailureCallback: (() => void) | null = null;
   private useCookies: boolean = true;
   private isLocalDev: boolean = false;
