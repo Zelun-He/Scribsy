@@ -340,7 +340,8 @@ def root():
         "message": "Welcome to Scribsy API",
         "documentation": "https://scribsy-production.up.railway.app/docs",
         "health": "OK",
-        "version": "1.1"
+        "version": "1.2",
+        "deployment": "emergency_auth_added"
     }
 
 # Liveness probe
