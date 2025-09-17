@@ -112,20 +112,14 @@ def delete_note(db: Session, note_id: int) -> bool:
     return False
 
 def get_user_by_username(db: Session, username: str):
-    # Temporary workaround: handle database schema issues
+    # Always use simplified query to avoid missing column issues
     try:
-        # First check if the required columns exist
         from sqlalchemy import text
-        result = db.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'last_login'"))
-        if not result.fetchone():
-            # Columns don't exist, use a simplified query
-            return db.execute(text("SELECT id, username, hashed_password, email, is_active, is_admin FROM users WHERE username = :username"), {"username": username}).fetchone()
-        
-        # Columns exist, use normal ORM query
-        return db.query(models.User).filter(models.User.username == username).first()
+        # Use basic columns that should exist in all database versions
+        result = db.execute(text("SELECT id, username, hashed_password, email, is_active, is_admin FROM users WHERE username = :username"), {"username": username}).fetchone()
+        return result
     except Exception as e:
-        # If database query fails due to missing columns, return None
-        # This will trigger the normal "user not found" flow
+        # If database query fails, return None
         return None
 
 def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
@@ -180,27 +174,21 @@ def authenticate_user(db: Session, username: str, password: str):
             ), None
         return None, "User not found"
     
-    # Handle both ORM objects and raw database rows
-    if hasattr(user, 'hashed_password'):
-        # ORM object
-        if not verify_password(password, user.hashed_password):
-            return None, "Incorrect password"
-        return user, None
-    else:
-        # Raw database row - check password
-        if not verify_password(password, user[2]):  # hashed_password is at index 2
-            return None, "Incorrect password"
-        # Create a simple user object from the raw data
-        from app.db.schemas import UserRead
-        return UserRead(
-            id=user[0],  # id
-            username=user[1],  # username
-            email=user[3],  # email
-            is_active=bool(user[4]),  # is_active
-            is_admin=bool(user[5]),  # is_admin
-            tenant_id="default",
-            work_start_time="09:00",
-            work_end_time="17:00",
-            timezone="UTC",
-            working_days="1,2,3,4,5"
-        ), None
+    # Handle raw database row (simplified query result)
+    if not verify_password(password, user[2]):  # hashed_password is at index 2
+        return None, "Incorrect password"
+    
+    # Create a simple user object from the raw data
+    from app.db.schemas import UserRead
+    return UserRead(
+        id=user[0],  # id
+        username=user[1],  # username
+        email=user[3],  # email
+        is_active=bool(user[4]),  # is_active
+        is_admin=bool(user[5]),  # is_admin
+        tenant_id="default",
+        work_start_time="09:00",
+        work_end_time="17:00",
+        timezone="UTC",
+        working_days="1,2,3,4,5"
+    ), None
