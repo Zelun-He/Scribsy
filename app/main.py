@@ -26,6 +26,7 @@ from app.api.endpoints.tenant_management import router as tenant_management_rout
 from app.api.endpoints.migrate import router as migrate_router
 from app.api.endpoints.simple_auth import router as simple_auth_router
 from app.api.endpoints.working_auth import router as working_auth_router
+from app.api.endpoints.emergency_auth import router as emergency_auth_router
 from app.utils.exceptions import ScribsyException, handle_scribsy_exception
 from app.utils.logging import logger, log_error
 from dotenv import load_dotenv
@@ -278,6 +279,7 @@ app.include_router(tenant_management_router)
 app.include_router(migrate_router)
 app.include_router(simple_auth_router)
 app.include_router(working_auth_router)
+app.include_router(emergency_auth_router)
 
 @app.on_event("startup")
 def on_startup():
