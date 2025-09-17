@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     
     # Database Configuration
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./scribsy.db")
+    # Use private endpoint to avoid egress fees and deployment issues
+    database_url: str = "sqlite:///./scribsy.db"  # Will be overridden by get_database_url()
     
     # Authentication Configuration
     secret_key: str = os.getenv("SECRET_KEY", "supersecretkey")
@@ -97,6 +98,18 @@ class Settings(BaseSettings):
         if value == "*" or value == "":
             return ["*"]
         return [host.strip() for host in value.split(",") if host.strip()]
+    
+    def get_database_url(self) -> str:
+        """Get database URL with Railway private endpoint preference"""
+        # Try Railway private domain first to avoid egress fees
+        if os.getenv("RAILWAY_PRIVATE_DOMAIN"):
+            return os.getenv("RAILWAY_PRIVATE_DOMAIN")
+        # Fall back to DATABASE_URL
+        elif os.getenv("DATABASE_URL"):
+            return os.getenv("DATABASE_URL")
+        # Default to SQLite for local development
+        else:
+            return "sqlite:///./scribsy.db"
 
 # Create settings instance
 settings = Settings()

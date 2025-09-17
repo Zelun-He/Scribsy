@@ -12,10 +12,10 @@ from sqlalchemy.exc import OperationalError
 def fix_database():
     """Fix the database schema by adding missing columns"""
     
-    # Get database URL from environment
-    database_url = os.getenv("DATABASE_URL")
+    # Get database URL from environment (prefer private endpoint)
+    database_url = os.getenv("RAILWAY_PRIVATE_DOMAIN") or os.getenv("DATABASE_URL")
     if not database_url:
-        print("ERROR: DATABASE_URL environment variable not set")
+        print("ERROR: No database URL found in RAILWAY_PRIVATE_DOMAIN or DATABASE_URL")
         return False
     
     print(f"Connecting to database: {database_url[:50]}...")
