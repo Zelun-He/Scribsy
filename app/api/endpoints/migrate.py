@@ -130,3 +130,41 @@ async def simple_fix():
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Simple fix error: {str(e)}")
+
+@router.post("/fix-railway-db")
+async def fix_railway_database():
+    """Fix Railway database schema by adding missing columns"""
+    try:
+        # Import and run the fix script
+        import subprocess
+        import os
+        
+        # Set environment variables
+        env = os.environ.copy()
+        env["DATABASE_URL"] = settings.database_url
+        
+        # Run the fix script
+        result = subprocess.run(
+            ["python", "fix_railway_db.py"],
+            capture_output=True,
+            text=True,
+            env=env,
+            cwd="/app"  # Railway app directory
+        )
+        
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "message": "Railway database fix completed successfully",
+                "output": result.stdout
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Railway database fix failed",
+                "error": result.stderr,
+                "output": result.stdout
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Railway DB fix error: {str(e)}")
