@@ -96,3 +96,37 @@ async def fix_database():
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fix error: {str(e)}")
+
+@router.post("/simple-fix")
+async def simple_fix():
+    """
+    Simple database fix - recreates the users table with correct structure.
+    This should resolve the 500 errors on auth endpoints.
+    """
+    try:
+        import subprocess
+        import sys
+        
+        # Run the simple fix script
+        result = subprocess.run([sys.executable, "simple_fix.py"], 
+                              capture_output=True, text=True, cwd="/app")
+        
+        if result.returncode == 0:
+            return {
+                "success": True,
+                "message": "Database simple fix completed",
+                "output": result.stdout,
+                "test_credentials": {
+                    "username": "testuser",
+                    "password": "testpass123"
+                }
+            }
+        else:
+            return {
+                "success": False,
+                "message": "Database simple fix failed",
+                "error": result.stderr
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simple fix error: {str(e)}")
