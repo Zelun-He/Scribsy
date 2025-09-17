@@ -92,16 +92,39 @@ async def general_exception_handler(request: Request, exc: Exception):
 if settings.https_redirect and not settings.debug:
     app.add_middleware(HTTPSRedirectMiddleware)
 
-# CORS - configured via env
+# CORS - configured via env with dynamic Vercel URL support
 allowed_origins = settings.allowed_origins_list()
-allow_credentials = False if "*" in allowed_origins else True
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "User-Agent"],
-)
+
+# Add dynamic Vercel URL support
+def is_vercel_url(origin: str) -> bool:
+    """Check if the origin is a Vercel deployment URL"""
+    return origin and (
+        origin.startswith("https://scribsy") and origin.endswith(".vercel.app") or
+        origin.startswith("https://scribsy-frontend") and origin.endswith(".vercel.app")
+    )
+
+# Custom CORS middleware that allows Vercel URLs dynamically
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+
+class DynamicCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        origin = request.headers.get("origin")
+        
+        # Check if origin is allowed or is a Vercel URL
+        if origin in allowed_origins or is_vercel_url(origin):
+            # Add CORS headers
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type, Accept, Origin, User-Agent"
+            return response
+        else:
+            # Use default CORS middleware
+            return await call_next(request)
+
+app.add_middleware(DynamicCORSMiddleware)
 
 # Basic rate limiting (per IP)
 # Use higher limits in DEBUG/local dev to accommodate dashboard burst requests
