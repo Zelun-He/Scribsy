@@ -258,8 +258,6 @@ class UserRead(UserBase):
     class Config:
         # Pydantic v2
         from_attributes = True
-        # Backward compatibility with v1-style config
-        orm_mode = True
 
 class Token(BaseModel):
     access_token: str
