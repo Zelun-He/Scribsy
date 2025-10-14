@@ -1,3 +1,4 @@
+
 # Add missing lib files to git
 git add scribsy-frontend/src/lib/utils.ts
 git add scribsy-frontend/src/lib/metrics.ts
@@ -9,3 +10,4 @@ git commit -m "Add missing lib files for Vercel build
 - Add medical-themed login background
 - Fix build errors for deployment"
 git push origin version1.1
+dou

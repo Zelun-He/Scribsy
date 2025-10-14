@@ -112,12 +112,13 @@ def delete_note(db: Session, note_id: int) -> bool:
     return False
 
 def get_user_by_username(db: Session, username: str):
-    # Always use simplified query to avoid missing column issues
+    # Use ORM query to return full User model with all columns
     try:
-        from sqlalchemy import text
-        # Use basic columns that should exist in all database versions
-        result = db.execute(text("SELECT id, username, hashed_password, email, is_active, is_admin FROM users WHERE username = :username"), {"username": username}).fetchone()
-        return result
+        user = db.query(models.User).filter(models.User.username == username).first()
+        if user:
+            # Force load all attributes to avoid lazy loading issues
+            db.refresh(user)
+        return user
     except Exception as e:
         # If database query fails, return None
         return None

@@ -42,7 +42,7 @@ git push origin bug-fix
 ### **Step 3: Set Environment Variables**
 In your Vercel project settings, add:
 ```bash
-NEXT_PUBLIC_API_URL=postgresql://postgres:MkzFynLbuIKRjeeOhkQBkywXAMzCGATO@postgres.railway.internal:5432/railway
+NEXT_PUBLIC_API_URL=https://your-railway-backend-url.railway.app
 ```
 
 ## 🔧 **Troubleshooting**

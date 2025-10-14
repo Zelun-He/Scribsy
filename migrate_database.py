@@ -20,6 +20,9 @@ def migrate_database():
     # Create database engine
     engine = create_engine(settings.database_url)
     
+
+
+
     # SQL commands to add missing columns (with error handling for SQLite)
     migrations = [
         "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'provider';",

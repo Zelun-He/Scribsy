@@ -141,7 +141,7 @@ async def fix_railway_database():
         
         # Set environment variables
         env = os.environ.copy()
-        env["DATABASE_URL"] = settings.database_url
+        env["DATABASE_URL"] .database_url
         
         # Run the fix script
         result = subprocess.run(

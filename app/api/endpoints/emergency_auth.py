@@ -54,3 +54,4 @@ async def get_emergency_users():
             {"username": "demo", "password": "demo123"}
         ]
     }
+
