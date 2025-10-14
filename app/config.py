@@ -100,16 +100,16 @@ class Settings(BaseSettings):
         return [host.strip() for host in value.split(",") if host.strip()]
     
     def get_database_url(self) -> str:
-        """Get database URL with Railway private endpoint preference"""
-        # Try Railway private domain first to avoid egress fees
-        if os.getenv("RAILWAY_PRIVATE_DOMAIN"):
-            return os.getenv("RAILWAY_PRIVATE_DOMAIN")
-        # Fall back to DATABASE_URL
-        elif os.getenv("DATABASE_URL"):
-            return os.getenv("DATABASE_URL")
+        """Get database URL with Railway support"""
+        # Use DATABASE_URL if set (Railway automatically provides this for PostgreSQL)
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            # Railway provides postgres:// but SQLAlchemy needs postgresql://
+            if database_url.startswith("postgres://"):
+                database_url = database_url.replace("postgres://", "postgresql://", 1)
+            return database_url
         # Default to SQLite for local development
-        else:
-            return "sqlite:///./scribsy.db"
+        return "sqlite:///./scribsy.db"
 
 # Create settings instance
 settings = Settings()
