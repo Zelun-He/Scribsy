@@ -23,6 +23,10 @@ from app.api.endpoints.working_hours import router as working_hours_router
 from app.api.endpoints.export import router as export_router
 from app.api.endpoints.audio_retention import router as audio_retention_router
 from app.api.endpoints.tenant_management import router as tenant_management_router
+from app.api.endpoints.migrate import router as migrate_router
+from app.api.endpoints.simple_auth import router as simple_auth_router
+from app.api.endpoints.working_auth import router as working_auth_router
+from app.api.endpoints.emergency_auth import router as emergency_auth_router
 from app.utils.exceptions import ScribsyException, handle_scribsy_exception
 from app.utils.logging import logger, log_error
 from dotenv import load_dotenv
@@ -272,13 +276,60 @@ app.include_router(working_hours_router)
 app.include_router(export_router)
 app.include_router(audio_retention_router)
 app.include_router(tenant_management_router)
+app.include_router(migrate_router)
+app.include_router(simple_auth_router)
+app.include_router(working_auth_router)
+app.include_router(emergency_auth_router)
 
 @app.on_event("startup")
 def on_startup():
     """Initialize database tables on application startup."""
     try:
         init_db()
-        logger.info("Database initialized (tables ensured)")
+        # Reduced logging for Railway rate limits
+        # logger.info("Database initialized (tables ensured)")
+        
+        # Run one-time migration to fix missing columns (reduced logging)
+        try:
+            from sqlalchemy import text
+            from app.db.database import engine
+            
+            # Check if migration is needed by checking if role column exists
+            with engine.connect() as conn:
+                try:
+                    result = conn.execute(text("SELECT role FROM users LIMIT 1"))
+                    # If this succeeds, columns already exist
+                    # logger.info("Database schema up to date")
+                except Exception:
+                    # Columns don't exist, run migration
+                    migrations = [
+                        "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'provider';",
+                        "ALTER TABLE users ADD COLUMN last_login TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;",
+                        "ALTER TABLE users ADD COLUMN account_locked_until TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN work_start_time VARCHAR DEFAULT '09:00';",
+                        "ALTER TABLE users ADD COLUMN work_end_time VARCHAR DEFAULT '17:00';",
+                        "ALTER TABLE users ADD COLUMN timezone VARCHAR DEFAULT 'UTC';",
+                        "ALTER TABLE users ADD COLUMN working_days VARCHAR DEFAULT '1,2,3,4,5';",
+                    ]
+                    
+                    trans = conn.begin()
+                    try:
+                        for migration in migrations:
+                            try:
+                                conn.execute(text(migration))
+                            except Exception:
+                                # Ignore duplicate column errors silently
+                                pass
+                        trans.commit()
+                        # logger.info("Database migration completed")
+                    except Exception as e:
+                        trans.rollback()
+                        logger.error(f"Migration failed: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Migration error: {e}")
+            
     except Exception as e:
         log_error(e, context="DB init on startup")
 
@@ -287,8 +338,12 @@ def root():
     logger.info("Root endpoint accessed")
     return {
         "message": "Welcome to Scribsy API",
-        "documentation": "http://127.0.0.1:8000/docs",
-        "health": "OK"
+        "documentation": "https://scribsy-production.up.railway.app/docs",
+        "health": "OK",
+        "version": "1.3",
+        "deployment": "railway_fix_attempt",
+        "timestamp": "2025-01-15T20:30:00Z",
+        "status": "testing_railway_deployment"
     }
 
 # Liveness probe

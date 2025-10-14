@@ -7,7 +7,7 @@ import os
 
 # Database URL from configuration
 from app.config import settings
-DATABASE_URL = settings.database_url
+DATABASE_URL = settings.get_database_url()
 
 # Configure engine based on database type
 if DATABASE_URL.startswith("sqlite"):

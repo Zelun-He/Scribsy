@@ -37,6 +37,14 @@ def get_working_hours(
 ):
     """Get user's working hours and current status"""
     try:
+        # Debug: log user object type and attributes
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"User object type: {type(current_user)}")
+        logger.info(f"User has working_days attr: {hasattr(current_user, 'working_days')}")
+        if hasattr(current_user, '__dict__'):
+            logger.info(f"User attributes: {current_user.__dict__.keys()}")
+        
         # Parse working days
         working_days = [int(day) for day in current_user.working_days.split(',')]
         

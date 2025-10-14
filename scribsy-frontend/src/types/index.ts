@@ -3,6 +3,14 @@ export interface User {
   username: string;
   email: string;
   is_active: boolean;
+  is_admin?: boolean;
+  role?: string;
+  last_login?: string;
+  work_start_time?: string;
+  work_end_time?: string;
+  timezone?: string;
+  working_days?: string;
+  tenant_id?: string;
 }
 
 export interface Patient {
