@@ -47,15 +47,25 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         cookie_token = request.cookies.get("auth_token")
         active_token = header_token or cookie_token
         if not active_token:
+            logger.warning("No token provided in request")
             raise credentials_exception
-        payload = jwt.decode(active_token, SECRET_KEY, algorithms=[ALGORITHM])
+        try:
+            payload = jwt.decode(active_token, SECRET_KEY, algorithms=[ALGORITHM])
+        except JWTError as e:
+            logger.warning(f"JWT decode failed: {str(e)}")
+            raise credentials_exception
         username: str = payload.get("sub")
         if username is None:
+            logger.warning("No username in JWT payload")
             raise credentials_exception
-    except JWTError:
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_current_user: {str(e)}")
         raise credentials_exception
     user = crud_notes.get_user_by_username(db, username)
     if user is None:
+        logger.warning(f"User '{username}' not found after token validation")
         raise credentials_exception
     return user
 
