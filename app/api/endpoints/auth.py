@@ -93,20 +93,29 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     if '@' not in user.email or '.' not in user.email:
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
     
-    # Check for existing username
-    db_user = crud_notes.get_user_by_username(db, user.username)
-    if db_user:
-        raise HTTPException(status_code=400, detail=f"Username '{user.username}' is already registered")
-    
-    # Check for existing email
-    db_email = db.query(models.User).filter_by(email=user.email).first()
-    if db_email:
-        raise HTTPException(status_code=400, detail=f"Email '{user.email}' is already registered")
-    
     try:
+        # Check for existing username
+        db_user = crud_notes.get_user_by_username(db, user.username)
+        if db_user:
+            db.rollback()  # Rollback transaction in case of any errors
+            raise HTTPException(status_code=400, detail=f"Username '{user.username}' is already registered")
+        
+        # Check for existing email
+        db_email = db.query(models.User).filter_by(email=user.email).first()
+        if db_email:
+            db.rollback()  # Rollback transaction in case of any errors
+            raise HTTPException(status_code=400, detail=f"Email '{user.email}' is already registered")
+        
+        # Create new user
         hashed_password = crud_notes.get_password_hash(user.password)
-        return crud_notes.create_user(db, user, hashed_password)
+        new_user = crud_notes.create_user(db, user, hashed_password)
+        return new_user
+    except HTTPException:
+        # Re-raise HTTP exceptions (validation errors)
+        raise
     except Exception as e:
+        # Rollback transaction on any database error
+        db.rollback()
         logger.error(f"Failed to create user '{user.username}': {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
 
