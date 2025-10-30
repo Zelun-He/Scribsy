@@ -127,7 +127,15 @@ def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
     db_user = models.User(
         username=user.username, 
         email=user.email,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        tenant_id="default",  # Explicitly set tenant_id
+        is_active=1,
+        is_admin=0,
+        role="provider",
+        work_start_time="09:00",
+        work_end_time="17:00",
+        timezone="UTC",
+        working_days="1,2,3,4,5"
     )
     db.add(db_user)
     db.commit()

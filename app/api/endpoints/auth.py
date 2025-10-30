@@ -107,6 +107,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         hashed_password = crud_notes.get_password_hash(user.password)
         return crud_notes.create_user(db, user, hashed_password)
     except Exception as e:
+        logger.error(f"Failed to create user '{user.username}': {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to create user: {str(e)}")
 
 # POST /auth/token - Obtain a JWT access token for authentication.
