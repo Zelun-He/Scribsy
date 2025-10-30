@@ -1,11 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 export const Fab: React.FC = () => {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const { user } = useAuth();
+  
+  // Hide FAB on login, register, and other public pages
+  const hiddenPaths = ['/login', '/register', '/', '/auth/forgot-password', '/auth/reset-password'];
+  const shouldShow = !hiddenPaths.some(path => pathname === path || pathname.startsWith(path)) && user;
+  
+  if (!shouldShow) {
+    return null;
+  }
 
   const Action = ({ label, onClick }: { label: string; onClick: () => void }) => (
     <button
