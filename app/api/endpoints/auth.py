@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import schemas, models
 from app.crud import notes as crud_notes
+from sqlalchemy import func
 from app.db.database import get_db
 from app.audit.logger import HIPAAAuditLogger
 from app.services.email_service import email_service
@@ -75,7 +76,8 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
 # Returns: UserRead schema
 @router.post("/register", response_model=schemas.UserRead)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Validate username format
+    # Normalize/validate username format
+    user.username = user.username.strip()
     if len(user.username) < 3:
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters long")
     if len(user.username) > 50:
@@ -101,7 +103,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Username '{user.username}' is already registered")
         
         # Check for existing email
-        db_email = db.query(models.User).filter_by(email=user.email).first()
+        db_email = db.query(models.User).filter(func.lower(models.User.email) == user.email.strip().lower()).first()
         if db_email:
             db.rollback()  # Rollback transaction in case of any errors
             raise HTTPException(status_code=400, detail=f"Email '{user.email}' is already registered")
@@ -125,7 +127,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 # Returns: Token schema (access_token, token_type)
 @router.post("/token", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db), request: Request = None):
-    user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    username = (form_data.username or "").strip()
+    user, error_message = crud_notes.authenticate_user(db, username, form_data.password)
     
     # Get client IP and user agent for audit
     client_ip = request.client.host if request and request.client else "unknown"
@@ -135,7 +138,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         # Log failed login attempt
         HIPAAAuditLogger.log_login_attempt(
             db=db,
-            username=form_data.username,
+            username=username,
             ip_address=client_ip,
             user_agent=user_agent,
             success=False,
@@ -146,7 +149,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Log successful login attempt
     HIPAAAuditLogger.log_login_attempt(
         db=db,
-        username=form_data.username,
+        username=username,
         ip_address=client_ip,
         user_agent=user_agent,
         success=True
@@ -158,7 +161,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # Cookie-based login that also returns the token for backward compatibility
 @router.post("/token-cookie")
 def login_cookie(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    username = (form_data.username or "").strip()
+    user, error_message = crud_notes.authenticate_user(db, username, form_data.password)
     
     # Get client IP and user agent for audit
     client_ip = request.client.host if request.client else "unknown"
@@ -168,7 +172,7 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
         # Log failed login attempt
         HIPAAAuditLogger.log_login_attempt(
             db=db,
-            username=form_data.username,
+            username=username,
             ip_address=client_ip,
             user_agent=user_agent,
             success=False,
@@ -179,7 +183,7 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
     # Log successful login attempt
     HIPAAAuditLogger.log_login_attempt(
         db=db,
-        username=form_data.username,
+        username=username,
         ip_address=client_ip,
         user_agent=user_agent,
         success=True
