@@ -13,8 +13,12 @@ import {
   NoteProvenance,
 } from '@/types';
 
-// Default to backend dev port 8000 unless overridden. When running on localhost, prefer Next proxy /api
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? '/api' : 'http://127.0.0.1:8000');
+// Prefer explicit env URL, then local proxy in dev, then production backend fallback.
+const DEFAULT_PROD_API_URL = 'https://scribsy-production.up.railway.app';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL
+  || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? '/api'
+    : DEFAULT_PROD_API_URL);
 
 
 
@@ -241,7 +245,8 @@ class ApiClient {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify(userData),
-      credentials: 'include',
+      // Registration does not require cookies; omitting credentials avoids cross-origin credential/CORS failures.
+      credentials: 'omit',
     });
 
     return this.handleResponse<User>(response);
