@@ -13,8 +13,8 @@ import {
   NoteProvenance,
 } from '@/types';
 
-// Route API calls through Next.js `/api` path so deployment can proxy backend consistently.
-const API_BASE_URL = '/api';
+// Prefer explicit public backend origin when provided (e.g., Railway), otherwise use same-origin proxy.
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '/api').trim() || '/api';
 
 
 class ApiClient {
@@ -51,7 +51,7 @@ class ApiClient {
       const refresh = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         headers: this.getHeaders(),
-        credentials: 'include',
+        credentials: this.requestCredentials(),
       });
       if (refresh.ok) {
         try {
@@ -89,6 +89,12 @@ class ApiClient {
 
   private getJsonHeaders(): HeadersInit {
     return { 'Content-Type': 'application/json' };
+  }
+
+
+  private requestCredentials(): RequestCredentials {
+    // Cross-origin backend calls should avoid credentialed requests unless proxied same-origin.
+    return this.baseURL.startsWith('http') ? 'omit' : 'include';
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
@@ -161,48 +167,33 @@ class ApiClient {
       form.append('username', credentials.username);
       form.append('password', credentials.password);
 
-      // In local dev (via Next.js proxy), prefer cookie-based flow
-      if (this.isLocalDev) {
-        const respCookie = await fetch(`${this.baseURL}/auth/token-cookie`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: form.toString(),
-          credentials: 'include',
-        });
-        const result = await this.handleResponse<LoginResponse>(respCookie);
-        this.setToken(result.access_token);
-        this.useCookies = true;
-        return result;
+      // Use token-based login as primary path for consistent cross-origin behavior.
+      const respToken = await fetch(`${this.baseURL}/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+        credentials: this.requestCredentials(),
+      });
+      const result = await this.handleResponse<LoginResponse>(respToken);
+      this.setToken(result.access_token);
+      this.useCookies = false;
+
+      // Best-effort cookie issuance for same-origin deployments.
+      if (this.requestCredentials() === 'include') {
+        try {
+          await fetch(`${this.baseURL}/auth/token-cookie`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: form.toString(),
+            credentials: this.requestCredentials(),
+          });
+          this.useCookies = true;
+        } catch {
+          this.useCookies = false;
+        }
       }
 
-      // In non-local, try cookie-based flow first
-      try {
-        const respCookie = await fetch(`${this.baseURL}/auth/token-cookie`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: form.toString(),
-          credentials: 'include',
-        });
-        const result = await this.handleResponse<LoginResponse>(respCookie);
-        // Keep cookie-based flow only when not in local dev
-        if (!this.isLocalDev) {
-          this.useCookies = true;
-        }
-        // also keep token for auth header fallback
-        this.setToken(result.access_token);
-        return result;
-      } catch (_err) {
-        // Fallback: token-based (no credentials)
-        const respToken = await fetch(`${this.baseURL}/auth/token`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: form.toString(),
-        });
-        const result = await this.handleResponse<LoginResponse>(respToken);
-        this.setToken(result.access_token);
-        this.useCookies = false;
-        return result;
-      }
+      return result;
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         throw new Error('Unable to reach server. Please check your connection and try again.');
@@ -227,7 +218,7 @@ class ApiClient {
     try {
       const response = await fetch(`${this.baseURL}/auth/me`, {
         headers: this.getHeaders(),
-        credentials: 'include',
+        credentials: this.requestCredentials(),
       });
 
       return this.handleResponse<User>(response);
@@ -243,7 +234,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/auth/refresh`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     const result = await this.handleResponse<LoginResponse>(response);
     // keep header token fallback updated
@@ -257,7 +248,7 @@ class ApiClient {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify({ email }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<{ message: string; success: boolean }>(response);
@@ -268,7 +259,7 @@ class ApiClient {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify({ token, new_password: newPassword }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<{ message: string; success: boolean }>(response);
@@ -283,7 +274,7 @@ class ApiClient {
         current_password: currentPassword, 
         new_password: newPassword 
       }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<{ message: string; success: boolean }>(response);
@@ -313,7 +304,7 @@ class ApiClient {
     const notesUrl = `${this.baseURL}/notes${query.toString() ? `/?${query.toString()}` : '/'}`;
     const response = await this.doFetch(notesUrl, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<Note[]>(response);
@@ -325,8 +316,8 @@ class ApiClient {
 
     // Try cookie-only first (most stable locally), then both, then header-only.
     const attempts: Array<RequestInit> = [
-      { credentials: 'include' },
-      { credentials: 'include', headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined },
+      { credentials: this.requestCredentials() },
+      { credentials: this.requestCredentials(), headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined },
       { credentials: 'omit', headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined },
     ];
 
@@ -377,7 +368,7 @@ class ApiClient {
   }
 
   async listComments(noteId: number): Promise<Array<{id:number;note_id:number;user_id:number;username:string;body:string;created_at:string;}>> {
-    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, { headers: this.getHeaders(), credentials: 'include' });
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, { headers: this.getHeaders(), credentials: this.requestCredentials() });
     return this.handleResponse(resp);
   }
 
@@ -385,14 +376,14 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
       method: 'POST',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-      credentials: 'include',
+      credentials: this.requestCredentials(),
       body: JSON.stringify({ body }),
     });
     return this.handleResponse(resp);
   }
 
   async listHistory(noteId: number): Promise<Array<{id:number;note_id:number;user_id:number;username:string;action:string;summary:string;created_at:string;}>> {
-    const resp = await fetch(`${this.baseURL}/notes/${noteId}/history`, { headers: this.getHeaders(), credentials: 'include' });
+    const resp = await fetch(`${this.baseURL}/notes/${noteId}/history`, { headers: this.getHeaders(), credentials: this.requestCredentials() });
     return this.handleResponse(resp);
   }
 
@@ -400,7 +391,7 @@ class ApiClient {
   async exportNoteCCD(id: number): Promise<string> {
     const resp = await fetch(`${this.baseURL}/notes/${id}/export/ccd`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     if (!resp.ok) throw new Error(`Failed to export CCD: ${resp.status}`);
     return resp.text();
@@ -409,7 +400,7 @@ class ApiClient {
   async exportNotePlain(id: number): Promise<string> {
     const resp = await fetch(`${this.baseURL}/notes/${id}/export/plain`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     if (!resp.ok) throw new Error(`Failed to export note: ${resp.status}`);
     return resp.text();
@@ -418,7 +409,7 @@ class ApiClient {
   async exportNotePDF(id: number): Promise<Blob> {
     const resp = await fetch(`${this.baseURL}/notes/${id}/export/pdf`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     if (!resp.ok) {
       if (resp.status === 503) throw new Error('PDF_UNAVAILABLE');
@@ -430,7 +421,7 @@ class ApiClient {
   async exportNoteAudio(id: number): Promise<Blob> {
     const resp = await fetch(`${this.baseURL}/notes/${id}/export/audio`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     if (!resp.ok) {
       throw new Error(`Failed to export audio: ${resp.status}`);
@@ -442,7 +433,7 @@ class ApiClient {
   async listProvenance(noteId: number): Promise<NoteProvenance[]> {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/provenance`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<NoteProvenance[]>(resp);
   }
@@ -450,7 +441,7 @@ class ApiClient {
   async listCodes(noteId: number): Promise<NoteCode[]> {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<NoteCode[]>(resp);
   }
@@ -459,7 +450,7 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes/${codeId}/accept`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<NoteCode>(resp);
   }
@@ -468,7 +459,7 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/codes/${codeId}/reject`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<NoteCode>(resp);
   }
@@ -477,7 +468,7 @@ class ApiClient {
   async getNoteComments(noteId: number): Promise<Array<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>> {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Array<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>>(resp);
   }
@@ -486,7 +477,7 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
       body: JSON.stringify({ content, is_resolved: isResolved }),
     });
     return this.handleResponse<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>(resp);
@@ -496,7 +487,7 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments/${commentId}`, {
       method: 'PUT',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
       body: JSON.stringify({ content, is_resolved: isResolved }),
     });
     return this.handleResponse<{id: number; note_id: number; user_id: number; username: string; content: string; is_resolved: boolean; created_at: string; updated_at: string}>(resp);
@@ -506,7 +497,7 @@ class ApiClient {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/comments/${commentId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<{ok: boolean}>(resp);
   }
@@ -515,7 +506,7 @@ class ApiClient {
   async getNoteHistory(noteId: number): Promise<Array<{id: number; note_id: number; user_id: number; username: string; action: string; summary: string; created_at: string}>> {
     const resp = await fetch(`${this.baseURL}/notes/${noteId}/history`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Array<{id: number; note_id: number; user_id: number; username: string; action: string; summary: string; created_at: string}>>(resp);
   }
@@ -536,7 +527,7 @@ class ApiClient {
             status: noteData.status,
             signed_at: noteData.signed_at,
           }),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         });
         if (response.ok) {
           return this.handleResponse<Note>(response);
@@ -569,7 +560,7 @@ class ApiClient {
       method: 'POST',
       headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
       body: formData,
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     if (!response.ok && (response.status === 404 || response.status === 405)) {
       // As a last resort, bypass proxy and hit backend directly in dev
@@ -578,7 +569,7 @@ class ApiClient {
           method: 'POST',
           headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
           body: formData,
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         });
         response = direct;
       } catch {}
@@ -591,7 +582,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(noteData),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<Note>(response);
@@ -601,7 +592,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/notes/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<{ ok: boolean }>(response);
@@ -624,7 +615,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/notes/${noteId}/start-timing?${params}`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -641,7 +632,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/notes/${noteId}/complete-timing`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -676,7 +667,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/notes/timing-stats?${params}`, {
       method: 'GET',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -719,7 +710,7 @@ class ApiClient {
     const url = `${this.baseURL}/patients${params.toString() ? `/?${params.toString()}` : '/'}`;
     const response = await fetch(url, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<Patient[]>(response);
@@ -728,7 +719,7 @@ class ApiClient {
   async getPatient(id: number): Promise<Patient> {
     const response = await fetch(`${this.baseURL}/patients/${id}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<Patient>(response);
@@ -753,7 +744,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -762,7 +753,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -771,7 +762,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -780,7 +771,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       // Direct dev fallback
@@ -790,7 +781,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -799,7 +790,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -808,7 +799,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
       {
@@ -817,7 +808,7 @@ class ApiClient {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
           body: JSON.stringify(patientData),
-          credentials: 'include',
+          credentials: this.requestCredentials(),
         },
       },
     ];
@@ -857,7 +848,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(patientData),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     console.log(`API Client: Update response status:`, response.status);
@@ -872,7 +863,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/patients/${id}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<{ message: string }>(response);
@@ -889,21 +880,21 @@ class ApiClient {
 
     const response = await fetch(`${this.baseURL}/patients/search/?${params}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
 
     return this.handleResponse<Patient[]>(response);
   }
 
   async logoutServer(): Promise<void> {
-    await fetch(`${this.baseURL}/auth/logout`, { method: 'POST', credentials: 'include' });
+    await fetch(`${this.baseURL}/auth/logout`, { method: 'POST', credentials: this.requestCredentials() });
   }
 
   // Appointments
   async getPatientAppointments(patientId: number): Promise<Appointment[]> {
     const response = await fetch(`${this.baseURL}/patients/${patientId}/appointments`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Appointment[]>(response);
   }
@@ -911,7 +902,7 @@ class ApiClient {
   async getUpcomingAppointments(withinHours: number = 168): Promise<Appointment[]> {
     const response = await this.doFetch(`${this.baseURL}/patients/appointments/upcoming?within_hours=${withinHours}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Appointment[]>(response);
   }
@@ -927,7 +918,7 @@ class ApiClient {
         note: appt.note,
         notify_before_minutes: appt.notify_before_minutes ?? 30,
       }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Appointment>(response);
   }
@@ -937,7 +928,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(update),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Appointment>(response);
   }
@@ -946,7 +937,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/patients/appointments/${appointmentId}/check-in`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<Appointment>(response);
   }
@@ -955,7 +946,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/patients/appointments/${appointmentId}`, {
       method: 'DELETE',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse<{ ok: boolean }>(response);
   }
@@ -964,7 +955,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}/patients/appointments/${appointmentId}/remind?in_minutes=${inMinutes}`, {
       method: 'POST',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1022,7 +1013,7 @@ class ApiClient {
 
     const response = await fetch(`${this.baseURL}/nudge/notifications?${query}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1039,7 +1030,7 @@ class ApiClient {
         note_id: noteId,
         nudge_type: nudgeType,
       }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1061,7 +1052,7 @@ class ApiClient {
   }> {
     const response = await fetch(`${this.baseURL}/nudge/preferences`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1074,7 +1065,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(preferences),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1089,7 +1080,7 @@ class ApiClient {
   }> {
     const response = await fetch(`${this.baseURL}/nudge/status`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1106,7 +1097,7 @@ class ApiClient {
       method: 'PUT',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify(statusData),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1127,7 +1118,7 @@ class ApiClient {
     const query = date ? `?date=${date}` : '';
     const response = await fetch(`${this.baseURL}/nudge/digest/preview${query}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1142,7 +1133,7 @@ class ApiClient {
       method: 'POST',
       headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
       body: JSON.stringify({ date }),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1162,7 +1153,7 @@ class ApiClient {
   }> {
     const response = await fetch(`${this.baseURL}/nudge/analytics?days=${days}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(response);
   }
@@ -1182,7 +1173,7 @@ class ApiClient {
     const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
     const resp = await fetch(`${backendURL}/working-hours/`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     
     return this.handleResponse(resp);
@@ -1208,7 +1199,7 @@ class ApiClient {
     const resp = await fetch(`${backendURL}/working-hours/`, {
       method: 'PUT',
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
       body: JSON.stringify(workingHours),
     });
     return this.handleResponse(resp);
@@ -1225,7 +1216,7 @@ class ApiClient {
     const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
     const resp = await fetch(`${backendURL}/working-hours/finalization-warning`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(resp);
   }
@@ -1242,7 +1233,7 @@ class ApiClient {
     const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
     const resp = await fetch(`${backendURL}/working-hours/pending-notes-today`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     return this.handleResponse(resp);
   }
@@ -1253,7 +1244,7 @@ class ApiClient {
     const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
     const resp = await fetch(`${backendURL}/export/data?format=${format}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     
     if (!resp.ok) {
@@ -1291,7 +1282,7 @@ class ApiClient {
     const backendURL = this.isLocalDev ? 'http://127.0.0.1:8000' : this.baseURL;
     const resp = await fetch(`${backendURL}/export/audio/${noteId}`, {
       headers: this.getHeaders(),
-      credentials: 'include',
+      credentials: this.requestCredentials(),
     });
     
     if (!resp.ok) {
