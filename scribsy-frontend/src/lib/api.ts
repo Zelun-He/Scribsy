@@ -13,8 +13,8 @@ import {
   NoteProvenance,
 } from '@/types';
 
-// Prefer explicit public backend origin when provided (e.g., Railway), otherwise use same-origin proxy.
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || '/api').trim() || '/api';
+// Always use same-origin API path; Next.js rewrites forward this to Railway/backend.
+const API_BASE_URL = '/api';
 
 
 class ApiClient {
@@ -93,8 +93,8 @@ class ApiClient {
 
 
   private requestCredentials(): RequestCredentials {
-    // Cross-origin backend calls should avoid credentialed requests unless proxied same-origin.
-    return this.baseURL.startsWith('http') ? 'omit' : 'include';
+    // Calls are same-origin via /api rewrite.
+    return 'include';
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
