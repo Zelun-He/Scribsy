@@ -53,7 +53,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-10 sm:px-6 sm:py-12">
       {/* Medical-themed background */}
       <div className="absolute inset-0 bg-gradient-to-br from-teal-900 via-teal-800 to-green-900">
         {/* Medical icons pattern */}
@@ -157,15 +157,15 @@ export default function LoginPage() {
       </div>
       
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md space-y-8">
-        <div className="text-center">
+      <div className="relative z-10 w-full max-w-md space-y-6 sm:space-y-7">
+        <div className="space-y-2 text-center">
           <div className="mx-auto mb-4 flex items-center justify-center">
             <Logo size="lg" />
           </div>
-          <h2 className="text-3xl font-bold text-white">
+          <h2 className="text-3xl font-bold leading-tight text-white sm:text-[2rem]">
             Sign in to Scribsy
           </h2>
-          <p className="mt-2 text-sm text-teal-100">
+          <p className="mx-auto max-w-sm text-sm leading-relaxed text-teal-100">
             Don&apos;t have an account?{' '}
             <Link href="/register" className="text-emerald-300 hover:text-emerald-200 transition-colors">
               Sign up
@@ -173,15 +173,15 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome back</CardTitle>
-            <CardDescription>
+        <Card className="border border-white/40 bg-white/95 shadow-2xl backdrop-blur-sm">
+          <CardHeader className="space-y-2 pb-4">
+            <CardTitle className="text-2xl leading-tight">Welcome back</CardTitle>
+            <CardDescription className="leading-relaxed">
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+          <CardContent className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-md p-4">
                   <p className="text-sm text-red-600">{error}</p>
@@ -221,7 +221,7 @@ export default function LoginPage() {
             <div className="mt-4 text-center">
               <Link 
                 href="/auth/forgot-password" 
-                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-sm font-medium text-blue-700 hover:underline"
               >
                 Forgot your password?
               </Link>
@@ -229,7 +229,7 @@ export default function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="text-center text-sm text-teal-100">
+        <p className="pt-1 text-center text-sm text-teal-100">
           <Link href="/" className="inline-block mt-6 font-medium text-emerald-300 hover:text-emerald-200 transition-colors">Back to home</Link>
         </p>
       </div>
