@@ -19,6 +19,31 @@ export const metadata: Metadata = {
   description: "Transform your clinical conversations into structured SOAP notes with AI-powered transcription and summarization.",
 };
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+function AppShell({ children }: { children: React.ReactNode }) {
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem={false}
+      disableTransitionOnChange
+    >
+      <AuthProvider enableClerk={Boolean(clerkPublishableKey)}>
+        <ToastProvider>
+          <SidebarProvider>
+            <SidebarFrame>
+              {children}
+              <CommandPalette />
+              <Fab />
+            </SidebarFrame>
+          </SidebarProvider>
+        </ToastProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -28,26 +53,13 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src *;" />
-        <ClerkProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
-            <AuthProvider>
-              <ToastProvider>
-                <SidebarProvider>
-                  <SidebarFrame>
-                    {children}
-                    <CommandPalette />
-                    <Fab />
-                  </SidebarFrame>
-                </SidebarProvider>
-              </ToastProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </ClerkProvider>
+        {clerkPublishableKey ? (
+          <ClerkProvider publishableKey={clerkPublishableKey}>
+            <AppShell>{children}</AppShell>
+          </ClerkProvider>
+        ) : (
+          <AppShell>{children}</AppShell>
+        )}
       </body>
     </html>
   );
