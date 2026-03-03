@@ -8,6 +8,7 @@ from app.db.database import get_db
 from app.audit.logger import HIPAAAuditLogger
 from app.services.email_service import email_service
 from jose import JWTError, jwt
+from jwt import PyJWKClient
 from datetime import datetime, timedelta
 from typing import Optional
 import os
@@ -17,6 +18,8 @@ import logging
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+clerk_jwk_client: Optional[PyJWKClient] = None
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
@@ -50,14 +53,19 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         if not active_token:
             logger.warning("No token provided in request")
             raise credentials_exception
+        payload = None
         try:
             payload = jwt.decode(active_token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError as e:
-            logger.warning(f"JWT decode failed: {str(e)}")
+        except JWTError:
+            payload = _verify_clerk_token(active_token)
+
+        if not payload:
+            logger.warning("JWT decode failed for both local and Clerk tokens")
             raise credentials_exception
-        username: str = payload.get("sub")
+
+        username: str = payload.get("sub") or payload.get("username")
         if username is None:
-            logger.warning("No username in JWT payload")
+            logger.warning("No subject/username in token payload")
             raise credentials_exception
     except HTTPException:
         raise
@@ -65,10 +73,73 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         logger.error(f"Unexpected error in get_current_user: {str(e)}")
         raise credentials_exception
     user = crud_notes.get_user_by_username(db, username)
+
+    # Auto-provision Clerk users when first seen.
+    if user is None and _is_clerk_subject(username):
+        user = _provision_clerk_user(db, payload)
+
     if user is None:
         logger.warning(f"User '{username}' not found after token validation")
         raise credentials_exception
     return user
+
+
+def _is_clerk_subject(subject: str) -> bool:
+    return bool(subject and subject.startswith("user_"))
+
+
+def _verify_clerk_token(token: str) -> Optional[dict]:
+    global clerk_jwk_client
+
+    jwks_url = os.getenv("CLERK_JWKS_URL")
+    issuer = os.getenv("CLERK_JWT_ISSUER")
+    if not jwks_url or not issuer:
+        return None
+
+    try:
+        if clerk_jwk_client is None:
+            clerk_jwk_client = PyJWKClient(jwks_url)
+        signing_key = clerk_jwk_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=issuer,
+            options={"verify_aud": False},
+        )
+        return payload
+    except Exception as error:
+        logger.warning(f"Clerk token verification failed: {error}")
+        return None
+
+
+def _provision_clerk_user(db: Session, payload: dict) -> Optional[models.User]:
+    clerk_subject = payload.get("sub")
+    if not clerk_subject:
+        return None
+
+    email = payload.get("email") or f"{clerk_subject}@clerk.local"
+    username = payload.get("preferred_username") or clerk_subject
+
+    existing_email = db.query(models.User).filter(func.lower(models.User.email) == email.lower()).first()
+    if existing_email:
+        return existing_email
+
+    hashed_password = crud_notes.get_password_hash(secrets.token_urlsafe(32))
+    new_user = models.User(
+        username=username,
+        email=email,
+        hashed_password=hashed_password,
+        tenant_id="default",
+        is_active=1,
+        is_admin=0,
+        role="provider",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    logger.info(f"Auto-provisioned Clerk user: {username}")
+    return new_user
 
 # POST /auth/register - Register a new user.
 # No authentication required.
