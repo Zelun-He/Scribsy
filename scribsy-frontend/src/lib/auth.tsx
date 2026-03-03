@@ -22,8 +22,6 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
-  const { user: clerkUser } = useUser();
 
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
@@ -35,23 +33,11 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
-      if (!isLoaded) return;
-
-      if (!isSignedIn) {
-        apiClient.clearToken();
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
       try {
-        const token = await getToken();
-        if (!token) throw new Error('No Clerk token available');
-
-        apiClient.setToken(token);
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
+        // User is not authenticated or token is invalid.
         handleAuthFailure();
       } finally {
         setLoading(false);
@@ -60,7 +46,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
     apiClient.setAuthFailureCallback(handleAuthFailure);
-  }, [getToken, handleAuthFailure, isLoaded, isSignedIn, clerkUser?.id]);
+  }, [handleAuthFailure]);
 
   const login = async (credentials: LoginRequest) => {
     await apiClient.login(credentials);
