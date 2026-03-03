@@ -10,8 +10,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
-  register: (userData: RegisterRequest) => Promise<void>;
+  login: (_credentials: LoginRequest) => Promise<void>;
+  register: (_userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   handleAuthFailure: () => void;
 }
@@ -23,6 +23,8 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
 
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
@@ -34,7 +36,20 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      if (!isLoaded) return;
+
+      if (!isSignedIn) {
+        apiClient.clearToken();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       try {
+        const token = await getToken();
+        if (!token) throw new Error('No Clerk token available');
+
+        apiClient.setToken(token);
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
@@ -46,7 +61,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
     apiClient.setAuthFailureCallback(handleAuthFailure);
-  }, [handleAuthFailure]);
+  }, [getToken, handleAuthFailure, isLoaded, isSignedIn, clerkUser?.id]);
 
   const login = async (credentials: LoginRequest) => {
     await apiClient.login(credentials);
@@ -59,7 +74,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
     await login(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
     apiClient.clearToken();
     apiClient.logoutServer().catch(() => {});
     setUser(null);
