@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ClerkProvider } from '@clerk/nextjs';
 import "./globals.css";
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider } from '@/lib/theme-provider';
@@ -27,24 +28,26 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src *;" />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem={false}
-          disableTransitionOnChange
-        >
-          <AuthProvider>
-            <ToastProvider>
-              <SidebarProvider>
-                <SidebarFrame>
-                  {children}
-                  <CommandPalette />
-                  <Fab />
-                </SidebarFrame>
-              </SidebarProvider>
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <ClerkProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem={false}
+            disableTransitionOnChange
+          >
+            <AuthProvider>
+              <ToastProvider>
+                <SidebarProvider>
+                  <SidebarFrame>
+                    {children}
+                    <CommandPalette />
+                    <Fab />
+                  </SidebarFrame>
+                </SidebarProvider>
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth as useClerkAuth, useUser } from '@clerk/nextjs';
 import { User, LoginRequest, RegisterRequest } from '@/types';
 import { apiClient } from '@/lib/api';
 
@@ -9,8 +10,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
-  register: (userData: RegisterRequest) => Promise<void>;
+  login: (_credentials: LoginRequest) => Promise<void>;
+  register: (_userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   handleAuthFailure: () => void;
 }
@@ -21,12 +22,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
 
-  // Function to handle authentication failures
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
     setUser(null);
-    // Redirect to access denied page for expired sessions
     if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
       router.push('/access-denied');
     }
@@ -34,83 +35,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      if (!isLoaded) return;
+
+      if (!isSignedIn) {
+        apiClient.clearToken();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
       try {
+        const token = await getToken();
+        if (!token) throw new Error('No Clerk token available');
+
+        apiClient.setToken(token);
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
-        // User is not authenticated or token is invalid
         handleAuthFailure();
-        console.log('User not authenticated');
       } finally {
         setLoading(false);
       }
     };
 
     initAuth();
-
-    // Set up the auth failure callback
     apiClient.setAuthFailureCallback(handleAuthFailure);
-  }, [handleAuthFailure]);
+  }, [getToken, handleAuthFailure, isLoaded, isSignedIn, clerkUser?.id]);
 
-  const login = async (credentials: LoginRequest) => {
-    try {
-      await apiClient.login(credentials);
-      const currentUser = await apiClient.getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      // Preserve the specific error message from the backend
-      throw error;
-    }
+  const login = async () => {
+    router.push('/login');
   };
 
-  const register = async (userData: RegisterRequest) => {
-    try {
-      await apiClient.register(userData);
-      // Auto-login after registration
-      await login(userData);
-    } catch (error) {
-      // Preserve the specific error message from the backend
-      throw error;
-    }
+  const register = async () => {
+    router.push('/register');
   };
 
-  const logout = () => {
+  const logout = async () => {
     apiClient.clearToken();
-    // Clear server-side cookies
-    apiClient.logoutServer().catch(() => {});
+    await signOut({ redirectUrl: '/' });
     setUser(null);
-    // Redirect to landing page after logout
-    router.push('/');
   };
-
-  // Set up periodic auth check and sliding refresh to handle expired tokens
-  useEffect(() => {
-    if (!user) return;
-
-    const checkAuthStatus = async () => {
-      try {
-        // Try to refresh token to extend session while the app is active
-        try {
-          await apiClient.refreshSession();
-        } catch {
-          // Fallback: try /me; if still 401, try using stored token header
-          try {
-            await apiClient.getCurrentUser();
-          } catch {
-            // no-op; handleAuthFailure will run below
-          }
-        }
-      } catch {
-        // Token is invalid, handle auth failure
-        handleAuthFailure();
-      }
-    };
-
-    // Refresh every 5 minutes to maintain session while active
-    const interval = setInterval(checkAuthStatus, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  }, [user, handleAuthFailure]);
 
   return (
     <AuthContext.Provider value={{ user, loading, isLoading: loading, login, register, logout, handleAuthFailure }}>
