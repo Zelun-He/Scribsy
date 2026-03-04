@@ -197,25 +197,36 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="how-it-works" className="bg-emerald-50 py-20 md:py-28">
+        <section id="how-it-works" className="scroll-mt-24 bg-emerald-50 py-20 md:py-28">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="mx-auto mb-14 max-w-3xl text-center">
               <h2 className="mb-3 text-3xl font-bold md:text-4xl">How Scribsy Works</h2>
               <p className="text-lg text-gray-600">Three simple steps to streamline your clinical documentation.</p>
             </div>
-            <div className="grid gap-10 md:grid-cols-3">
-              {steps.map((step) => (
-                <div key={step.number} className="rounded-xl border border-emerald-100 bg-white p-6">
-                  <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                    {step.number}
+            <div className="grid items-start gap-10 lg:grid-cols-2">
+              <div className="space-y-6">
+                {steps.map((step) => (
+                  <div key={step.number} className="rounded-xl border border-emerald-100 bg-white p-6">
+                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                      {step.number}
+                    </div>
+                    <div className="mb-3 flex items-center gap-2">
+                      <step.icon className="h-5 w-5 text-emerald-600" />
+                      <h3 className="font-semibold">{step.title}</h3>
+                    </div>
+                    <p className="text-sm text-gray-600">{step.description}</p>
                   </div>
-                  <div className="mb-3 flex items-center gap-2">
-                    <step.icon className="h-5 w-5 text-emerald-600" />
-                    <h3 className="font-semibold">{step.title}</h3>
-                  </div>
-                  <p className="text-sm text-gray-600">{step.description}</p>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div className="relative">
+                <Image
+                  src="https://images.unsplash.com/photo-1759813641406-980519f58b1c?auto=format&fit=crop&w=1080&q=80"
+                  alt="Medical professionals using technology"
+                  className="w-full rounded-2xl shadow-2xl"
+                  width={1080}
+                  height={720}
+                />
+              </div>
             </div>
           </div>
         </section>
