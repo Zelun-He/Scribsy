@@ -100,20 +100,41 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Clerk session propagation can be briefly eventual after redirect.
-        // Retry a few times before treating it as an auth failure.
-        let token: string | null = null;
-        for (let i = 0; i < 3; i++) {
-          token = await getToken();
-          if (token) break;
-          await new Promise((resolve) => setTimeout(resolve, 250));
+        // Retry Clerk token retrieval + API user bootstrap before failing auth.
+        // Prefer direct Clerk JWT auth against /auth/me; fallback to clerk-login exchange.
+        let currentUser: User | null = null;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const token = await getToken();
+          if (!token) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            continue;
+          }
+
+          apiClient.setToken(token);
+
+          try {
+            currentUser = await apiClient.getCurrentUser();
+            break;
+          } catch {
+            try {
+              await apiClient.loginWithClerk(token, {
+                email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
+                username: clerkUser?.username ?? undefined,
+              });
+              currentUser = await apiClient.getCurrentUser();
+              break;
+            } catch {
+              // Backend may still be waiting for session/token propagation.
+              await new Promise((resolve) => setTimeout(resolve, 400));
+            }
+          }
         }
-        if (!token) throw new Error('No Clerk token available');
-        await apiClient.loginWithClerk(token, {
-          email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
-          username: clerkUser?.username ?? undefined,
-        });
-        const currentUser = await apiClient.getCurrentUser();
+
+        if (!currentUser) {
+          throw new Error('Unable to authenticate with Clerk-backed session');
+        }
+
         setUser(currentUser);
       } catch {
         handleAuthFailure();
