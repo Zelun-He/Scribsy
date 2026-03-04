@@ -1,7 +1,7 @@
 'use client';
 
 import { SignIn } from '@clerk/nextjs';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,18 @@ import { Input } from '@/components/ui/input';
 const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 function ClerkLogin() {
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/dashboard');
+    }
+  }, [loading, router, user]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <SignIn routing="hash" signUpUrl="/register" forceRedirectUrl="/dashboard" />
+      <SignIn routing="path" signUpUrl="/register" forceRedirectUrl="/dashboard" />
     </div>
   );
 }
