@@ -21,6 +21,7 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 clerk_jwk_client: Optional[PyJWKClient] = None
+clerk_jwk_url: Optional[str] = None
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
@@ -95,43 +96,42 @@ def _is_clerk_subject(subject: str) -> bool:
 
 
 def _verify_clerk_token(token: str) -> Optional[dict]:
-    global clerk_jwk_client
+    global clerk_jwk_client, clerk_jwk_url
 
-    issuer = (os.getenv("CLERK_JWT_ISSUER") or os.getenv("CLERK_ISSUER") or "").strip()
-    jwks_url = (os.getenv("CLERK_JWKS_URL") or "").strip()
-    if not jwks_url and issuer:
-        jwks_url = f"{issuer.rstrip('/')}/.well-known/jwks.json"
+    configured_issuer = (os.getenv("CLERK_JWT_ISSUER") or os.getenv("CLERK_ISSUER") or "").strip().rstrip("/")
+    configured_jwks_url = (os.getenv("CLERK_JWKS_URL") or "").strip()
+
+    token_issuer = ""
+    try:
+        token_issuer = (jwt.get_unverified_claims(token).get("iss") or "").strip().rstrip("/")
+    except Exception:
+        token_issuer = ""
+
+    issuer = configured_issuer or token_issuer
+    jwks_url = configured_jwks_url or (f"{issuer}/.well-known/jwks.json" if issuer else "")
     if not jwks_url:
+        logger.warning("Clerk token verification skipped: missing CLERK_ISSUER/CLERK_JWKS_URL and no token issuer")
         return None
 
     try:
-        if clerk_jwk_client is None:
+        if clerk_jwk_client is None or clerk_jwk_url != jwks_url:
             clerk_jwk_client = PyJWKClient(jwks_url)
+            clerk_jwk_url = jwks_url
+
         signing_key = clerk_jwk_client.get_signing_key_from_jwt(token)
-        # Prefer issuer validation when configured, but gracefully fall back
-        # without issuer check to tolerate minor config mismatches (e.g. slash).
+        decode_kwargs = {
+            "key": signing_key.key,
+            "algorithms": ["RS256"],
+            "options": {"verify_aud": False},
+        }
+
         if issuer:
             try:
-                return jwt.decode(
-                    token,
-                    signing_key.key,
-                    algorithms=["RS256"],
-                    issuer=issuer.rstrip("/"),
-                    options={"verify_aud": False},
-                )
+                return jwt.decode(token, issuer=issuer, **decode_kwargs)
             except Exception:
-                return jwt.decode(
-                    token,
-                    signing_key.key,
-                    algorithms=["RS256"],
-                    options={"verify_aud": False},
-                )
-        return jwt.decode(
-            token,
-            signing_key.key,
-            algorithms=["RS256"],
-            options={"verify_aud": False},
-        )
+                return jwt.decode(token, **decode_kwargs)
+
+        return jwt.decode(token, **decode_kwargs)
     except Exception as error:
         logger.warning(f"Clerk token verification failed: {error}")
         return None
