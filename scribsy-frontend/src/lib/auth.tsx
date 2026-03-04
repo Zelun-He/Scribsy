@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth as useClerkAuth } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { User, LoginRequest, RegisterRequest } from '@/types';
 import { apiClient } from '@/lib/api';
 
@@ -78,6 +79,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
 
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
@@ -107,7 +109,10 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
         if (!token) throw new Error('No Clerk token available');
-        apiClient.setToken(token);
+        await apiClient.loginWithClerk(token, {
+          email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
+          username: clerkUser?.username ?? undefined,
+        });
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
@@ -119,7 +124,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
     apiClient.setAuthFailureCallback(handleAuthFailure);
-  }, [getToken, handleAuthFailure, isLoaded, isSignedIn]);
+  }, [clerkUser, getToken, handleAuthFailure, isLoaded, isSignedIn]);
 
   const login = async () => {
     router.push('/login');

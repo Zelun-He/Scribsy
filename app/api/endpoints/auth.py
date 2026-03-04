@@ -14,6 +14,7 @@ from typing import Optional
 import os
 import secrets
 import logging
+from pydantic import BaseModel
 
 from app.config import settings
 
@@ -28,6 +29,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class ClerkLoginRequest(BaseModel):
+    email: Optional[str] = None
+    username: Optional[str] = None
 
 # Utility to create JWT token
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -311,6 +317,42 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
     except Exception:
         pass
 
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/clerk-login", response_model=schemas.Token)
+def clerk_login(
+    request: Request,
+    payload: ClerkLoginRequest,
+    db: Session = Depends(get_db),
+):
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Clerk bearer token")
+
+    clerk_token = auth_header.split(" ", 1)[1].strip()
+    verified_payload = _verify_clerk_token(clerk_token)
+    if not verified_payload:
+        raise HTTPException(status_code=401, detail="Invalid Clerk token")
+
+    username = verified_payload.get("preferred_username") or verified_payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Missing Clerk subject")
+
+    user = crud_notes.get_user_by_username(db, username)
+    if user is None:
+        user = _provision_clerk_user(db, verified_payload)
+
+    if user is None:
+        # Last fallback: attempt email match if available
+        email = (payload.email or verified_payload.get("email") or "").strip().lower()
+        if email:
+            user = db.query(models.User).filter(func.lower(models.User.email) == email).first()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unable to map Clerk user")
+
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/logout")

@@ -230,6 +230,27 @@ class ApiClient {
     }
   }
 
+  async loginWithClerk(
+    clerkToken: string,
+    profile?: { email?: string; username?: string }
+  ): Promise<LoginResponse> {
+    const response = await fetch(`${this.baseURL}/auth/clerk-login`, {
+      method: 'POST',
+      headers: {
+        ...this.getJsonHeaders(),
+        Authorization: `Bearer ${clerkToken}`,
+      },
+      body: JSON.stringify({
+        email: profile?.email,
+        username: profile?.username,
+      }),
+      credentials: this.requestCredentials(),
+    });
+    const result = await this.handleResponse<LoginResponse>(response);
+    this.setToken(result.access_token);
+    return result;
+  }
+
   async refreshSession(): Promise<LoginResponse> {
     const response = await fetch(`${this.baseURL}/auth/refresh`, {
       method: 'POST',
