@@ -12,7 +12,7 @@ const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 function ClerkRegister() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <SignUp routing="path" path="/register" signInUrl="/login" forceRedirectUrl="/dashboard" />
+      <SignUp routing="hash" signInUrl="/login" forceRedirectUrl="/dashboard" />
     </div>
   );
 }
