@@ -49,10 +49,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const csp = [
+    "default-src 'self'",
+    "img-src 'self' data: blob: https:",
+    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com",
+    "connect-src 'self' https: wss:",
+    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
+    "font-src 'self' data:",
+  ].join("; ");
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
-        <meta httpEquiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline'; connect-src *;" />
+        <meta httpEquiv="Content-Security-Policy" content={csp} />
         {clerkPublishableKey ? (
           <ClerkProvider publishableKey={clerkPublishableKey}>
             <AppShell>{children}</AppShell>

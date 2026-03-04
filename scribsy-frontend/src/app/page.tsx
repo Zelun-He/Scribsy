@@ -12,7 +12,6 @@ import {
   Mic,
   Shield,
   Sparkles,
-  Star,
   Stethoscope,
   Zap,
 } from "lucide-react";
@@ -79,27 +78,6 @@ const steps = [
   },
 ];
 
-const testimonials = [
-  {
-    name: "Dr. Sarah Chen",
-    role: "Family Medicine Physician",
-    content:
-      "Scribsy transformed my workflow. I save hours each day on documentation and spend more time with patients.",
-  },
-  {
-    name: "Dr. Michael Rodriguez",
-    role: "Emergency Medicine",
-    content:
-      "The medical context recognition is excellent. It consistently captures the details I need in my notes.",
-  },
-  {
-    name: "Dr. Emily Thompson",
-    role: "Internal Medicine",
-    content:
-      "Fast onboarding and immediate value. This is one of the best productivity tools in our clinic.",
-  },
-];
-
 export default function Home() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
@@ -118,9 +96,6 @@ export default function Home() {
             <a href="#how-it-works" className="text-sm text-gray-600 hover:text-gray-900">
               How It Works
             </a>
-            <a href="#testimonials" className="text-sm text-gray-600 hover:text-gray-900">
-              Testimonials
-            </a>
           </nav>
           <div className="flex items-center gap-3">
             <Link href="/login" className="hidden rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 md:inline-flex">
@@ -130,7 +105,7 @@ export default function Home() {
               href="/register"
               className="inline-flex rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
-              Get Started
+              Sign Up
             </Link>
           </div>
         </div>
@@ -155,7 +130,7 @@ export default function Home() {
                   href="/register"
                   className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-6 py-3 text-base font-semibold text-white hover:bg-emerald-700"
                 >
-                  Get Started
+                  Sign Up
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
                 <Link
@@ -218,7 +193,7 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-              <div className="relative">
+              <div className="relative self-center lg:pt-8">
                 <Image
                   src="https://images.unsplash.com/photo-1759813641406-980519f58b1c?auto=format&fit=crop&w=1080&q=80"
                   alt="Medical professionals using technology"
@@ -227,29 +202,6 @@ export default function Home() {
                   height={720}
                 />
               </div>
-            </div>
-          </div>
-        </section>
-
-        <section id="testimonials" className="bg-white py-20 md:py-28">
-          <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="mx-auto mb-14 max-w-3xl text-center">
-              <h2 className="mb-3 text-3xl font-bold md:text-4xl">Trusted by Healthcare Professionals</h2>
-              <p className="text-lg text-gray-600">See what teams are saying about Scribsy.</p>
-            </div>
-            <div className="grid gap-6 md:grid-cols-3">
-              {testimonials.map((item) => (
-                <div key={item.name} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <div className="mb-3 flex gap-1">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <Star key={i} className="h-4 w-4 fill-emerald-500 text-emerald-500" />
-                    ))}
-                  </div>
-                  <p className="mb-4 text-sm text-gray-600">{item.content}</p>
-                  <div className="font-semibold">{item.name}</div>
-                  <div className="text-sm text-gray-500">{item.role}</div>
-                </div>
-              ))}
             </div>
           </div>
         </section>
@@ -265,7 +217,7 @@ export default function Home() {
                 href="/register"
                 className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 font-semibold text-emerald-700 hover:bg-emerald-50"
               >
-                Get Started
+                Sign Up
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
               <Link
