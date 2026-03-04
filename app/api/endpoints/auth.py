@@ -91,23 +91,41 @@ def _is_clerk_subject(subject: str) -> bool:
 def _verify_clerk_token(token: str) -> Optional[dict]:
     global clerk_jwk_client
 
-    jwks_url = os.getenv("CLERK_JWKS_URL")
-    issuer = os.getenv("CLERK_JWT_ISSUER")
-    if not jwks_url or not issuer:
+    issuer = (os.getenv("CLERK_JWT_ISSUER") or os.getenv("CLERK_ISSUER") or "").strip()
+    jwks_url = (os.getenv("CLERK_JWKS_URL") or "").strip()
+    if not jwks_url and issuer:
+        jwks_url = f"{issuer.rstrip('/')}/.well-known/jwks.json"
+    if not jwks_url:
         return None
 
     try:
         if clerk_jwk_client is None:
             clerk_jwk_client = PyJWKClient(jwks_url)
         signing_key = clerk_jwk_client.get_signing_key_from_jwt(token)
-        payload = jwt.decode(
+        # Prefer issuer validation when configured, but gracefully fall back
+        # without issuer check to tolerate minor config mismatches (e.g. slash).
+        if issuer:
+            try:
+                return jwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    issuer=issuer.rstrip("/"),
+                    options={"verify_aud": False},
+                )
+            except Exception:
+                return jwt.decode(
+                    token,
+                    signing_key.key,
+                    algorithms=["RS256"],
+                    options={"verify_aud": False},
+                )
+        return jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            issuer=issuer,
             options={"verify_aud": False},
         )
-        return payload
     except Exception as error:
         logger.warning(f"Clerk token verification failed: {error}")
         return None

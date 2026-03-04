@@ -98,7 +98,14 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const token = await getToken();
+        // Clerk session propagation can be briefly eventual after redirect.
+        // Retry a few times before treating it as an auth failure.
+        let token: string | null = null;
+        for (let i = 0; i < 3; i++) {
+          token = await getToken();
+          if (token) break;
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
         if (!token) throw new Error('No Clerk token available');
         apiClient.setToken(token);
         const currentUser = await apiClient.getCurrentUser();
