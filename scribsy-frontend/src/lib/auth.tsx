@@ -100,8 +100,8 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Clerk session propagation can be eventual after redirect.
-        // Retry token retrieval + backend session sync before failing auth.
+        // Retry Clerk token retrieval + API user bootstrap before failing auth.
+        // Prefer direct Clerk JWT auth against /auth/me; fallback to clerk-login exchange.
         let currentUser: User | null = null;
 
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -111,21 +111,28 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
             continue;
           }
 
+          apiClient.setToken(token);
+
           try {
-            await apiClient.loginWithClerk(token, {
-              email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
-              username: clerkUser?.username ?? undefined,
-            });
             currentUser = await apiClient.getCurrentUser();
             break;
           } catch {
-            // Backend may still be waiting for session/token propagation.
-            await new Promise((resolve) => setTimeout(resolve, 400));
+            try {
+              await apiClient.loginWithClerk(token, {
+                email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
+                username: clerkUser?.username ?? undefined,
+              });
+              currentUser = await apiClient.getCurrentUser();
+              break;
+            } catch {
+              // Backend may still be waiting for session/token propagation.
+              await new Promise((resolve) => setTimeout(resolve, 400));
+            }
           }
         }
 
         if (!currentUser) {
-          throw new Error('Unable to sync Clerk session with API');
+          throw new Error('Unable to authenticate with Clerk-backed session');
         }
 
         setUser(currentUser);
