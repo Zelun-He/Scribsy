@@ -97,7 +97,7 @@ class ApiClient {
     return 'include';
   }
 
-  private async handleResponse<T>(response: Response): Promise<T> {
+  private async handleResponse<T>(response: Response, options?: { suppressAuthFailure?: boolean }): Promise<T> {
     if (!response.ok) {
       // Read body text once; attempt to surface detail string if present
       let bodyText = '';
@@ -117,7 +117,7 @@ class ApiClient {
 
       if (response.status === 401) {
         this.clearToken();
-        if (this.authFailureCallback) this.authFailureCallback();
+        if (!options?.suppressAuthFailure && this.authFailureCallback) this.authFailureCallback();
         throw new Error(parsedMsg || 'Authentication failed');
       }
 
@@ -214,14 +214,14 @@ class ApiClient {
     return this.handleResponse<User>(response);
   }
 
-  async getCurrentUser(): Promise<User> {
+  async getCurrentUser(options?: { suppressAuthFailure?: boolean }): Promise<User> {
     try {
       const response = await fetch(`${this.baseURL}/auth/me`, {
         headers: this.getHeaders(),
         credentials: this.requestCredentials(),
       });
 
-      return this.handleResponse<User>(response);
+      return this.handleResponse<User>(response, options);
     } catch (error) {
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
         throw new Error('Unable to reach server. Please check your connection and try again.');
@@ -232,7 +232,8 @@ class ApiClient {
 
   async loginWithClerk(
     clerkToken: string,
-    profile?: { email?: string; username?: string }
+    profile?: { email?: string; username?: string },
+    options?: { suppressAuthFailure?: boolean }
   ): Promise<LoginResponse> {
     const response = await fetch(`${this.baseURL}/auth/clerk-login`, {
       method: 'POST',
@@ -246,7 +247,7 @@ class ApiClient {
       }),
       credentials: this.requestCredentials(),
     });
-    const result = await this.handleResponse<LoginResponse>(response);
+    const result = await this.handleResponse<LoginResponse>(response, options);
     this.setToken(result.access_token);
     return result;
   }
