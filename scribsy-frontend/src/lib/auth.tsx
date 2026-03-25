@@ -28,7 +28,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
     apiClient.clearToken();
     setUser(null);
     if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
-      router.push('/access-denied');
+      router.push('/login');
     }
   }, [router]);
 
@@ -85,7 +85,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
     apiClient.clearToken();
     setUser(null);
     if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
-      router.push('/access-denied');
+      router.push('/login');
     }
   }, [router]);
 
@@ -100,8 +100,8 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        // Retry Clerk token retrieval + API user bootstrap before failing auth.
-        // Prefer direct Clerk JWT auth against /auth/me; fallback to clerk-login exchange.
+        // Basic login flow:
+        // 1) get Clerk token, 2) load API user, 3) fallback to clerk-login exchange, 4) retry briefly.
         let currentUser: User | null = null;
 
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -114,15 +114,19 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
           apiClient.setToken(token);
 
           try {
-            currentUser = await apiClient.getCurrentUser();
+            currentUser = await apiClient.getCurrentUser({ suppressAuthFailure: true });
             break;
           } catch {
             try {
-              await apiClient.loginWithClerk(token, {
-                email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
-                username: clerkUser?.username ?? undefined,
-              });
-              currentUser = await apiClient.getCurrentUser();
+              await apiClient.loginWithClerk(
+                token,
+                {
+                  email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
+                  username: clerkUser?.username ?? undefined,
+                },
+                { suppressAuthFailure: true }
+              );
+              currentUser = await apiClient.getCurrentUser({ suppressAuthFailure: true });
               break;
             } catch {
               // Backend may still be waiting for session/token propagation.
@@ -132,7 +136,7 @@ function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (!currentUser) {
-          throw new Error('Unable to authenticate with Clerk-backed session');
+          throw new Error('Login failed. Unable to establish authenticated session');
         }
 
         setUser(currentUser);
