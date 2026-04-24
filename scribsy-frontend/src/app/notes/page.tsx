@@ -45,13 +45,28 @@ export default function NotesPage() {
     }
   }, []);
 
+  const shouldTreatAsEmptyState = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('404') ||
+      normalized.includes('not found') ||
+      normalized.includes('no notes')
+    );
+  };
+
   const fetchNotes = async () => {
     try {
       const fetchedNotes = await apiClient.getNotes();
       setNotes(fetchedNotes);
       setError('');
-    } catch {
-      setError('Failed to fetch notes');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch notes';
+      if (shouldTreatAsEmptyState(message)) {
+        setNotes([]);
+        setError('');
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -102,8 +117,8 @@ export default function NotesPage() {
     try {
       await apiClient.deleteNote(noteId);
       setNotes(notes.filter(note => note.id !== noteId));
-    } catch {
-      setError('Failed to delete note');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
     } finally {
       setDeleteLoading(null);
     }
