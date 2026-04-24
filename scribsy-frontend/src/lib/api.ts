@@ -162,44 +162,21 @@ class ApiClient {
 
   // Auth endpoints
   async login(credentials: LoginRequest): Promise<LoginResponse> {
-    try {
-      const form = new URLSearchParams();
-      form.append('username', credentials.username);
-      form.append('password', credentials.password);
+    const form = new URLSearchParams();
+    form.append('username', credentials.username.trim());
+    form.append('password', credentials.password);
 
-      // Use token-based login as primary path for consistent cross-origin behavior.
-      const respToken = await fetch(`${this.baseURL}/auth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
-        credentials: this.requestCredentials(),
-      });
-      const result = await this.handleResponse<LoginResponse>(respToken);
-      this.setToken(result.access_token);
-      this.useCookies = false;
+    const response = await fetch(`${this.baseURL}/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      credentials: 'include',
+    });
 
-      // Best-effort cookie issuance for same-origin deployments.
-      if (this.requestCredentials() === 'include') {
-        try {
-          await fetch(`${this.baseURL}/auth/token-cookie`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: form.toString(),
-            credentials: this.requestCredentials(),
-          });
-          this.useCookies = true;
-        } catch {
-          this.useCookies = false;
-        }
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error('Unable to reach server. Please check your connection and try again.');
-      }
-      throw error;
-    }
+    const result = await this.handleResponse<LoginResponse>(response);
+    this.setToken(result.access_token);
+    this.useCookies = false;
+    return result;
   }
 
   async register(userData: RegisterRequest): Promise<User> {
@@ -214,20 +191,12 @@ class ApiClient {
     return this.handleResponse<User>(response);
   }
 
-  async getCurrentUser(options?: { suppressAuthFailure?: boolean }): Promise<User> {
-    try {
-      const response = await fetch(`${this.baseURL}/auth/me`, {
-        headers: this.getHeaders(),
-        credentials: this.requestCredentials(),
-      });
-
-      return this.handleResponse<User>(response, options);
-    } catch (error) {
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error('Unable to reach server. Please check your connection and try again.');
-      }
-      throw error;
-    }
+  async getCurrentUser(): Promise<User> {
+    const response = await fetch(`${this.baseURL}/auth/me`, {
+      headers: this.getHeaders(),
+      credentials: 'include',
+    });
+    return this.handleResponse<User>(response);
   }
 
   async loginWithClerk(
