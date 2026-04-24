@@ -1,38 +1,24 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-
-function ClerkLogin() {
+export default function LoginPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
-
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace('/dashboard');
-    }
-  }, [loading, router, user]);
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <SignIn routing="path" signUpUrl="/register" forceRedirectUrl="/dashboard" />
-    </div>
-  );
-}
-
-function LegacyLogin() {
-  const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace('/dashboard');
+    }
+  }, [authLoading, router, user]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
@@ -60,8 +46,4 @@ function LegacyLogin() {
       </form>
     </div>
   );
-}
-
-export default function LoginPage() {
-  return hasClerkKey ? <ClerkLogin /> : <LegacyLogin />;
 }

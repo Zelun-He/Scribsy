@@ -2,12 +2,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-Set Clerk environment variables before running locally:
-
-```bash
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-```
+Authentication is handled by the backend user database. Create an account from `/register` or seed users in the API database before signing in.
 
 First, run the development server:
 
