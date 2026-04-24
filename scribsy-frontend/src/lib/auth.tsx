@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth as useClerkAuth } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import { User, LoginRequest, RegisterRequest } from '@/types';
 import { apiClient } from '@/lib/api';
 
@@ -9,26 +11,24 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isLoading: boolean;
-  login: (credentials: LoginRequest) => Promise<void>;
-  register: (userData: RegisterRequest) => Promise<void>;
+  login: (_credentials: LoginRequest) => Promise<void>;
+  register: (_userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   handleAuthFailure: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // Function to handle authentication failures
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
     setUser(null);
-    // Redirect to access denied page for expired sessions
     if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
-      router.push('/access-denied');
+      router.push('/login');
     }
   }, [router]);
 
@@ -38,85 +38,145 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
-        // User is not authenticated or token is invalid
+        // User is not authenticated or token is invalid.
         handleAuthFailure();
-        console.log('User not authenticated');
       } finally {
         setLoading(false);
       }
     };
 
     initAuth();
-
-    // Set up the auth failure callback
     apiClient.setAuthFailureCallback(handleAuthFailure);
   }, [handleAuthFailure]);
 
   const login = async (credentials: LoginRequest) => {
-    try {
-      await apiClient.login(credentials);
-      const currentUser = await apiClient.getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      // Preserve the specific error message from the backend
-      throw error;
-    }
+    await apiClient.login(credentials);
+    const currentUser = await apiClient.getCurrentUser();
+    setUser(currentUser);
   };
 
   const register = async (userData: RegisterRequest) => {
-    try {
-      await apiClient.register(userData);
-      // Auto-login after registration
-      await login(userData);
-    } catch (error) {
-      // Preserve the specific error message from the backend
-      throw error;
-    }
+    await apiClient.register(userData);
+    await login(userData);
   };
 
-  const logout = () => {
+  const logout = async () => {
     apiClient.clearToken();
-    // Clear server-side cookies
     apiClient.logoutServer().catch(() => {});
     setUser(null);
-    // Redirect to landing page after logout
     router.push('/');
   };
-
-  // Set up periodic auth check and sliding refresh to handle expired tokens
-  useEffect(() => {
-    if (!user) return;
-
-    const checkAuthStatus = async () => {
-      try {
-        // Try to refresh token to extend session while the app is active
-        try {
-          await apiClient.refreshSession();
-        } catch {
-          // Fallback: try /me; if still 401, try using stored token header
-          try {
-            await apiClient.getCurrentUser();
-          } catch {
-            // no-op; handleAuthFailure will run below
-          }
-        }
-      } catch {
-        // Token is invalid, handle auth failure
-        handleAuthFailure();
-      }
-    };
-
-    // Refresh every 5 minutes to maintain session while active
-    const interval = setInterval(checkAuthStatus, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  }, [user, handleAuthFailure]);
 
   return (
     <AuthContext.Provider value={{ user, loading, isLoading: loading, login, register, logout, handleAuthFailure }}>
       {children}
     </AuthContext.Provider>
   );
+}
+
+function ClerkAuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { isLoaded, isSignedIn, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+
+  const handleAuthFailure = useCallback(() => {
+    apiClient.clearToken();
+    setUser(null);
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login' && window.location.pathname !== '/register' && window.location.pathname !== '/') {
+      router.push('/login');
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      if (!isLoaded) return;
+      if (!isSignedIn) {
+        apiClient.clearToken();
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Basic login flow:
+        // 1) get Clerk token, 2) load API user, 3) fallback to clerk-login exchange, 4) retry briefly.
+        let currentUser: User | null = null;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const token = await getToken();
+          if (!token) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            continue;
+          }
+
+          apiClient.setToken(token);
+
+          try {
+            currentUser = await apiClient.getCurrentUser({ suppressAuthFailure: true });
+            break;
+          } catch {
+            try {
+              await apiClient.loginWithClerk(
+                token,
+                {
+                  email: clerkUser?.primaryEmailAddress?.emailAddress ?? undefined,
+                  username: clerkUser?.username ?? undefined,
+                },
+                { suppressAuthFailure: true }
+              );
+              currentUser = await apiClient.getCurrentUser({ suppressAuthFailure: true });
+              break;
+            } catch {
+              // Backend may still be waiting for session/token propagation.
+              await new Promise((resolve) => setTimeout(resolve, 400));
+            }
+          }
+        }
+
+        if (!currentUser) {
+          throw new Error('Login failed. Unable to establish authenticated session');
+        }
+
+        setUser(currentUser);
+      } catch {
+        handleAuthFailure();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+    apiClient.setAuthFailureCallback(handleAuthFailure);
+  }, [clerkUser, getToken, handleAuthFailure, isLoaded, isSignedIn]);
+
+  const login = async () => {
+    router.push('/login');
+  };
+
+  const register = async () => {
+    router.push('/register');
+  };
+
+  const logout = async () => {
+    apiClient.clearToken();
+    await signOut({ redirectUrl: '/' });
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, isLoading: loading, login, register, logout, handleAuthFailure }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function AuthProvider({ children, enableClerk = false }: { children: React.ReactNode; enableClerk?: boolean }) {
+  if (!enableClerk) {
+    return <LegacyAuthProvider>{children}</LegacyAuthProvider>;
+  }
+  return <ClerkAuthProvider>{children}</ClerkAuthProvider>;
 }
 
 export function useAuth() {

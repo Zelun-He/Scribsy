@@ -372,4 +372,9 @@ def readyz():
 
 @app.get("/test-env")
 def test_env():
-    return {"OPENAI_API_KEY": os.getenv("OPENAI_API_KEY")}
+    if not settings.debug:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+
+    api_key = os.getenv("OPENAI_API_KEY", "")
+    masked_key = f"{api_key[:8]}..." if api_key else ""
+    return {"OPENAI_API_KEY": masked_key}

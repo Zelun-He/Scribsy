@@ -5,8 +5,13 @@ from sqlalchemy.orm import Session
 from app.db import models, schemas
 from typing import List, Optional
 from datetime import datetime
-from passlib.context import CryptContext
+import bcrypt
 from sqlalchemy import func
+from app.utils.logging import logger
+
+def normalize_username(username: str) -> str:
+    """Normalize usernames for consistent authentication lookups."""
+    return (username or "").strip().lower()
 
 def generate_visit_id(db: Session, patient_id: int) -> int:
     """
@@ -112,20 +117,26 @@ def delete_note(db: Session, note_id: int) -> bool:
     return False
 
 def get_user_by_username(db: Session, username: str):
-    # Use ORM query to return full User model with all columns
+    """Fetch user by username with whitespace/case tolerant matching."""
+    normalized_username = normalize_username(username)
+    if not normalized_username:
+        return None
+
     try:
-        user = db.query(models.User).filter(models.User.username == username).first()
-        if user:
-            # Force load all attributes to avoid lazy loading issues
-            db.refresh(user)
-        return user
+        return (
+            db.query(models.User)
+            .filter(func.lower(func.trim(models.User.username)) == normalized_username)
+            .first()
+        )
     except Exception as e:
-        # If database query fails, return None
+        logger.error(f"Failed user lookup for '{username}': {e}", exc_info=True)
+        db.rollback()
         return None
 
 def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
+    cleaned_username = user.username.strip()
     db_user = models.User(
-        username=user.username, 
+        username=cleaned_username, 
         email=user.email,
         hashed_password=hashed_password,
         tenant_id="default",  # Explicitly set tenant_id
@@ -153,23 +164,24 @@ def set_user_admin(db: Session, username: str):
         db.refresh(user)
     return user
 
-# Authentication helper
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Authentication helpers (bcrypt via direct library to avoid passlib+bcrypt compatibility issues)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
+    except Exception:
+        return False
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_password_hash(password: str) -> str:
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def authenticate_user(db: Session, username: str, password: str):
     user = get_user_by_username(db, username)
     if not user:
         return None, "User not found"
-    
+
     # Verify password using User ORM object attributes
     if not verify_password(password, user.hashed_password):
         return None, "Incorrect password"
-    
+
     # Return the User ORM object directly (it will be converted to UserRead schema by FastAPI)
     return user, None

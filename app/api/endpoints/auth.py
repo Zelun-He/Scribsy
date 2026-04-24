@@ -3,19 +3,25 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import schemas, models
 from app.crud import notes as crud_notes
+from sqlalchemy import func
 from app.db.database import get_db
 from app.audit.logger import HIPAAAuditLogger
 from app.services.email_service import email_service
 from jose import JWTError, jwt
+from jwt import PyJWKClient
 from datetime import datetime, timedelta
 from typing import Optional
 import os
 import secrets
 import logging
+from pydantic import BaseModel
 
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+clerk_jwk_client: Optional[PyJWKClient] = None
+clerk_jwk_url: Optional[str] = None
 
 SECRET_KEY = settings.secret_key
 ALGORITHM = settings.algorithm
@@ -24,6 +30,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token", auto_error=False)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class ClerkLoginRequest(BaseModel):
+    email: Optional[str] = None
+    username: Optional[str] = None
 
 # Utility to create JWT token
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -49,14 +60,19 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         if not active_token:
             logger.warning("No token provided in request")
             raise credentials_exception
+        payload = None
         try:
             payload = jwt.decode(active_token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError as e:
-            logger.warning(f"JWT decode failed: {str(e)}")
+        except JWTError:
+            payload = _verify_clerk_token(active_token)
+
+        if not payload:
+            logger.warning("JWT decode failed for both local and Clerk tokens")
             raise credentials_exception
-        username: str = payload.get("sub")
+
+        username: str = payload.get("sub") or payload.get("username")
         if username is None:
-            logger.warning("No username in JWT payload")
+            logger.warning("No subject/username in token payload")
             raise credentials_exception
     except HTTPException:
         raise
@@ -64,10 +80,90 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         logger.error(f"Unexpected error in get_current_user: {str(e)}")
         raise credentials_exception
     user = crud_notes.get_user_by_username(db, username)
+
+    # Auto-provision Clerk users when first seen.
+    if user is None and _is_clerk_subject(username):
+        user = _provision_clerk_user(db, payload)
+
     if user is None:
         logger.warning(f"User '{username}' not found after token validation")
         raise credentials_exception
     return user
+
+
+def _is_clerk_subject(subject: str) -> bool:
+    return bool(subject and subject.startswith("user_"))
+
+
+def _verify_clerk_token(token: str) -> Optional[dict]:
+    global clerk_jwk_client, clerk_jwk_url
+
+    configured_issuer = (os.getenv("CLERK_JWT_ISSUER") or os.getenv("CLERK_ISSUER") or "").strip().rstrip("/")
+    configured_jwks_url = (os.getenv("CLERK_JWKS_URL") or "").strip()
+
+    token_issuer = ""
+    try:
+        token_issuer = (jwt.get_unverified_claims(token).get("iss") or "").strip().rstrip("/")
+    except Exception:
+        token_issuer = ""
+
+    issuer = configured_issuer or token_issuer
+    jwks_url = configured_jwks_url or (f"{issuer}/.well-known/jwks.json" if issuer else "")
+    if not jwks_url:
+        logger.warning("Clerk token verification skipped: missing CLERK_ISSUER/CLERK_JWKS_URL and no token issuer")
+        return None
+
+    try:
+        if clerk_jwk_client is None or clerk_jwk_url != jwks_url:
+            clerk_jwk_client = PyJWKClient(jwks_url)
+            clerk_jwk_url = jwks_url
+
+        signing_key = clerk_jwk_client.get_signing_key_from_jwt(token)
+        decode_kwargs = {
+            "key": signing_key.key,
+            "algorithms": ["RS256"],
+            "options": {"verify_aud": False},
+        }
+
+        if issuer:
+            try:
+                return jwt.decode(token, issuer=issuer, **decode_kwargs)
+            except Exception:
+                return jwt.decode(token, **decode_kwargs)
+
+        return jwt.decode(token, **decode_kwargs)
+    except Exception as error:
+        logger.warning(f"Clerk token verification failed: {error}")
+        return None
+
+
+def _provision_clerk_user(db: Session, payload: dict) -> Optional[models.User]:
+    clerk_subject = payload.get("sub")
+    if not clerk_subject:
+        return None
+
+    email = payload.get("email") or f"{clerk_subject}@clerk.local"
+    username = payload.get("preferred_username") or clerk_subject
+
+    existing_email = db.query(models.User).filter(func.lower(models.User.email) == email.lower()).first()
+    if existing_email:
+        return existing_email
+
+    hashed_password = crud_notes.get_password_hash(secrets.token_urlsafe(32))
+    new_user = models.User(
+        username=username,
+        email=email,
+        hashed_password=hashed_password,
+        tenant_id="default",
+        is_active=1,
+        is_admin=0,
+        role="provider",
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    logger.info(f"Auto-provisioned Clerk user: {username}")
+    return new_user
 
 # POST /auth/register - Register a new user.
 # No authentication required.
@@ -75,7 +171,8 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
 # Returns: UserRead schema
 @router.post("/register", response_model=schemas.UserRead)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Validate username format
+    # Normalize/validate username format
+    user.username = user.username.strip()
     if len(user.username) < 3:
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters long")
     if len(user.username) > 50:
@@ -101,7 +198,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail=f"Username '{user.username}' is already registered")
         
         # Check for existing email
-        db_email = db.query(models.User).filter_by(email=user.email).first()
+        db_email = db.query(models.User).filter(func.lower(models.User.email) == user.email.strip().lower()).first()
         if db_email:
             db.rollback()  # Rollback transaction in case of any errors
             raise HTTPException(status_code=400, detail=f"Email '{user.email}' is already registered")
@@ -125,7 +222,8 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 # Returns: Token schema (access_token, token_type)
 @router.post("/token", response_model=schemas.Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db), request: Request = None):
-    user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    username = (form_data.username or "").strip()
+    user, error_message = crud_notes.authenticate_user(db, username, form_data.password)
     
     # Get client IP and user agent for audit
     client_ip = request.client.host if request and request.client else "unknown"
@@ -135,7 +233,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         # Log failed login attempt
         HIPAAAuditLogger.log_login_attempt(
             db=db,
-            username=form_data.username,
+            username=username,
             ip_address=client_ip,
             user_agent=user_agent,
             success=False,
@@ -146,7 +244,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     # Log successful login attempt
     HIPAAAuditLogger.log_login_attempt(
         db=db,
-        username=form_data.username,
+        username=username,
         ip_address=client_ip,
         user_agent=user_agent,
         success=True
@@ -158,7 +256,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 # Cookie-based login that also returns the token for backward compatibility
 @router.post("/token-cookie")
 def login_cookie(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user, error_message = crud_notes.authenticate_user(db, form_data.username, form_data.password)
+    username = (form_data.username or "").strip()
+    user, error_message = crud_notes.authenticate_user(db, username, form_data.password)
     
     # Get client IP and user agent for audit
     client_ip = request.client.host if request.client else "unknown"
@@ -168,7 +267,7 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
         # Log failed login attempt
         HIPAAAuditLogger.log_login_attempt(
             db=db,
-            username=form_data.username,
+            username=username,
             ip_address=client_ip,
             user_agent=user_agent,
             success=False,
@@ -179,7 +278,7 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
     # Log successful login attempt
     HIPAAAuditLogger.log_login_attempt(
         db=db,
-        username=form_data.username,
+        username=username,
         ip_address=client_ip,
         user_agent=user_agent,
         success=True
@@ -218,6 +317,42 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
     except Exception:
         pass
 
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+@router.post("/clerk-login", response_model=schemas.Token)
+def clerk_login(
+    request: Request,
+    payload: ClerkLoginRequest,
+    db: Session = Depends(get_db),
+):
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Clerk bearer token")
+
+    clerk_token = auth_header.split(" ", 1)[1].strip()
+    verified_payload = _verify_clerk_token(clerk_token)
+    if not verified_payload:
+        raise HTTPException(status_code=401, detail="Invalid Clerk token")
+
+    username = verified_payload.get("preferred_username") or verified_payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Missing Clerk subject")
+
+    user = crud_notes.get_user_by_username(db, username)
+    if user is None:
+        user = _provision_clerk_user(db, verified_payload)
+
+    if user is None:
+        # Last fallback: attempt email match if available
+        email = (payload.email or verified_payload.get("email") or "").strip().lower()
+        if email:
+            user = db.query(models.User).filter(func.lower(models.User.email) == email).first()
+
+    if user is None:
+        raise HTTPException(status_code=401, detail="Unable to map Clerk user")
+
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/logout")

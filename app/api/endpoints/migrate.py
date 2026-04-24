@@ -7,6 +7,7 @@ from sqlalchemy.exc import OperationalError
 import os
 from app.db.database import get_db
 from sqlalchemy.orm import Session
+from app.config import settings
 
 router = APIRouter()
 
@@ -17,8 +18,8 @@ async def migrate_database(db: Session = Depends(get_db)):
     This endpoint should only be called once to fix the schema.
     """
     try:
-        # Get database URL from environment
-        database_url = os.getenv("DATABASE_URL")
+        # Get database URL from environment/settings (normalizes postgres:// for SQLAlchemy)
+        database_url = settings.get_database_url()
         if not database_url:
             raise HTTPException(status_code=500, detail="DATABASE_URL not configured")
         
@@ -38,25 +39,17 @@ async def migrate_database(db: Session = Depends(get_db)):
         ]
         
         results = []
-        with engine.connect() as conn:
-            trans = conn.begin()
-            try:
-                for i, migration in enumerate(migrations, 1):
-                    try:
-                        conn.execute(text(migration))
-                        results.append(f"Migration {i}: Success")
-                    except OperationalError as e:
-                        if "already exists" in str(e).lower():
-                            results.append(f"Migration {i}: Column already exists")
-                        else:
-                            results.append(f"Migration {i}: Error - {str(e)}")
-                            raise e
-                
-                trans.commit()
-                
-            except Exception as e:
-                trans.rollback()
-                raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
+        with engine.begin() as conn:
+            for i, migration in enumerate(migrations, 1):
+                try:
+                    conn.execute(text(migration))
+                    results.append(f"Migration {i}: Success")
+                except OperationalError as e:
+                    if "already exists" in str(e).lower():
+                        results.append(f"Migration {i}: Column already exists")
+                    else:
+                        results.append(f"Migration {i}: Error - {str(e)}")
+                        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}") from e
         
         return {
             "success": True,
@@ -64,6 +57,8 @@ async def migrate_database(db: Session = Depends(get_db)):
             "results": results
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Migration error: {str(e)}")
 
@@ -141,7 +136,7 @@ async def fix_railway_database():
         
         # Set environment variables
         env = os.environ.copy()
-        env["DATABASE_URL"] .database_url
+        env["DATABASE_URL"] = settings.get_database_url()
         
         # Run the fix script
         result = subprocess.run(
