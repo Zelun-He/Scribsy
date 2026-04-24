@@ -11,6 +11,7 @@ from app.services.transcription import transcription_service
 from app.services.ai_summary import summarize_note
 from app.services.preferences import load_user_preferences
 from typing import List, Optional
+from pydantic import BaseModel
 from datetime import datetime, timezone
 from pathlib import Path
 import io
@@ -19,6 +20,28 @@ import os
 import shutil
 
 router = APIRouter(prefix="/notes", tags=["notes"])
+
+
+class SummarizeTextRequest(BaseModel):
+    text: str
+
+
+@router.post("/summarize-text")
+async def summarize_text(
+    payload: SummarizeTextRequest,
+    current_user=Depends(get_current_user),
+):
+    source_text = (payload.text or "").strip()
+    if not source_text:
+        raise HTTPException(status_code=400, detail="Text is required")
+    prefs = load_user_preferences(current_user.id)
+    summary = await summarize_note(source_text, preferences=prefs)
+    return {
+        "subjective": summary.subjective,
+        "objective": summary.objective,
+        "assessment": summary.assessment,
+        "plan": summary.plan,
+    }
 
 def calculate_content_accuracy(original: str, current: str) -> float:
     """Calculate accuracy percentage based on content similarity"""
@@ -75,6 +98,11 @@ async def create_note(
     auto_summarize: bool = Form(True),   # New option to auto-generate SOAP
     client_timezone: Optional[str] = Form(None),  # Client timezone
     client_timestamp: Optional[str] = Form(None),  # Client timestamp
+    transcript: Optional[str] = Form(None),
+    soap_subjective: Optional[str] = Form(None),
+    soap_objective: Optional[str] = Form(None),
+    soap_assessment: Optional[str] = Form(None),
+    soap_plan: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
@@ -146,6 +174,18 @@ async def create_note(
         # Default to UTC
         local_time = datetime.now(pytz.UTC)
     
+    # Prefer explicit payload values from frontend; otherwise fall back to server-generated values.
+    final_transcript = (transcript or "").strip() or (transcription or "").strip() or None
+    final_subjective = soap_subjective
+    final_objective = soap_objective
+    final_assessment = soap_assessment
+    final_plan = soap_plan
+    if soap_summary:
+        final_subjective = final_subjective or soap_summary.subjective
+        final_objective = final_objective or soap_summary.objective
+        final_assessment = final_assessment or soap_summary.assessment
+        final_plan = final_plan or soap_summary.plan
+
     note_data = {
         "patient_id": patient_id,
         "provider_id": current_user.id,
@@ -154,7 +194,12 @@ async def create_note(
         "content": content,
         "status": status,
         "signed_at": signed_at,
-        "audio_file": audio_file_path
+        "audio_file": audio_file_path,
+        "transcript": final_transcript,
+        "soap_subjective": final_subjective,
+        "soap_objective": final_objective,
+        "soap_assessment": final_assessment,
+        "soap_plan": final_plan,
     }
     
     try:
@@ -679,6 +724,37 @@ def update_note(note_id: int, note: schemas.NoteUpdate, db: Session = Depends(ge
         db.commit()
     except Exception:
         db.rollback()
+    return db_note
+
+
+@router.post("/{note_id}/generate-soap", response_model=schemas.NoteRead)
+async def generate_soap_for_note(
+    note_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Generate (or regenerate) SOAP fields from the note transcript/content."""
+    db_note = crud_notes.get_note(db, note_id)
+    if db_note is None or db_note.provider_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Note not found")
+
+    source_text = (db_note.transcript or "").strip() or (db_note.content or "").strip()
+    if not source_text:
+        raise HTTPException(status_code=400, detail="No transcript or note content available to summarize")
+
+    prefs = load_user_preferences(current_user.id)
+    summary = await summarize_note(source_text, preferences=prefs)
+
+    db_note.soap_subjective = summary.subjective
+    db_note.soap_objective = summary.objective
+    db_note.soap_assessment = summary.assessment
+    db_note.soap_plan = summary.plan
+    if db_note.status == "draft":
+        db_note.status = "pending_review"
+
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
     return db_note
 
 # DELETE /notes/{note_id} - Delete a specific note by ID for the authenticated provider.

@@ -14,7 +14,6 @@ import {
   DocumentTextIcon,
   SparklesIcon,
   CalendarIcon,
-  CheckCircleIcon,
   ClockIcon,
   DocumentCheckIcon
 } from '@heroicons/react/24/outline';
@@ -44,6 +43,8 @@ export default function NotePage() {
   const [playingAudio, setPlayingAudio] = useState<number | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
+  const [soapReview, setSoapReview] = useState<Record<string, 'approved' | 'disproved'>>({});
 
 
   useEffect(() => {
@@ -53,6 +54,18 @@ export default function NotePage() {
       fetchNote(params.id as string);
     }
   }, [params.id, authLoading]);
+
+  useEffect(() => {
+    if (!note) return;
+    const key = `soap_review_${note.id}`;
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (raw) setSoapReview(JSON.parse(raw));
+      else setSoapReview({});
+    } catch {
+      setSoapReview({});
+    }
+  }, [note]);
 
   const fetchNote = async (noteId: string) => {
     try {
@@ -217,6 +230,39 @@ export default function NotePage() {
   const handleFinalizeConfirm = async () => {
     setShowFinalizeDialog(false);
     await changeStatus('finalized');
+  };
+
+  const reviewableSections = [
+    { key: 'subjective', label: 'Subjective', value: note?.soap_subjective },
+    { key: 'objective', label: 'Objective', value: note?.soap_objective },
+    { key: 'assessment', label: 'Assessment', value: note?.soap_assessment },
+    { key: 'plan', label: 'Plan', value: note?.soap_plan },
+  ].filter(section => !!section.value);
+
+  const hasRequiredSoapReview = note?.status === 'pending_review' && note?.provider_id === user?.id && reviewableSections.length > 0;
+  const isSoapReviewComplete = !hasRequiredSoapReview || reviewableSections.every(section => !!soapReview[section.key]);
+
+  const setSoapDecision = (sectionKey: string, decision: 'approved' | 'disproved') => {
+    if (!note) return;
+    const next = { ...soapReview, [sectionKey]: decision };
+    setSoapReview(next);
+    try {
+      window.localStorage.setItem(`soap_review_${note.id}`, JSON.stringify(next));
+    } catch {}
+  };
+
+  const generateSoap = async () => {
+    if (!note) return;
+    setIsGeneratingSoap(true);
+    try {
+      const updated = await apiClient.generateSoap(note.id);
+      setNote(updated);
+      show('SOAP note generated from full conversation');
+    } catch (e) {
+      show(e instanceof Error ? e.message : 'Failed to generate SOAP note');
+    } finally {
+      setIsGeneratingSoap(false);
+    }
   };
 
   const getLowConfidenceItems = () => {
@@ -557,12 +603,17 @@ export default function NotePage() {
                   <Button
                     size="sm"
                     onClick={() => changeStatus('finalized')}
-                    disabled={statusLoading}
+                    disabled={statusLoading || !isSoapReviewComplete}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
                     <DocumentCheckIcon className="w-4 h-4 mr-1" />
                     Finalize Note
                   </Button>
+                )}
+                {hasRequiredSoapReview && !isSoapReviewComplete && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    Review SOAP sections (approve/disprove) before finalizing.
+                  </span>
                 )}
                 
                 {note.status === 'draft' && note.provider_id === user?.id && (
@@ -717,75 +768,63 @@ export default function NotePage() {
           </Card>
         )}
 
-        {/* SOAP Note - Show if any SOAP fields exist */}
-        {(note.soap_subjective || note.soap_objective || note.soap_assessment || note.soap_plan) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
+        {/* SOAP Note Review */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center">
                 <SparklesIcon className="w-5 h-5 mr-2" />
                 SOAP Note
-              </CardTitle>
-              <CardDescription>
-                AI-generated structured clinical documentation
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+              </span>
+              <Button size="sm" variant="secondary" onClick={generateSoap} disabled={isGeneratingSoap}>
+                {isGeneratingSoap ? 'Generating...' : 'Summarize Conversation to SOAP'}
+              </Button>
+            </CardTitle>
+            <CardDescription>
+              Generate SOAP from transcript/content, then approve or disprove each section before finalizing.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {reviewableSections.length === 0 ? (
+              <div className="text-sm text-stone-500">
+                No SOAP sections yet. Click <strong>Summarize Conversation to SOAP</strong> to generate them.
+              </div>
+            ) : (
               <div className="space-y-6">
-                {note.soap_subjective && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-2 uppercase tracking-wide">
-                      Subjective
-                    </h4>
+                {reviewableSections.map(section => (
+                  <div key={section.key}>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">
+                        {section.label}
+                      </h4>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={soapReview[section.key] === 'approved' ? 'default' : 'secondary'}
+                          onClick={() => setSoapDecision(section.key, 'approved')}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={soapReview[section.key] === 'disproved' ? 'destructive' : 'secondary'}
+                          onClick={() => setSoapDecision(section.key, 'disproved')}
+                        >
+                          Disprove
+                        </Button>
+                      </div>
+                    </div>
                     <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-4">
                       <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {note.soap_subjective}
+                        {section.value}
                       </p>
                     </div>
                   </div>
-                )}
-                
-                {note.soap_objective && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-blue-700 dark:text-blue-300 mb-2 uppercase tracking-wide">
-                      Objective
-                    </h4>
-                    <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {note.soap_objective}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {note.soap_assessment && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-amber-700 dark:text-amber-300 mb-2 uppercase tracking-wide">
-                      Assessment
-                    </h4>
-                    <div className="bg-amber-50 dark:bg-amber-900/10 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {note.soap_assessment}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {note.soap_plan && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-purple-700 dark:text-purple-300 mb-2 uppercase tracking-wide">
-                      Plan
-                    </h4>
-                    <div className="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {note.soap_plan}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            )}
+          </CardContent>
+        </Card>
 
         {/* Clinical Notes - Always show as fallback */}
         <Card>

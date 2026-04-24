@@ -151,6 +151,11 @@ export interface CreateNoteRequest {
   status: string;
   signed_at?: string;
   audio_file?: File;
+  transcript?: string;
+  soap_subjective?: string;
+  soap_objective?: string;
+  soap_assessment?: string;
+  soap_plan?: string;
   auto_transcribe?: boolean;
   auto_summarize?: boolean;
 }

@@ -495,6 +495,11 @@ class ApiClient {
             content: noteData.content,
             status: noteData.status,
             signed_at: noteData.signed_at,
+            transcript: noteData.transcript,
+            soap_subjective: noteData.soap_subjective,
+            soap_objective: noteData.soap_objective,
+            soap_assessment: noteData.soap_assessment,
+            soap_plan: noteData.soap_plan,
           }),
           credentials: this.requestCredentials(),
         });
@@ -522,28 +527,40 @@ class ApiClient {
     formData.append('status', noteData.status);
     if (noteData.signed_at) formData.append('signed_at', noteData.signed_at);
     if (noteData.audio_file) formData.append('audio_file', noteData.audio_file);
+    if (noteData.transcript) formData.append('transcript', noteData.transcript);
+    if (noteData.soap_subjective) formData.append('soap_subjective', noteData.soap_subjective);
+    if (noteData.soap_objective) formData.append('soap_objective', noteData.soap_objective);
+    if (noteData.soap_assessment) formData.append('soap_assessment', noteData.soap_assessment);
+    if (noteData.soap_plan) formData.append('soap_plan', noteData.soap_plan);
     if (noteData.auto_transcribe !== undefined) formData.append('auto_transcribe', noteData.auto_transcribe.toString());
     if (noteData.auto_summarize !== undefined) formData.append('auto_summarize', noteData.auto_summarize.toString());
 
-    let response = await fetch(`${this.baseURL}/notes/`, {
+    const response = await fetch(`${this.baseURL}/notes/`, {
       method: 'POST',
       headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
       body: formData,
       credentials: this.requestCredentials(),
     });
-    if (!response.ok && (response.status === 404 || response.status === 405)) {
-      // As a last resort, bypass proxy and hit backend directly in dev
-      try {
-        const direct = await fetch(`http://127.0.0.1:8000/notes/`, {
-          method: 'POST',
-          headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
-          body: formData,
-          credentials: this.requestCredentials(),
-        });
-        response = direct;
-      } catch {}
-    }
     return this.handleResponse<Note>(response);
+  }
+
+  async generateSoap(noteId: number): Promise<Note> {
+    const response = await fetch(`${this.baseURL}/notes/${noteId}/generate-soap`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: this.requestCredentials(),
+    });
+    return this.handleResponse<Note>(response);
+  }
+
+  async summarizeNoteText(text: string): Promise<{ subjective: string; objective: string; assessment: string; plan: string }> {
+    const response = await fetch(`${this.baseURL}/notes/summarize-text`, {
+      method: 'POST',
+      headers: this.getHeaders(),
+      credentials: this.requestCredentials(),
+      body: JSON.stringify({ text }),
+    });
+    return this.handleResponse<{ subjective: string; objective: string; assessment: string; plan: string }>(response);
   }
 
   async updateNote(id: number, noteData: Partial<CreateNoteRequest>): Promise<Note> {

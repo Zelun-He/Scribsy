@@ -37,6 +37,17 @@ interface SOAPNote {
   plan: string;
 }
 
+const isSOAPNote = (value: unknown): value is SOAPNote => {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.subjective === 'string' &&
+    typeof candidate.objective === 'string' &&
+    typeof candidate.assessment === 'string' &&
+    typeof candidate.plan === 'string'
+  );
+};
+
 function NewNotePageContent() {
   const { user } = useAuth();
   const { show } = useToast();
@@ -51,6 +62,7 @@ function NewNotePageContent() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [soapNote, setSoapNote] = useState<SOAPNote | null>(null);
   const [loading, setLoading] = useState(false);
@@ -225,8 +237,8 @@ function NewNotePageContent() {
       if (response.summary) {
         console.log('Summary received:', response.summary);
         // Convert the dictionary response to SOAPNote object
-        const soapNoteData = response.summary as any;
-        if (soapNoteData.subjective && soapNoteData.objective && soapNoteData.assessment && soapNoteData.plan) {
+        const soapNoteData = response.summary;
+        if (isSOAPNote(soapNoteData)) {
           setSoapNote({
             subjective: soapNoteData.subjective,
             objective: soapNoteData.objective,
@@ -255,6 +267,26 @@ function NewNotePageContent() {
       setError(`Failed to transcribe audio: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setIsTranscribing(false);
+    }
+  };
+
+  const generateSoapFromConversation = async () => {
+    const sourceText = (transcription || content || '').trim();
+    if (!sourceText) {
+      setError('Add typed notes or transcribe audio first to generate SOAP.');
+      return;
+    }
+
+    setIsGeneratingSoap(true);
+    setError('');
+    try {
+      const summary = await apiClient.summarizeNoteText(sourceText);
+      setSoapNote(summary);
+      show('SOAP note generated');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate SOAP note');
+    } finally {
+      setIsGeneratingSoap(false);
     }
   };
 
@@ -343,6 +375,11 @@ function NewNotePageContent() {
         status: status,
         auto_transcribe: !!audioFile,
         auto_summarize: !!audioFile,
+        transcript: transcription || undefined,
+        soap_subjective: soapNote?.subjective || undefined,
+        soap_objective: soapNote?.objective || undefined,
+        soap_assessment: soapNote?.assessment || undefined,
+        soap_plan: soapNote?.plan || undefined,
         client_timezone: clientTimezone,
         client_timestamp: clientTimestamp,
         ...(audioFile && { audio_file: audioFile })
@@ -364,11 +401,19 @@ function NewNotePageContent() {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
-            Create New Note
-          </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
+              Create New Note
+            </h1>
+            <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={generateSoapFromConversation}
+              disabled={isGeneratingSoap || (!content.trim() && !transcription.trim())}
+            >
+              {isGeneratingSoap ? 'Generating SOAP...' : 'Summarize to SOAP'}
+            </Button>
             <Button
               onClick={handleSubmit}
               disabled={loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
