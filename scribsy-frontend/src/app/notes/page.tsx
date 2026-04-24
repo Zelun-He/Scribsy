@@ -45,6 +45,15 @@ export default function NotesPage() {
     }
   }, []);
 
+  const shouldTreatAsEmptyState = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('404') ||
+      normalized.includes('not found') ||
+      normalized.includes('no notes')
+    );
+  };
+
   const fetchNotes = async () => {
     try {
       const fetchedNotes = await apiClient.getNotes();

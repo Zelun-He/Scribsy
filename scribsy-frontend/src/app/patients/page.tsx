@@ -41,6 +41,15 @@ export default function PatientsPage() {
     }
   }, []);
 
+  const shouldTreatAsEmptyState = (message: string) => {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes('404') ||
+      normalized.includes('not found') ||
+      normalized.includes('no patients')
+    );
+  };
+
   const fetchPatients = async () => {
     try {
       const fetchedPatients = await apiClient.getPatients();
