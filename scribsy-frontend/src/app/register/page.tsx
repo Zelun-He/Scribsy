@@ -1,23 +1,12 @@
 'use client';
 
-import { SignUp } from '@clerk/nextjs';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-
-function ClerkRegister() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
-      <SignUp routing="hash" signInUrl="/login" forceRedirectUrl="/dashboard" />
-    </div>
-  );
-}
-
-function LegacyRegister() {
+export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
   const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
@@ -56,8 +45,4 @@ function LegacyRegister() {
       </form>
     </div>
   );
-}
-
-export default function RegisterPage() {
-  return hasClerkKey ? <ClerkRegister /> : <LegacyRegister />;
 }
