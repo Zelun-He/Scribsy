@@ -294,38 +294,31 @@ def on_startup():
             from sqlalchemy import text
             from app.db.database import engine
             
-            # Check if migration is needed by checking if role column exists
             with engine.connect() as conn:
+                # Always run additive migrations with IF NOT EXISTS so partially-migrated
+                # databases (e.g. role exists but last_login does not) self-heal on boot.
+                migrations = [
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP;",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
+                ]
+
+                trans = conn.begin()
                 try:
-                    result = conn.execute(text("SELECT role FROM users LIMIT 1"))
-                    # If this succeeds, columns already exist
-                    # logger.info("Database schema up to date")
-                except Exception:
-                    # Columns don't exist, run migration
-                    migrations = [
-                        "ALTER TABLE users ADD COLUMN role VARCHAR DEFAULT 'provider';",
-                        "ALTER TABLE users ADD COLUMN last_login TIMESTAMP;",
-                        "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;",
-                        "ALTER TABLE users ADD COLUMN account_locked_until TIMESTAMP;",
-                        "ALTER TABLE users ADD COLUMN work_start_time VARCHAR DEFAULT '09:00';",
-                        "ALTER TABLE users ADD COLUMN work_end_time VARCHAR DEFAULT '17:00';",
-                        "ALTER TABLE users ADD COLUMN timezone VARCHAR DEFAULT 'UTC';",
-                        "ALTER TABLE users ADD COLUMN working_days VARCHAR DEFAULT '1,2,3,4,5';",
-                    ]
-                    
-                    trans = conn.begin()
-                    try:
-                        for migration in migrations:
-                            try:
-                                conn.execute(text(migration))
-                            except Exception:
-                                # Ignore duplicate column errors silently
-                                pass
-                        trans.commit()
-                        # logger.info("Database migration completed")
-                    except Exception as e:
-                        trans.rollback()
-                        logger.error(f"Migration failed: {e}")
+                    for migration in migrations:
+                        conn.execute(text(migration))
+                    trans.commit()
+                    # logger.info("Database migration completed")
+                except Exception as e:
+                    trans.rollback()
+                    logger.error(f"Migration failed: {e}")
                     
         except Exception as e:
             logger.error(f"Migration error: {e}")

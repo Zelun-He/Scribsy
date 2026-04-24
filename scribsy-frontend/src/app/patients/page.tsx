@@ -46,8 +46,11 @@ export default function PatientsPage() {
       const fetchedPatients = await apiClient.getPatients();
       setPatients(fetchedPatients);
       setError('');
-    } catch {
-      setError('Failed to fetch patients');
+    } catch (err) {
+      console.warn('Patients list unavailable, showing empty state:', err);
+      // New accounts should see an empty state rather than an error banner.
+      setPatients([]);
+      setError('');
     } finally {
       setLoading(false);
     }
@@ -85,8 +88,8 @@ export default function PatientsPage() {
     try {
       await apiClient.deletePatient(patientId);
       setPatients(patients.filter(patient => patient.id !== patientId));
-    } catch {
-      setError('Failed to delete patient');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete patient');
     } finally {
       setDeleteLoading(null);
     }

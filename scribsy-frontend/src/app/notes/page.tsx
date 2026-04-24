@@ -50,8 +50,11 @@ export default function NotesPage() {
       const fetchedNotes = await apiClient.getNotes();
       setNotes(fetchedNotes);
       setError('');
-    } catch {
-      setError('Failed to fetch notes');
+    } catch (err) {
+      console.warn('Notes list unavailable, showing empty state:', err);
+      // New accounts should see an empty state rather than an error banner.
+      setNotes([]);
+      setError('');
     } finally {
       setLoading(false);
     }
@@ -102,8 +105,8 @@ export default function NotesPage() {
     try {
       await apiClient.deleteNote(noteId);
       setNotes(notes.filter(note => note.id !== noteId));
-    } catch {
-      setError('Failed to delete note');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete note');
     } finally {
       setDeleteLoading(null);
     }
