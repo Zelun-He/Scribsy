@@ -8,7 +8,6 @@ from app.crud import patients as crud_patients
 from app.db.database import get_db
 from app.api.endpoints.auth import get_current_user
 from app.audit.logger import HIPAAAuditLogger, get_phi_fields
-from app.security.permissions import Permission, has_permission, can_access_patient, validate_minimum_necessary
 from typing import List, Optional
 from datetime import datetime, timezone
 
@@ -75,22 +74,7 @@ def read_patient(
     Retrieve a specific patient by ID.
     """
     try:
-        # Check permission to read patients
-        if not has_permission(current_user, Permission.READ_PATIENT):
-            HIPAAAuditLogger.log_action(
-                db=db,
-                user_id=current_user.id,
-                username=current_user.username,
-                action_type="READ",
-                resource_type="patient",
-                resource_id=patient_id,
-                description=f"Access denied - insufficient permissions for patient {patient_id}",
-                success=False,
-                error_message="Insufficient permissions",
-                request=request
-            )
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
-        
+        # Ownership is enforced directly in the query to avoid cross-account exposure.
         patient = crud_patients.get_patient(db, patient_id, current_user.id)
         if patient is None:
             HIPAAAuditLogger.log_action(
@@ -106,38 +90,23 @@ def read_patient(
                 request=request
             )
             raise HTTPException(status_code=404, detail="Patient not found")
-        
-        # Check if user can access this specific patient (HIPAA access control)
-        if not can_access_patient(current_user, patient_id, patient.user_id):
-            HIPAAAuditLogger.log_action(
+
+        # Log successful PHI access without blocking response on audit/logging errors.
+        try:
+            patient_dict = patient.__dict__ if hasattr(patient, '__dict__') else patient.model_dump()
+            phi_fields = get_phi_fields(patient_dict)
+            HIPAAAuditLogger.log_phi_access(
                 db=db,
                 user_id=current_user.id,
                 username=current_user.username,
+                patient_id=patient.id,
+                phi_fields=phi_fields,
                 action_type="READ",
-                resource_type="patient",
-                resource_id=patient_id,
-                patient_id=patient_id,
-                description=f"Unauthorized access attempt to patient {patient_id}",
-                success=False,
-                error_message="Access denied - not authorized for this patient",
+                description=f"Patient detail access - ID: {patient_id}",
                 request=request
             )
-            raise HTTPException(status_code=403, detail="Access denied - not authorized for this patient")
-        
-        # Log successful PHI access
-        patient_dict = patient.__dict__ if hasattr(patient, '__dict__') else patient.model_dump()
-        phi_fields = get_phi_fields(patient_dict)
-        
-        HIPAAAuditLogger.log_phi_access(
-            db=db,
-            user_id=current_user.id,
-            username=current_user.username,
-            patient_id=patient.id,
-            phi_fields=phi_fields,
-            action_type="READ",
-            description=f"Patient detail access - ID: {patient_id}",
-            request=request
-        )
+        except Exception as log_error:
+            print(f"Audit logging warning while reading patient {patient_id}: {log_error}")
         
         return patient
         
@@ -208,6 +177,7 @@ def create_patient(
         # Add user_id to the patient data and clean empty strings
         patient_data = patient.model_dump()
         patient_data['user_id'] = current_user.id
+        patient_data['tenant_id'] = current_user.tenant_id or f"user-{current_user.id}"
         
         # Convert empty strings to None for optional fields
         for field in ['phone_number', 'email', 'address', 'city', 'state', 'zip_code']:
