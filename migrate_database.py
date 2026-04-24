@@ -30,6 +30,7 @@ def migrate_database():
         "ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;",
         "ALTER TABLE users ADD COLUMN account_locked_until TIMESTAMP;",
         "ALTER TABLE users ADD COLUMN tenant_id VARCHAR DEFAULT 'default';",
+        "ALTER TABLE patients ADD COLUMN tenant_id VARCHAR DEFAULT 'default';",
         "ALTER TABLE users ADD COLUMN work_start_time VARCHAR DEFAULT '09:00';",
         "ALTER TABLE users ADD COLUMN work_end_time VARCHAR DEFAULT '17:00';",
         "ALTER TABLE users ADD COLUMN timezone VARCHAR DEFAULT 'UTC';",

@@ -303,6 +303,7 @@ def on_startup():
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP;",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
+                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",

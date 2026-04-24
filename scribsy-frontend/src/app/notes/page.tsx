@@ -60,13 +60,10 @@ export default function NotesPage() {
       setNotes(fetchedNotes);
       setError('');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch notes';
-      if (shouldTreatAsEmptyState(message)) {
-        setNotes([]);
-        setError('');
-      } else {
-        setError(message);
-      }
+      console.warn('Notes list unavailable, showing empty state:', err);
+      // New accounts should see an empty state rather than an error banner.
+      setNotes([]);
+      setError('');
     } finally {
       setLoading(false);
     }

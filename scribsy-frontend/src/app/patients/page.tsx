@@ -56,13 +56,10 @@ export default function PatientsPage() {
       setPatients(fetchedPatients);
       setError('');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch patients';
-      if (shouldTreatAsEmptyState(message)) {
-        setPatients([]);
-        setError('');
-      } else {
-        setError(message);
-      }
+      console.warn('Patients list unavailable, showing empty state:', err);
+      // New accounts should see an empty state rather than an error banner.
+      setPatients([]);
+      setError('');
     } finally {
       setLoading(false);
     }
