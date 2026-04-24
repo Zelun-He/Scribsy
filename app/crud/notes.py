@@ -139,7 +139,7 @@ def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
         username=cleaned_username, 
         email=user.email,
         hashed_password=hashed_password,
-        tenant_id="default",  # Explicitly set tenant_id
+        tenant_id="default",
         is_active=1,
         is_admin=0,
         role="provider",
@@ -151,6 +151,15 @@ def create_user(db: Session, user: schemas.UserCreate, hashed_password: str):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
+
+    # Every account should have its own isolated tenant namespace.
+    # Keep this additive and idempotent for older rows that still use "default".
+    isolated_tenant_id = f"user-{db_user.id}"
+    if not db_user.tenant_id or db_user.tenant_id == "default":
+        db_user.tenant_id = isolated_tenant_id
+        db.commit()
+        db.refresh(db_user)
+
     return db_user
 
 def get_user(db: Session, user_id: int):
@@ -175,7 +184,14 @@ def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def authenticate_user(db: Session, username: str, password: str):
+    normalized_input = (username or "").strip().lower()
     user = get_user_by_username(db, username)
+    if not user and "@" in normalized_input:
+        user = (
+            db.query(models.User)
+            .filter(func.lower(func.trim(models.User.email)) == normalized_input)
+            .first()
+        )
     if not user:
         return None, "User not found"
 

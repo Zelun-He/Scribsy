@@ -199,28 +199,6 @@ class ApiClient {
     return this.handleResponse<User>(response);
   }
 
-  async loginWithClerk(
-    clerkToken: string,
-    profile?: { email?: string; username?: string },
-    options?: { suppressAuthFailure?: boolean }
-  ): Promise<LoginResponse> {
-    const response = await fetch(`${this.baseURL}/auth/clerk-login`, {
-      method: 'POST',
-      headers: {
-        ...this.getJsonHeaders(),
-        Authorization: `Bearer ${clerkToken}`,
-      },
-      body: JSON.stringify({
-        email: profile?.email,
-        username: profile?.username,
-      }),
-      credentials: this.requestCredentials(),
-    });
-    const result = await this.handleResponse<LoginResponse>(response, options);
-    this.setToken(result.access_token);
-    return result;
-  }
-
   async refreshSession(): Promise<LoginResponse> {
     const response = await fetch(`${this.baseURL}/auth/refresh`, {
       method: 'POST',
@@ -758,43 +736,6 @@ class ApiClient {
       },
       {
         url: `${this.baseURL}/patients/create/`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      // Direct dev fallback
-      {
-        url: `http://127.0.0.1:8000/patients`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/create`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/create/`,
         init: {
           method: 'POST',
           headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
