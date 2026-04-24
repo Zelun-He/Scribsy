@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { ClerkProvider } from '@clerk/nextjs';
 import "./globals.css";
 import { AuthProvider } from '@/lib/auth';
 import { ThemeProvider } from '@/lib/theme-provider';
@@ -19,8 +18,6 @@ export const metadata: Metadata = {
   description: "Transform your clinical conversations into structured SOAP notes with AI-powered transcription and summarization.",
 };
 
-const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
 function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider
@@ -29,7 +26,7 @@ function AppShell({ children }: { children: React.ReactNode }) {
       enableSystem={false}
       disableTransitionOnChange
     >
-      <AuthProvider enableClerk={Boolean(clerkPublishableKey)}>
+      <AuthProvider>
         <ToastProvider>
           <SidebarProvider>
             <SidebarFrame>
@@ -53,9 +50,9 @@ export default function RootLayout({
     "default-src 'self'",
     "img-src 'self' data: blob: https:",
     "style-src 'self' 'unsafe-inline'",
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.clerk.accounts.dev https://*.clerk.com",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
     "connect-src 'self' https: wss:",
-    "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
+    "frame-src 'self'",
     "font-src 'self' data:",
   ].join("; ");
 
@@ -63,13 +60,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased`}>
         <meta httpEquiv="Content-Security-Policy" content={csp} />
-        {clerkPublishableKey ? (
-          <ClerkProvider publishableKey={clerkPublishableKey}>
-            <AppShell>{children}</AppShell>
-          </ClerkProvider>
-        ) : (
-          <AppShell>{children}</AppShell>
-        )}
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -175,7 +175,14 @@ def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 def authenticate_user(db: Session, username: str, password: str):
+    normalized_input = (username or "").strip().lower()
     user = get_user_by_username(db, username)
+    if not user and "@" in normalized_input:
+        user = (
+            db.query(models.User)
+            .filter(func.lower(func.trim(models.User.email)) == normalized_input)
+            .first()
+        )
     if not user:
         return None, "User not found"
 
