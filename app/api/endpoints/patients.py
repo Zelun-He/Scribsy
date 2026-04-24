@@ -208,6 +208,7 @@ def create_patient(
         # Add user_id to the patient data and clean empty strings
         patient_data = patient.model_dump()
         patient_data['user_id'] = current_user.id
+        patient_data['tenant_id'] = current_user.tenant_id or f"user-{current_user.id}"
         
         # Convert empty strings to None for optional fields
         for field in ['phone_number', 'email', 'address', 'city', 'state', 'zip_code']:

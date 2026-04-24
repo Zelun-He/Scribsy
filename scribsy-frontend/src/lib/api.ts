@@ -743,43 +743,6 @@ class ApiClient {
           credentials: this.requestCredentials(),
         },
       },
-      // Direct dev fallback
-      {
-        url: `http://127.0.0.1:8000/patients`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/create`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
-      {
-        url: `http://127.0.0.1:8000/patients/create/`,
-        init: {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify(patientData),
-          credentials: this.requestCredentials(),
-        },
-      },
     ];
 
     let lastResp: Response | null = null;

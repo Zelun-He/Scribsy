@@ -38,6 +38,8 @@ async def migrate_database(db: Session = Depends(get_db)):
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
+            "UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default';",
+            "UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE (tenant_id IS NULL OR tenant_id = 'default') AND user_id IS NOT NULL;",
         ]
         
         results = []

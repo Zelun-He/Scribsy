@@ -35,6 +35,8 @@ def migrate_database():
         "ALTER TABLE users ADD COLUMN work_end_time VARCHAR DEFAULT '17:00';",
         "ALTER TABLE users ADD COLUMN timezone VARCHAR DEFAULT 'UTC';",
         "ALTER TABLE users ADD COLUMN working_days VARCHAR DEFAULT '1,2,3,4,5';",
+        "UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default';",
+        "UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE (tenant_id IS NULL OR tenant_id = 'default') AND user_id IS NOT NULL;",
     ]
     
     print("Starting database migration...")
