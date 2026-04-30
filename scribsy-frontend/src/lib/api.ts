@@ -503,38 +503,8 @@ class ApiClient {
   }
 
   async createNote(noteData: CreateNoteRequest): Promise<Note> {
-    // Prefer JSON endpoint when no audio_file is included
-    if (!noteData.audio_file) {
-      try {
-        const response = await fetch(`${this.baseURL}/notes/create-json`, {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify({
-            patient_id: noteData.patient_id,
-            provider_id: noteData.provider_id,
-            visit_id: noteData.visit_id,
-            note_type: noteData.note_type,
-            content: noteData.content,
-            status: noteData.status,
-            signed_at: noteData.signed_at,
-          }),
-          credentials: this.requestCredentials(),
-        });
-        if (response.ok) {
-          return this.handleResponse<Note>(response);
-        }
-        // Fallback in case server doesn't recognize JSON route
-        if (response.status === 404 || response.status === 405) {
-          // continue to multipart fallback below
-        } else {
-          return this.handleResponse<Note>(response);
-        }
-      } catch (_err) {
-        // Fallback to multipart below
-      }
-    }
-
-    // Fallback to multipart when audio is present
+    // Use a single create-note path for both text and audio notes.
+    // This keeps validation and error behavior consistent server-side.
     const formData = new FormData();
     formData.append('patient_id', noteData.patient_id.toString());
     formData.append('provider_id', noteData.provider_id.toString());
