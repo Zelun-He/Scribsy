@@ -17,15 +17,15 @@ export default function Home() {
     <header className={styles.header}><div className={styles.navInner}>
       <Brand/>
       <nav className={styles.desktopNav} aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#features">Why Scribsy</a><Link href="/contact">Contact</Link></nav>
-      <div className={styles.navActions}><Link href="/login" className={styles.signIn}>Log in</Link><Link href="/register" className={styles.navCta}>Get started <ArrowRight size={16}/></Link></div>
-      <details className={styles.mobileMenu}><summary aria-label="Open menu"><Menu size={23}/></summary><nav aria-label="Mobile navigation"><a href="#how-it-works">How it works</a><a href="#features">Why Scribsy</a><Link href="/contact">Contact</Link><Link href="/login">Log in</Link><Link href="/register">Get started</Link></nav></details>
+      <div className={styles.navActions}>{/* Login hidden while Scribsy is a showcase. */}<Link href="/dashboard" className={styles.navCta}>View dashboard <ArrowRight size={16}/></Link></div>
+      <details className={styles.mobileMenu}><summary aria-label="Open menu"><Menu size={23}/></summary><nav aria-label="Mobile navigation"><a href="#how-it-works">How it works</a><a href="#features">Why Scribsy</a><Link href="/contact">Contact</Link><Link href="/dashboard">View dashboard</Link></nav></details>
     </div></header>
     <main>
       <section className={styles.hero}><div className={styles.heroGlow} aria-hidden="true"/><div className={styles.heroInner}>
         <div className={styles.heroCopy}><span className={styles.eyebrow}><span className={styles.eyebrowDot}/> THE AI SCRIBE FOR CLINICIANS</span>
           <h1>Be with your patient.<br/><em>We&apos;ll help with the note.</em></h1>
           <p className={styles.heroLead}>Scribsy turns visit audio into a structured clinical draft, giving you a simpler path from conversation to documentation.</p>
-          <div className={styles.heroActions}><Link href="/register" className={styles.primaryButton}>Start using Scribsy <ArrowRight size={18}/></Link><a href="#how-it-works" className={styles.textButton}>See how it works <ChevronRight size={18}/></a></div>
+          <div className={styles.heroActions}><Link href="/dashboard" className={styles.primaryButton}>Explore the dashboard <ArrowRight size={18}/></Link><a href="#how-it-works" className={styles.textButton}>See how it works <ChevronRight size={18}/></a></div>
           <p className={styles.heroNote}><Check size={16}/> You review and finalize every note.</p>
         </div>
         <div className={styles.previewWrap} aria-label="Illustration of a Scribsy SOAP note draft">
@@ -50,15 +50,15 @@ export default function Home() {
         <div className={styles.steps}>{steps.map(step => <div className={styles.step} key={step.number}><span className={styles.stepNumber}>{step.number}</span><span className={styles.stepIcon}><step.icon size={24} strokeWidth={1.8}/></span><h3>{step.title}</h3><p>{step.text}</p></div>)}</div>
       </div></section>
       <section id="features" className={styles.featureSection}><div className={styles.featureInner}>
-        <div className={styles.featureCopy}><span className={styles.kicker}>BUILT FOR THE MOMENTS THAT MATTER</span><h2>Documentation that<br/>moves with you.</h2><p>A clinical workflow should make room for your judgment. Scribsy gives you a starting point and keeps the final word in your hands.</p><Link href="/register" className={styles.featureLink}>Explore Scribsy <ArrowRight size={18}/></Link></div>
+        <div className={styles.featureCopy}><span className={styles.kicker}>BUILT FOR THE MOMENTS THAT MATTER</span><h2>Documentation that<br/>moves with you.</h2><p>A clinical workflow should make room for your judgment. Scribsy gives you a starting point and keeps the final word in your hands.</p><Link href="/dashboard" className={styles.featureLink}>Explore Scribsy <ArrowRight size={18}/></Link></div>
         <div className={styles.featureList}>
           <div><span className={styles.featureIcon}><AudioLines size={21}/></span><div><h3>Audio to transcript</h3><p>Bring visit audio into a readable transcript.</p></div></div>
           <div><span className={styles.featureIcon}><FileText size={21}/></span><div><h3>Structured SOAP notes</h3><p>Organize information into familiar clinical sections.</p></div></div>
           <div><span className={styles.featureIcon}><ClipboardCheck size={21}/></span><div><h3>Review before export</h3><p>Edit your draft and decide when it is ready to use.</p></div></div>
         </div>
       </div></section>
-      <section className={styles.ctaSection}><div className={styles.ctaInner}><span className={styles.kicker}>READY WHEN YOU ARE</span><h2>Let the visit come first.</h2><p>Start with a more thoughtful way to document care.</p><Link href="/register" className={styles.lightButton}>Get started <ArrowRight size={18}/></Link></div></section>
+      <section className={styles.ctaSection}><div className={styles.ctaInner}><span className={styles.kicker}>TAKE A LOOK INSIDE</span><h2>Let the visit come first.</h2><p>See how Scribsy brings documentation into focus.</p><Link href="/dashboard" className={styles.lightButton}>View the dashboard <ArrowRight size={18}/></Link></div></section>
     </main>
-    <footer className={styles.footer}><div className={styles.footerInner}><Brand/><p>Clinical documentation, with room for care.</p><div><Link href="/contact">Contact</Link><Link href="/login">Log in</Link></div><span className={styles.copyright}>© {new Date().getFullYear()} Scribsy</span></div></footer>
+    <footer className={styles.footer}><div className={styles.footerInner}><Brand/><p>Clinical documentation, with room for care.</p><div><Link href="/contact">Contact</Link><Link href="/dashboard">Dashboard preview</Link></div><span className={styles.copyright}>© {new Date().getFullYear()} Scribsy</span></div></footer>
   </div>;
 }
