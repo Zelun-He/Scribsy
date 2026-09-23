@@ -12,8 +12,8 @@ export const SidebarFrame: React.FC<{ children: React.ReactNode }> = ({ children
   const { user, loading } = useAuth();
   
   // Public pages that should not show the sidebar
-  const publicPages = ['/login', '/register', '/'];
-  const isPublicPage = publicPages.includes(pathname);
+  const publicPages = ['/login', '/register', '/', '/contact'];
+  const isPublicPage = publicPages.includes(pathname) || (pathname === '/dashboard' && !user);
   
   // If it's a public page or the user is not authenticated (or still loading), render without sidebar
   if (isPublicPage || loading || !user) {
@@ -35,5 +35,3 @@ export const SidebarFrame: React.FC<{ children: React.ReactNode }> = ({ children
     </div>
   );
 };
-
-
