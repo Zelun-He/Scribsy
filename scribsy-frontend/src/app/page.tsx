@@ -1,245 +1,64 @@
-"use client";
-
 import Link from "next/link";
-import Image from "next/image";
-import {
-  ArrowRight,
-  Bot,
-  CheckCircle,
-  Clock,
-  FileCheck,
-  FileText,
-  Mic,
-  Shield,
-  Sparkles,
-  Stethoscope,
-  Zap,
-} from "lucide-react";
-
-const features = [
-  {
-    icon: Bot,
-    title: "AI-Powered Transcription",
-    description:
-      "Advanced speech recognition that understands medical terminology and context with high accuracy.",
-  },
-  {
-    icon: Clock,
-    title: "Real-Time Documentation",
-    description:
-      "Generate clinical notes instantly during or after patient encounters, saving hours of administrative work.",
-  },
-  {
-    icon: Shield,
-    title: "HIPAA Compliant",
-    description:
-      "Bank-level encryption and complete HIPAA compliance to keep patient data secure and private.",
-  },
-  {
-    icon: Zap,
-    title: "EHR Integration",
-    description: "Integrates with your existing EHR workflow and handoff process.",
-  },
-  {
-    icon: FileText,
-    title: "Smart Templates",
-    description:
-      "Customizable templates that adapt to your specialty and documentation style preferences.",
-  },
-  {
-    icon: CheckCircle,
-    title: "Quality Assurance",
-    description:
-      "Built-in review checkpoints help ensure accuracy and completeness before finalizing.",
-  },
-];
+import { ArrowRight, AudioLines, Check, ChevronRight, ClipboardCheck, FileText, LockKeyhole, Menu, Mic2, PenLine, Sparkles } from "lucide-react";
+import styles from "./landing.module.css";
 
 const steps = [
-  {
-    number: "01",
-    icon: Mic,
-    title: "Capture the Conversation",
-    description:
-      "Speak naturally during patient encounters while Scribsy captures the key clinical details.",
-  },
-  {
-    number: "02",
-    icon: Sparkles,
-    title: "AI Structures the Note",
-    description:
-      "Scribsy transforms conversation context into organized, clinician-ready documentation.",
-  },
-  {
-    number: "03",
-    icon: FileCheck,
-    title: "Review and Finalize",
-    description:
-      "Review, edit if needed, and move notes into your workflow with minimal friction.",
-  },
+  { number: "01", icon: Mic2, title: "Capture the visit", text: "Record the conversation or upload audio after the appointment." },
+  { number: "02", icon: Sparkles, title: "Get a structured draft", text: "Turn the transcript into an organized SOAP note you can work from." },
+  { number: "03", icon: PenLine, title: "Make it yours", text: "Review, refine, and export the note when it is ready." },
 ];
 
+function Brand() {
+  return <Link href="/" className={styles.brand} aria-label="Scribsy home"><span className={styles.brandMark}><AudioLines size={20} strokeWidth={2.5}/></span><span>Scribsy<span className={styles.brandDot}>.</span></span></Link>;
+}
+
 export default function Home() {
-  return (
-    <div className="min-h-screen bg-white text-gray-900">
-      <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600">
-              <Stethoscope className="h-6 w-6 text-white" />
-            </div>
-            <span className="text-xl font-semibold">Scribsy AI</span>
-          </div>
-          <nav className="hidden items-center gap-6 md:flex">
-            <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">
-              Features
-            </a>
-            <a href="#how-it-works" className="text-sm text-gray-600 hover:text-gray-900">
-              How It Works
-            </a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <Link href="/login" className="hidden rounded-md px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 md:inline-flex">
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="inline-flex rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Sign Up
-            </Link>
-          </div>
+  return <div className={styles.site}>
+    <header className={styles.header}><div className={styles.navInner}>
+      <Brand/>
+      <nav className={styles.desktopNav} aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#features">Why Scribsy</a><Link href="/contact">Contact</Link></nav>
+      <div className={styles.navActions}><Link href="/login" className={styles.signIn}>Log in</Link><Link href="/register" className={styles.navCta}>Get started <ArrowRight size={16}/></Link></div>
+      <details className={styles.mobileMenu}><summary aria-label="Open menu"><Menu size={23}/></summary><nav aria-label="Mobile navigation"><a href="#how-it-works">How it works</a><a href="#features">Why Scribsy</a><Link href="/contact">Contact</Link><Link href="/login">Log in</Link><Link href="/register">Get started</Link></nav></details>
+    </div></header>
+    <main>
+      <section className={styles.hero}><div className={styles.heroGlow} aria-hidden="true"/><div className={styles.heroInner}>
+        <div className={styles.heroCopy}><span className={styles.eyebrow}><span className={styles.eyebrowDot}/> THE AI SCRIBE FOR CLINICIANS</span>
+          <h1>Be with your patient.<br/><em>We&apos;ll help with the note.</em></h1>
+          <p className={styles.heroLead}>Scribsy turns visit audio into a structured clinical draft, giving you a simpler path from conversation to documentation.</p>
+          <div className={styles.heroActions}><Link href="/register" className={styles.primaryButton}>Start using Scribsy <ArrowRight size={18}/></Link><a href="#how-it-works" className={styles.textButton}>See how it works <ChevronRight size={18}/></a></div>
+          <p className={styles.heroNote}><Check size={16}/> You review and finalize every note.</p>
         </div>
-      </header>
-
-      <main>
-        <section className="bg-gradient-to-b from-white to-emerald-50 py-20 md:py-28">
-          <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 md:grid-cols-2 md:px-6">
-            <div className="space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-sm text-emerald-800">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-600" />
-                AI-Powered Documentation
-              </div>
-              <h1 className="text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-                Transform Patient Encounters Into Better Documentation
-              </h1>
-              <p className="max-w-xl text-lg text-gray-600">
-                Scribsy converts conversations into accurate clinical notes so your team spends less time charting and more time caring.
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/register"
-                  className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-6 py-3 text-base font-semibold text-white hover:bg-emerald-700"
-                >
-                  Sign Up
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-6 py-3 text-base font-semibold text-gray-800 hover:bg-gray-50"
-                >
-                  Sign In
-                </Link>
-              </div>
-            </div>
-            <div className="relative">
-              <Image
-                src="https://images.unsplash.com/photo-1758691462749-a95ce1bd7f96?auto=format&fit=crop&w=1200&q=80"
-                alt="Doctor consulting with patient"
-                className="w-full rounded-2xl shadow-2xl"
-                width={1200}
-                height={800}
-                priority
-              />
-            </div>
+        <div className={styles.previewWrap} aria-label="Illustration of a Scribsy SOAP note draft">
+          <div className={styles.previewCard}>
+            <div className={styles.previewTop}><div className={styles.previewLogo}><AudioLines size={17}/> <span>scribsy</span></div><span className={styles.previewBadge}><span/> Draft note</span></div>
+            <div className={styles.previewHeading}><div><span className={styles.previewOverline}>VISIT DOCUMENTATION</span><h2>Clinical note</h2></div><span className={styles.previewIcon}><FileText size={18}/></span></div>
+            <div className={styles.previewDivider}/>
+            {[
+              ["S", "Subjective", "Patient reports symptoms and relevant history from the visit conversation."],
+              ["O", "Objective", "Document observed findings and clinical details."],
+              ["A", "Assessment", "Review the working clinical impression."],
+              ["P", "Plan", "Refine next steps before finalizing."],
+            ].map(([letter, title, copy]) => <div className={styles.noteSection} key={letter}><span className={styles.noteLetter}>{letter}</span><div><h3>{title}</h3><p>{copy}</p></div></div>)}
+            <div className={styles.previewBottom}><span><LockKeyhole size={13}/> Your workspace</span><span>Review before export <ArrowRight size={13}/></span></div>
           </div>
-        </section>
-
-        <section id="features" className="bg-white py-20 md:py-28">
-          <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="mx-auto mb-14 max-w-3xl text-center">
-              <h2 className="mb-3 text-3xl font-bold md:text-4xl">Everything You Need for Effortless Documentation</h2>
-              <p className="text-lg text-gray-600">Powerful features designed to streamline your workflow and improve patient care.</p>
-            </div>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {features.map((feature) => (
-                <div key={feature.title} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <feature.icon className="mb-3 h-6 w-6 text-emerald-600" />
-                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
-                  <p className="text-sm text-gray-600">{feature.description}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="how-it-works" className="scroll-mt-24 bg-emerald-50 py-20 md:py-28">
-          <div className="mx-auto max-w-7xl px-4 md:px-6">
-            <div className="mx-auto mb-14 max-w-3xl text-center">
-              <h2 className="mb-3 text-3xl font-bold md:text-4xl">How Scribsy Works</h2>
-              <p className="text-lg text-gray-600">Three simple steps to streamline your clinical documentation.</p>
-            </div>
-            <div className="grid items-start gap-10 lg:grid-cols-2">
-              <div className="space-y-6">
-                {steps.map((step) => (
-                  <div key={step.number} className="rounded-xl border border-emerald-100 bg-white p-6">
-                    <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                      {step.number}
-                    </div>
-                    <div className="mb-3 flex items-center gap-2">
-                      <step.icon className="h-5 w-5 text-emerald-600" />
-                      <h3 className="font-semibold">{step.title}</h3>
-                    </div>
-                    <p className="text-sm text-gray-600">{step.description}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="relative self-center lg:pt-8">
-                <Image
-                  src="https://images.unsplash.com/photo-1759813641406-980519f58b1c?auto=format&fit=crop&w=1080&q=80"
-                  alt="Medical professionals using technology"
-                  className="w-full rounded-2xl shadow-2xl"
-                  width={1080}
-                  height={720}
-                />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="bg-emerald-600 py-20 text-white md:py-28">
-          <div className="mx-auto max-w-4xl px-4 text-center md:px-6">
-            <h2 className="mb-4 text-3xl font-bold md:text-5xl">Ready to Reclaim Your Time?</h2>
-            <p className="mb-8 text-lg text-emerald-100">
-              Join providers reducing documentation time and improving patient focus.
-            </p>
-            <div className="flex flex-col justify-center gap-3 sm:flex-row">
-              <Link
-                href="/register"
-                className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 font-semibold text-emerald-700 hover:bg-emerald-50"
-              >
-                Sign Up
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-              <Link
-                href="/login"
-                className="inline-flex items-center justify-center rounded-lg border border-white px-6 py-3 font-semibold text-white hover:bg-emerald-500"
-              >
-                Sign In
-              </Link>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="border-t bg-gray-50 py-10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 text-sm text-gray-600 md:flex-row md:px-6">
-          <div className="flex items-center gap-2">
-            <Stethoscope className="h-4 w-4 text-emerald-600" />
-            <span>Scribsy AI</span>
-          </div>
-          <div>© 2026 Scribsy. All rights reserved.</div>
+          <div className={styles.audioPill}><span className={styles.audioIcon}><Mic2 size={17}/></span><span><strong>Visit audio</strong><small>Ready to transcribe</small></span><span className={styles.wave} aria-hidden="true"><i/><i/><i/><i/><i/><i/><i/></span></div>
+          <div className={styles.sparkle} aria-hidden="true"><Sparkles size={22}/></div>
         </div>
-      </footer>
-    </div>
-  );
+      </div><div className={styles.heroFooter}><span>LESS TIME FORMATTING</span><span className={styles.footerLine}/><span>MORE ROOM TO FOCUS</span></div></section>
+      <section id="how-it-works" className={styles.processSection}><div className={styles.sectionInner}>
+        <div className={styles.sectionIntro}><span className={styles.kicker}>A CLEARER WAY TO CHART</span><h2>From conversation to note,<br/><em>in three simple steps.</em></h2><p>Keep your focus on the encounter. Scribsy helps organize the documentation that follows.</p></div>
+        <div className={styles.steps}>{steps.map(step => <div className={styles.step} key={step.number}><span className={styles.stepNumber}>{step.number}</span><span className={styles.stepIcon}><step.icon size={24} strokeWidth={1.8}/></span><h3>{step.title}</h3><p>{step.text}</p></div>)}</div>
+      </div></section>
+      <section id="features" className={styles.featureSection}><div className={styles.featureInner}>
+        <div className={styles.featureCopy}><span className={styles.kicker}>BUILT FOR THE MOMENTS THAT MATTER</span><h2>Documentation that<br/>moves with you.</h2><p>A clinical workflow should make room for your judgment. Scribsy gives you a starting point and keeps the final word in your hands.</p><Link href="/register" className={styles.featureLink}>Explore Scribsy <ArrowRight size={18}/></Link></div>
+        <div className={styles.featureList}>
+          <div><span className={styles.featureIcon}><AudioLines size={21}/></span><div><h3>Audio to transcript</h3><p>Bring visit audio into a readable transcript.</p></div></div>
+          <div><span className={styles.featureIcon}><FileText size={21}/></span><div><h3>Structured SOAP notes</h3><p>Organize information into familiar clinical sections.</p></div></div>
+          <div><span className={styles.featureIcon}><ClipboardCheck size={21}/></span><div><h3>Review before export</h3><p>Edit your draft and decide when it is ready to use.</p></div></div>
+        </div>
+      </div></section>
+      <section className={styles.ctaSection}><div className={styles.ctaInner}><span className={styles.kicker}>READY WHEN YOU ARE</span><h2>Let the visit come first.</h2><p>Start with a more thoughtful way to document care.</p><Link href="/register" className={styles.lightButton}>Get started <ArrowRight size={18}/></Link></div></section>
+    </main>
+    <footer className={styles.footer}><div className={styles.footerInner}><Brand/><p>Clinical documentation, with room for care.</p><div><Link href="/contact">Contact</Link><Link href="/login">Log in</Link></div><span className={styles.copyright}>© {new Date().getFullYear()} Scribsy</span></div></footer>
+  </div>;
 }
