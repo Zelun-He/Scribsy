@@ -115,21 +115,50 @@ interface DashboardStats {
   noteAccuracy: number;
 }
 
-export default function DashboardPage() {
+interface AuthenticatedDashboardProps {
+  preview?: boolean;
+}
+
+const previewNotes = (): Note[] => {
+  const now = Date.now();
+  return [
+    { id: 101, patient_id: 201, visit_id: 301, note_type: 'follow-up', content: 'Follow-up visit note ready for clinician review.', status: 'pending_review', created_at: new Date(now - 45 * 60 * 1000).toISOString(), time_saved_minutes: 18 },
+    { id: 102, patient_id: 202, visit_id: 302, note_type: 'consultation', content: 'Initial consultation draft with assessment and plan.', status: 'completed', created_at: new Date(now - 25 * 60 * 60 * 1000).toISOString(), time_saved_minutes: 22 },
+    { id: 103, patient_id: 203, visit_id: 303, note_type: 'physical', content: 'Annual wellness visit documentation.', status: 'signed', created_at: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString(), time_saved_minutes: 16, signed_at: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString() },
+  ] as Note[];
+};
+
+const previewAppointments = (): Appointment[] => {
+  const appointmentAt = (days: number, hour: number) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setHours(hour, 0, 0, 0);
+    return date.toISOString();
+  };
+  return [
+    { id: 401, patient_id: 201, scheduled_at: appointmentAt(0, 10), title: 'Follow-up visit' },
+    { id: 402, patient_id: 202, scheduled_at: appointmentAt(0, 14), title: 'Annual wellness visit' },
+    { id: 403, patient_id: 203, scheduled_at: appointmentAt(1, 9), title: 'Initial consultation' },
+  ] as Appointment[];
+};
+
+export default function DashboardPage({ preview = false }: AuthenticatedDashboardProps) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const sampleNotes = useMemo(() => previewNotes(), []);
+  const sampleAppointments = useMemo(() => previewAppointments(), []);
   const [stats, setStats] = useState<DashboardStats>({
-    totalNotes: 0,
-    recentNotes: [],
-    timeSaved: 0,
-    patientEncounters: 0,
-    noteAccuracy: 0
+    totalNotes: preview ? 24 : 0,
+    recentNotes: preview ? sampleNotes : [],
+    timeSaved: preview ? 326 : 0,
+    patientEncounters: preview ? 18 : 0,
+    noteAccuracy: preview ? 96 : 0
   });
-  const [loading, setLoading] = useState(true);
-  const [upcoming, setUpcoming] = useState<Appointment[]>([]);
-  const [loadingUpcoming, setLoadingUpcoming] = useState(true);
+  const [loading, setLoading] = useState(!preview);
+  const [upcoming, setUpcoming] = useState<Appointment[]>(preview ? sampleAppointments : []);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(!preview);
   const [patients, setPatients] = useState<{[key: number]: Patient}>({});
-  const [allNotes, setAllNotes] = useState<Note[]>([]);
+  const [allNotes, setAllNotes] = useState<Note[]>(preview ? sampleNotes : []);
   
   // Finalization warning
   const { warning, loading: warningLoading, dismissWarning } = useFinalizationWarning();
@@ -205,11 +234,11 @@ export default function DashboardPage() {
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!preview && !authLoading && !user) {
       // Use router.push instead of window.location.href for better navigation
       router.push('/access-denied');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, preview]);
 
   // Show finalization warning dialog when warning is detected
   useEffect(() => {
@@ -227,6 +256,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      if (preview) return;
       // Only fetch data if user is authenticated
       if (!user) {
         setLoading(false);
@@ -286,6 +316,7 @@ export default function DashboardPage() {
 
     fetchDashboardData();
     const fetchUpcoming = async () => {
+      if (preview) return;
       if (!user) return;
       try {
         const appts = await apiClient.getUpcomingAppointments(168);
@@ -329,7 +360,7 @@ export default function DashboardPage() {
       // Fallback to random if storage unavailable
       setInspoMessage(inspirationMessages[Math.floor(Math.random()*inspirationMessages.length)]);
     }
-  }, [user, inspirationMessages]);
+  }, [user, inspirationMessages, preview]);
 
   // Animate stats when they load
   useEffect(() => {
@@ -366,13 +397,13 @@ export default function DashboardPage() {
 
   // Celebrate milestones
   useEffect(() => {
-    if (loading) return;
+    if (loading || preview) return;
     try {
       if (stats.totalNotes === 1) { burstConfetti(); show('🎉 First note created!'); }
       if (stats.patientEncounters === 10) { burstConfetti(); show('🎉 10th patient added!'); }
       if (stats.noteAccuracy >= 95) { burstConfetti(); show('🎯 95% accuracy streak!'); }
     } catch {}
-  }, [loading, stats, show]);
+  }, [loading, stats, show, preview]);
 
   // Load/save KPI order per user
   const storageKey = useMemo(() => `kpiOrder:${user?.id ?? 'anon'}`, [user]);
@@ -887,7 +918,7 @@ export default function DashboardPage() {
   ];
 
   // Don't render dashboard if user is not authenticated
-  if (authLoading || !user) {
+  if (!preview && (authLoading || !user)) {
     return (
       <div className="min-h-screen flex items-center justify-center" role="status" aria-live="polite" aria-label="Loading dashboard">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600" aria-hidden="true"></div>
@@ -997,7 +1028,7 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold mb-2">
-                  Welcome back, {user?.username || 'Dr. Smith'}!
+                  Welcome back, {preview ? 'Dr. Smith' : (user?.username || 'Dr. Smith')}!
                 </h1>
                 <p className="text-green-100 mb-6 text-lg">{inspoMessage}</p>
                 <div className="flex items-center gap-3">
