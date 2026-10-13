@@ -25,7 +25,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   const handleAuthFailure = useCallback(() => {
     apiClient.clearToken();
     setUser(null);
-    if (typeof window !== 'undefined' && !['/', '/dashboard', '/contact', '/login', '/register'].includes(window.location.pathname)) {
+    if (typeof window !== 'undefined' && !['/', '/dashboard', '/sample-visit', '/contact', '/login', '/register'].includes(window.location.pathname)) {
       router.push('/login');
     }
   }, [router]);

@@ -1,973 +1,744 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { 
-  ArrowLeftIcon,
-  PencilIcon,
-  TrashIcon,
-  DocumentTextIcon,
-  SparklesIcon,
-  CalendarIcon,
-  ClockIcon,
-  DocumentCheckIcon
-} from '@heroicons/react/24/outline';
-import { apiClient } from '@/lib/api';
-import { Note, NoteCode, NoteProvenance } from '@/types';
-import { useAuth } from '@/lib/auth';
-import { useToast } from '@/lib/toast';
-import { burstConfetti } from '@/lib/confetti';
-// Comments component removed
-import { ChangeHistory } from '@/components/ui/change-history';
-import { formatDateOnly } from '@/utils/date';
-import { isFinalized } from '@/lib/dashboard';
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Check,
+  Clipboard,
+  Download,
+  FileText,
+  LoaderCircle,
+  Sparkles,
+  Volume2,
+} from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { apiClient } from "@/lib/api";
+import { useToast } from "@/lib/toast";
+import { isFinalized, parseDate } from "@/lib/dashboard";
+import { SOAP_SECTIONS } from "@/lib/sample-visit";
+import { ClinicalNote } from "@/components/notes/clinical-note";
+import { ApprovalDialog } from "@/components/notes/approval-dialog";
+import type { Note, NoteCode, NoteProvenance, SOAPNote } from "@/types";
+import styles from "@/components/notes/note-workspace.module.css";
+
+interface HistoryEntry {
+  id: number;
+  username: string;
+  action: string;
+  summary: string;
+  created_at: string;
+}
+const noteSoap = (note: Note): SOAPNote => ({
+  subjective: note.soap_subjective || "",
+  objective: note.soap_objective || "",
+  assessment: note.soap_assessment || "",
+  plan: note.soap_plan || "",
+});
+const sourceContent = (note: Note) =>
+  note.content.split("=== GENERATED SOAP NOTE ===")[0].trim();
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export default function NotePage() {
-  const params = useParams();
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { show } = useToast();
   const [note, setNote] = useState<Note | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [statusLoading, setStatusLoading] = useState(false);
-  const [error, setError] = useState('');
-  // Comments are now handled by the Comments component
-  // History is now handled by the ChangeHistory component
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [codes, setCodes] = useState<NoteCode[]>([]);
   const [provenance, setProvenance] = useState<NoteProvenance[]>([]);
-  const [playingAudio, setPlayingAudio] = useState<number | null>(null);
-  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
-  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
-  const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
-  const [soapReview, setSoapReview] = useState<Record<string, 'approved' | 'disproved'>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editedSoap, setEditedSoap] = useState<SOAPNote>({
+    subjective: "",
+    objective: "",
+    assessment: "",
+    plan: "",
+  });
+  const [content, setContent] = useState("");
+  const [approved, setApproved] = useState<
+    Partial<Record<keyof SOAPNote, boolean>>
+  >({});
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [playingSnippet, setPlayingSnippet] = useState<number | null>(null);
+  const snippetRef = useRef<HTMLAudioElement | null>(null);
+  const snippetUrlRef = useRef("");
 
+  useEffect(
+    () => () => {
+      snippetRef.current?.pause();
+      if (snippetUrlRef.current) URL.revokeObjectURL(snippetUrlRef.current);
+      snippetRef.current = null;
+      snippetUrlRef.current = "";
+    },
+    [id],
+  );
 
-  useEffect(() => {
-    // Wait for auth to initialize to ensure Authorization header is available
-    if (authLoading) return;
-    if (params.id) {
-      fetchNote(params.id as string);
-    }
-  }, [params.id, authLoading]);
-
-  useEffect(() => {
-    if (!note) return;
-    const key = `soap_review_${note.id}_${note.updated_at}`;
+  const refresh = useCallback(async () => {
+    if (!user) return;
     try {
-      const raw = window.localStorage.getItem(key);
-      if (raw) setSoapReview(JSON.parse(raw));
-      else setSoapReview({});
-    } catch {
-      setSoapReview({});
-    }
-  }, [note]);
-
-  const fetchNote = async (noteId: string) => {
-    try {
-      const fetchedNote = await apiClient.getNote(parseInt(noteId));
-      setNote(fetchedNote);
-      setError('');
-      // Comments are now loaded by the Comments component
-      // History is now loaded by the ChangeHistory component
-      try { const cd = await apiClient.listCodes(fetchedNote.id); setCodes(cd); } catch {}
-      try { const pv = await apiClient.listProvenance(fetchedNote.id); setProvenance(pv); } catch {}
-    } catch (err) {
-      // Fallback: fetch notes list and find the one by id to avoid any single-note endpoint issues
-      try {
-        const allNotes = await apiClient.getNotes({ limit: 1000 });
-        const found = allNotes.find(n => n.id === parseInt(noteId));
-        if (found) {
-          // Try to enrich with patient info, but do not fail if it errors
-          try {
-            const patient = await apiClient.getPatient(found.patient_id);
-            setNote({
-              ...found,
-              patient_first_name: patient.first_name,
-              patient_last_name: patient.last_name,
-              patient_date_of_birth: patient.date_of_birth,
-              patient_phone_number: patient.phone_number,
-              patient_email: patient.email,
-            } as Note);
-          } catch {
-            setNote(found as Note);
-          }
-          setError('');
-        } else {
-          const message = err instanceof Error ? err.message : 'Failed to fetch note';
-          setError(message);
-        }
-      } catch (listErr) {
-        const message = listErr instanceof Error ? listErr.message : 'Failed to fetch note';
-        setError(message);
-      }
+      const saved = await apiClient.getNote(Number(id));
+      setNote(saved);
+      setContent(sourceContent(saved));
+      setEditedSoap(noteSoap(saved));
+      setApproved({});
+      setError("");
+      const extras = await Promise.allSettled([
+        apiClient.getNoteHistory(saved.id),
+        apiClient.listCodes(saved.id),
+        apiClient.listProvenance(saved.id),
+      ]);
+      if (extras[0].status === "fulfilled") setHistory(extras[0].value);
+      if (extras[1].status === "fulfilled") setCodes(extras[1].value);
+      if (extras[2].status === "fulfilled") setProvenance(extras[2].value);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load this note.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, user]);
+  useEffect(() => {
+    if (!authLoading) void refresh();
+  }, [authLoading, refresh]);
+  useEffect(
+    () => () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    },
+    [audioUrl],
+  );
 
-  const deleteNote = async () => {
-    if (!note || !confirm('Are you sure you want to delete this note?')) return;
-
-    setDeleteLoading(true);
-    try {
-      await apiClient.deleteNote(note.id);
-      router.push('/notes');
-    } catch {
-      setError('Failed to delete note');
-      setDeleteLoading(false);
-    }
-  };
-
-  // Comment submission is now handled by the Comments component
-
-  const confidenceBadge = (conf?: number | null) => {
-    if (conf === undefined || conf === null) return (
-      <span className="px-2 py-0.5 text-xs rounded-full bg-stone-100 dark:bg-gray-800 text-stone-600 dark:text-gray-300">—</span>
-    );
-    const pct = Math.round(conf * 100);
-    const color = pct >= 80 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300' : pct >= 60 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300' : 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
-    return <span className={`px-2 py-0.5 text-xs rounded-full ${color}`}>{pct}%</span>;
-  };
-
-  const handleAcceptCode = async (codeId: number) => {
+  const save = async () => {
     if (!note) return;
+    setBusy("save");
+    setError("");
     try {
-      const updated = await apiClient.acceptCode(note.id, codeId);
-      setCodes(prev => prev.map(c => c.id === updated.id ? updated : c));
-      show('Code accepted');
-    } catch (e) { show(e instanceof Error ? e.message : 'Failed to accept'); }
-  };
-  const handleRejectCode = async (codeId: number) => {
-    if (!note) return;
-    try {
-      const updated = await apiClient.rejectCode(note.id, codeId);
-      setCodes(prev => prev.map(c => c.id === updated.id ? updated : c));
-      show('Code rejected');
-    } catch (e) { show(e instanceof Error ? e.message : 'Failed to reject'); }
-  };
-
-  const playAudioSnippet = async (provenanceId: number, startMs?: number | null, endMs?: number | null) => {
-    if (!note) return;
-    
-    // Stop current audio
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-    }
-    
-    try {
-      setPlayingAudio(provenanceId);
-      
-      // Create audio element for streaming
-      const audio = new Audio();
-      const audioBlob = await apiClient.exportNoteAudio(note.id);
-      audio.src = URL.createObjectURL(audioBlob);
-      audio.currentTime = (startMs || 0) / 1000;
-      audio.onloadedmetadata = () => { audio.currentTime = (startMs || 0) / 1000; };
-      audio.ontimeupdate = () => { if (endMs && audio.currentTime >= endMs / 1000) audio.pause(); };
-      audio.onpause = () => { URL.revokeObjectURL(audio.src); setPlayingAudio(null); };
-      
-      audio.onended = () => setPlayingAudio(null);
-      audio.onerror = () => {
-        setPlayingAudio(null);
-        show('Audio playback failed');
-      };
-      
-      await audio.play();
-      setAudioElement(audio);
+      await apiClient.updateNote(note.id, {
+        content,
+        soap_subjective: editedSoap.subjective,
+        soap_objective: editedSoap.objective,
+        soap_assessment: editedSoap.assessment,
+        soap_plan: editedSoap.plan,
+      });
+      setEditing(false);
+      await refresh();
+      show("Changes saved. Review the updated draft.");
     } catch (e) {
-      setPlayingAudio(null);
-      show('Audio playback failed');
-    }
-  };
-
-  const stopAudio = () => {
-    if (audioElement) {
-      audioElement.pause();
-      audioElement.currentTime = 0;
-    }
-    setPlayingAudio(null);
-  };
-
-  const getSectionConfidence = (section: string) => {
-    const sectionProvenance = provenance.filter(p => p.section === section);
-    if (sectionProvenance.length === 0) return null;
-    const avgConfidence = sectionProvenance.reduce((sum, p) => sum + (p.confidence || 0), 0) / sectionProvenance.length;
-    return avgConfidence;
-  };
-
-  const hasLowConfidenceItems = () => {
-    const lowConfidenceCodes = codes.some(c => (c.confidence || 0) < 0.6 && c.status === 'suggested');
-    const lowConfidenceProvenance = provenance.some(p => (p.confidence || 0) < 0.6);
-    return lowConfidenceCodes || lowConfidenceProvenance;
-  };
-
-  const changeStatus = async (newStatus: string) => {
-    if (!note) return;
-
-    // Check for low confidence items before finalizing
-    if (newStatus === 'finalized' && hasLowConfidenceItems()) {
-      setShowFinalizeDialog(true);
-      return;
-    }
-
-    setStatusLoading(true);
-    try {
-      const updatedNote = await apiClient.updateNote(note.id, { status: newStatus });
-      setNote(previous => previous ? { ...previous, ...updatedNote } : updatedNote);
-      setError('');
-      if (newStatus === 'finalized') {
-        show('Note signed successfully');
-        burstConfetti();
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update status');
+      setError(e instanceof Error ? e.message : "Could not save changes.");
     } finally {
-      setStatusLoading(false);
+      setBusy(null);
     }
   };
-
-  const handleFinalizeConfirm = async () => {
-    setShowFinalizeDialog(false);
-    await changeStatus('finalized');
-  };
-
-  const reviewableSections = [
-    { key: 'subjective', label: 'Subjective', value: note?.soap_subjective },
-    { key: 'objective', label: 'Objective', value: note?.soap_objective },
-    { key: 'assessment', label: 'Assessment', value: note?.soap_assessment },
-    { key: 'plan', label: 'Plan', value: note?.soap_plan },
-  ].filter(section => !!section.value);
-
-  const hasRequiredSoapReview = note?.status === 'pending_review' && note?.provider_id === user?.id && reviewableSections.length > 0;
-  const isSoapReviewComplete = !hasRequiredSoapReview || (reviewableSections.length === 4 && reviewableSections.every(section => soapReview[section.key] === 'approved'));
-  const soapReviewKey = note ? `soap_review_${note.id}_${note.updated_at}` : '';
-
-  const setSoapDecision = (sectionKey: string, decision: 'approved' | 'disproved') => {
-    if (!note) return;
-    const next = { ...soapReview, [sectionKey]: decision };
-    setSoapReview(next);
-    try {
-      window.localStorage.setItem(soapReviewKey, JSON.stringify(next));
-    } catch {}
-  };
-
   const generateSoap = async () => {
     if (!note) return;
-    setIsGeneratingSoap(true);
+    setBusy("generate");
+    setError("");
     try {
-      const updated = await apiClient.generateSoap(note.id);
-      setNote(previous => previous ? { ...previous, ...updated } : updated);
-      show('SOAP note generated from full conversation');
+      await apiClient.generateSoap(note.id);
+      await refresh();
+      show("SOAP draft generated.");
     } catch (e) {
-      show(e instanceof Error ? e.message : 'Failed to generate SOAP note');
+      setError(e instanceof Error ? e.message : "Could not generate SOAP.");
     } finally {
-      setIsGeneratingSoap(false);
+      setBusy(null);
     }
   };
-
-  const getLowConfidenceItems = () => {
-    const lowCodes = codes.filter(c => (c.confidence || 0) < 0.6 && c.status === 'suggested');
-    const lowProvenance = provenance.filter(p => (p.confidence || 0) < 0.6);
-    return { codes: lowCodes, provenance: lowProvenance };
+  const exportPDF = async (finalize = false) => {
+    if (!note) return;
+    setBusy("export");
+    setError("");
+    let signed = false;
+    try {
+      if (finalize) {
+        const saved = await apiClient.updateNote(note.id, {
+          status: "finalized",
+        });
+        setNote((previous) => (previous ? { ...previous, ...saved } : saved));
+        signed = true;
+      }
+      const pdf = await apiClient.exportNotePDF(note.id);
+      downloadBlob(pdf, `scribsy-note-${note.id}.pdf`);
+      setConfirmOpen(false);
+      show(finalize ? "Note finalized and exported." : "PDF downloaded.");
+    } catch (e) {
+      setConfirmOpen(false);
+      setError(
+        `${signed ? "The note was finalized, but the PDF download failed. Use Download PDF to retry. " : ""}${e instanceof Error ? e.message : "Export failed."}`,
+      );
+    } finally {
+      setBusy(null);
+    }
   };
-
-  const exportPlain = async () => {
+  const copyNote = async () => {
     if (!note) return;
     try {
-      const txt = await apiClient.exportNotePlain(note.id);
-      const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${note.id}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      show('Exported note (TXT)');
-    } catch (e) {
-      show(e instanceof Error ? e.message : 'Failed to export');
+      await navigator.clipboard.writeText(note.content);
+      show("Note copied.");
+    } catch {
+      setError(
+        "Clipboard access is unavailable. Download a plain-text copy instead.",
+      );
     }
   };
-
+  const exportText = async () => {
+    if (!note) return;
+    setBusy("text");
+    try {
+      const text = await apiClient.exportNotePlain(note.id);
+      downloadBlob(
+        new Blob([text], { type: "text/plain;charset=utf-8" }),
+        `scribsy-note-${note.id}.txt`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Text export failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
   const exportCCD = async () => {
     if (!note) return;
+    setBusy("ccd");
     try {
-      const xml = await apiClient.exportNoteCCD(note.id);
-      const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${note.id}.xml`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      show('Exported note (CCD)');
+      const text = await apiClient.exportNoteCCD(note.id);
+      downloadBlob(
+        new Blob([text], { type: "application/xml" }),
+        `scribsy-note-${note.id}.xml`,
+      );
     } catch (e) {
-      show(e instanceof Error ? e.message : 'Failed to export');
+      setError(e instanceof Error ? e.message : "XML export failed.");
+    } finally {
+      setBusy(null);
     }
   };
-
-  const exportPDF = async () => {
+  const loadAudio = async () => {
     if (!note) return;
+    setBusy("audio");
     try {
-      const blob = await apiClient.exportNotePDF(note.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${note.id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      show('Exported note (PDF)');
+      const audio = await apiClient.exportNoteAudio(note.id);
+      setAudioUrl(URL.createObjectURL(audio));
     } catch (e) {
-      if (e instanceof Error && e.message === 'PDF_UNAVAILABLE') {
-        // Client-side fallback: download TXT instead
-        try {
-          const txt = await apiClient.exportNotePlain(note.id);
-          const blobTxt = new Blob([txt], { type: 'text/plain;charset=utf-8' });
-          const url = URL.createObjectURL(blobTxt);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `note-${note.id}.txt`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          show('PDF not available on server. Exported TXT instead.');
-        } catch (e2) {
-          show(e2 instanceof Error ? e2.message : 'Failed to export');
-        }
-      } else {
-        show(e instanceof Error ? e.message : 'Failed to export');
-      }
+      setError(e instanceof Error ? e.message : "Audio is unavailable.");
+    } finally {
+      setBusy(null);
     }
   };
-
   const exportAudio = async () => {
     if (!note) return;
+    setBusy("audioDownload");
     try {
-      const blob = await apiClient.exportNoteAudio(note.id);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${note.id}-audio${blob.type.includes('mp3') ? '.mp3' : blob.type.includes('wav') ? '.wav' : '.audio'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      show('Exported audio file');
+      const audio = await apiClient.exportNoteAudio(note.id);
+      const extension = note.audio_file?.split(".").pop() || "audio";
+      downloadBlob(audio, `scribsy-note-${note.id}.${extension}`);
     } catch (e) {
-      show(e instanceof Error ? e.message : 'Failed to export audio');
+      setError(e instanceof Error ? e.message : "Audio export failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const playSnippet = async (item: NoteProvenance) => {
+    if (!note) return;
+    snippetRef.current?.pause();
+    if (playingSnippet === item.id) {
+      setPlayingSnippet(null);
+      return;
+    }
+    setBusy("snippet");
+    try {
+      if (!snippetUrlRef.current) {
+        const blob = await apiClient.exportNoteAudio(note.id);
+        snippetUrlRef.current = URL.createObjectURL(blob);
+      }
+      const audio = new Audio(snippetUrlRef.current);
+      snippetRef.current = audio;
+      const start =
+        (item.audio_start_ms ?? item.transcript_start_ms ?? 0) / 1000;
+      const end = item.audio_end_ms ?? item.transcript_end_ms;
+      audio.onloadedmetadata = () => {
+        audio.currentTime = start;
+      };
+      audio.ontimeupdate = () => {
+        if (end != null && audio.currentTime >= end / 1000) audio.pause();
+      };
+      audio.onpause = audio.onended = () => setPlayingSnippet(null);
+      audio.onerror = () => {
+        setPlayingSnippet(null);
+        setError("Could not play the source recording.");
+      };
+      await audio.play();
+      setPlayingSnippet(item.id);
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Could not play the source recording.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+  const deleteNote = async () => {
+    if (
+      !note ||
+      !window.confirm("Delete this draft note? This cannot be undone.")
+    )
+      return;
+    setBusy("delete");
+    try {
+      await apiClient.deleteNote(note.id);
+      router.push("/notes");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete the draft.");
+      setBusy(null);
+    }
+  };
+  const updateCode = async (code: NoteCode, accept: boolean) => {
+    if (!note) return;
+    setBusy(`code-${code.id}`);
+    try {
+      const saved = await (accept
+        ? apiClient.acceptCode(note.id, code.id)
+        : apiClient.rejectCode(note.id, code.id));
+      setCodes((previous) =>
+        previous.map((item) => (item.id === saved.id ? saved : item)),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not update the code.");
+    } finally {
+      setBusy(null);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending_review':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
-      case 'finalized':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending_review':
-        return <ClockIcon className="w-4 h-4" />;
-      case 'finalized':
-        return <DocumentCheckIcon className="w-4 h-4" />;
-      default:
-        return <DocumentTextIcon className="w-4 h-4" />;
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZoneName: 'short'
-    });
-  };
-
-  if (loading || authLoading) {
+  if (authLoading || loading)
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </DashboardLayout>
+      <div className={styles.workspace} role="status">
+        <LoaderCircle size={22} className="animate-spin mb-3" />
+        Loading clinical note…
+      </div>
     );
-  }
-
-  if (error && !note) {
+  if (!user) return null;
+  if (!note)
     return (
-      <DashboardLayout>
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 dark:bg-red-900/10 border border-red-800/40 dark:border-red-800 rounded-md p-4">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          </div>
-          <div className="mt-4">
-            <Link href="/notes">
-              <Button variant="ghost">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Back to Notes
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </DashboardLayout>
+      <div className={styles.workspace}>
+        <Link href="/notes" className={styles.backLink}>
+          <ArrowLeft size={15} />
+          Back to notes
+        </Link>
+        <p role="alert" className={styles.error}>
+          {error || "Note not found."}
+        </p>
+        <button
+          className={styles.secondaryButton}
+          onClick={() => void refresh()}
+        >
+          Retry
+        </button>
+      </div>
     );
-  }
-
-  if (!note) {
-    return (
-      <DashboardLayout>
-        <div className="max-w-4xl mx-auto text-center py-12">
-          <DocumentTextIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">
-            Note not found
-          </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            The note you&apos;re looking for doesn&apos;t exist.
-          </p>
-          <div className="mt-6">
-            <Link href="/notes">
-              <Button>
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Back to Notes
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </DashboardLayout>
+  const finalized = isFinalized(note);
+  const soap = editing ? editedSoap : noteSoap(note);
+  const hasSoap = Object.values(noteSoap(note)).some((value) => value.trim());
+  const allComplete = Object.values(noteSoap(note)).every((value) =>
+    value.trim(),
+  );
+  const canFinalize =
+    !editing &&
+    !finalized &&
+    (!hasSoap ||
+      (allComplete && SOAP_SECTIONS.every((section) => approved[section.key])));
+  const patient = note.patient_first_name
+    ? `${note.patient_first_name} ${note.patient_last_name || ""}`
+    : `Patient #${note.patient_id}`;
+  const rawSource = sourceContent(note);
+  const needsSourceReview =
+    codes.some(
+      (code) =>
+        code.status === "suggested" &&
+        typeof code.confidence === "number" &&
+        code.confidence < 0.6,
+    ) ||
+    provenance.some(
+      (item) => typeof item.confidence === "number" && item.confidence < 0.6,
     );
-  }
-
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/notes">
-              <Button variant="ghost" size="sm">
-                <ArrowLeftIcon className="w-4 h-4 mr-2" />
-                Back to Notes
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                Clinical Note #{note.id}
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {note.patient_first_name && note.patient_last_name ? 
-                  `${note.patient_first_name} ${note.patient_last_name}` : 
-                  `Patient #${note.patient_id}`
-                } • Visit #{note.visit_id} • {note.note_type.charAt(0).toUpperCase() + note.note_type.slice(1)}
-              </p>
-              {note.patient_date_of_birth && (
-                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                  DOB: {formatDateOnly(note.patient_date_of_birth)} 
-                  {note.patient_phone_number && ` • ${note.patient_phone_number}`}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {!isFinalized(note) && <Link href={`/notes/${note.id}/edit`}>
-              <Button variant="ghost">
-                <PencilIcon className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-            </Link>}
-            <Button
-              variant="destructive"
-              onClick={deleteNote}
-              disabled={deleteLoading}
-              loading={deleteLoading}
-            >
-              <TrashIcon className="w-4 h-4 mr-2" />
-              {deleteLoading ? 'Deleting...' : 'Delete'}
-            </Button>
-          </div>
+    <div className={styles.workspace}>
+      <Link href="/notes" className={styles.backLink}>
+        <ArrowLeft size={15} />
+        Back to notes
+      </Link>
+      <header className={styles.header}>
+        <div>
+          <p className={styles.eyebrow}>Visit documentation · Note {note.id}</p>
+          <h1>{patient}</h1>
+          <p>
+            {note.note_type} · Visit {note.visit_id} ·{" "}
+            {parseDate(note.created_at).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </p>
         </div>
-
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-md p-4">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          </div>
-        )}
-
-        {/* Note Metadata */}
-        <Card>
-          <CardContent className="p-6">
-            {/* Patient Information */}
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-                Patient Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-1">
-                    Patient ID
-                  </div>
-                  <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                    #{note.patient_id}
-                  </div>
-                </div>
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
-                    Visit ID
-                  </div>
-                  <div className="text-2xl font-bold text-green-900 dark:text-green-100">
-                    #{note.visit_id}
-                  </div>
-                </div>
-                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg">
-                  <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300 mb-1">
-                    Note Type
-                  </div>
-                  <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 capitalize">
-                    {note.note_type}
-                  </div>
-                </div>
-              </div>
-              
-              {/* AI Accuracy Display */}
-              {note.accuracy_score !== undefined && note.accuracy_score !== null && (
-                <div className="mt-4 p-4 rounded-lg border border-stone-200 dark:border-gray-700">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-sm font-medium text-stone-700 dark:text-gray-300 mb-1">
-                        AI Accuracy
-                      </div>
-                      <div className="text-xs text-stone-500 dark:text-gray-400">
-                        Based on content similarity to original AI generation
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                        note.accuracy_score >= 90 ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200' :
-                        note.accuracy_score >= 70 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200' :
-                        'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-200'
-                      }`}>
-                        {note.accuracy_score.toFixed(1)}%
-                      </div>
-                      {note.content_changes_count && note.content_changes_count > 0 && (
-                        <div className="text-xs text-stone-500 dark:text-gray-400">
-                          {note.content_changes_count} edit{note.content_changes_count !== 1 ? 's' : ''}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <CalendarIcon className="w-4 h-4" />
-                    <span>Created: {formatDate(note.created_at)}</span>
-                  </div>
-                  {note.updated_at !== note.created_at && (
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4" />
-                      <span>Updated: {formatDate(note.updated_at)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Status Display */}
-              <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(note.status)}`}>
-                  {getStatusIcon(note.status)}
-                  <span className="capitalize">{note.status.replace('_', ' ')}</span>
-                </div>
-                
-                {/* Status Change Buttons - Only author can finalize */}
-                {!isFinalized(note) && note.status === 'pending_review' && note.provider_id === user?.id && (
-                  <Button
-                    size="sm"
-                    onClick={() => changeStatus('finalized')}
-                    disabled={statusLoading || !isSoapReviewComplete}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    <DocumentCheckIcon className="w-4 h-4 mr-1" />
-                    Finalize Note
-                  </Button>
-                )}
-                {hasRequiredSoapReview && !isSoapReviewComplete && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Approve all SOAP sections before finalizing. Edit any section that needs correction.
-                  </span>
-                )}
-                
-                {!isFinalized(note) && note.status === 'draft' && note.provider_id === user?.id && (
-                  <Button
-                    size="sm"
-                    onClick={() => changeStatus('pending_review')}
-                    disabled={statusLoading}
-                    className="bg-yellow-600 hover:bg-yellow-700"
-                  >
-                    <ClockIcon className="w-4 h-4 mr-1" />
-                    Submit for Review
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Structured Data (Codes) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">Structured Data</CardTitle>
-            <CardDescription>Suggested codes with confidence. Accept to include; reject to dismiss.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {codes.length === 0 ? (
-              <div className="text-sm text-stone-500">No suggestions yet</div>
-            ) : (
-              <div className="divide-y divide-stone-200 dark:divide-gray-800">
-                <div className="grid grid-cols-5 text-xs font-medium text-stone-600 dark:text-gray-300 pb-2">
-                  <div>System</div>
-                  <div>Code</div>
-                  <div>Display</div>
-                  <div>Confidence</div>
-                  <div className="text-right pr-1">Actions</div>
-                </div>
-                {codes.map(c => (
-                  <div key={c.id} className="grid grid-cols-5 items-center py-2">
-                    <div className="text-sm text-stone-800 dark:text-gray-100">{c.system}</div>
-                    <div className="text-sm font-mono text-stone-800 dark:text-gray-100">{c.code}</div>
-                    <div className="text-sm text-stone-700 dark:text-gray-300 truncate" title={c.display || ''}>{c.display || '—'}</div>
-                    <div>{confidenceBadge(c.confidence)}</div>
-                    <div className="text-right space-x-2">
-                      {c.status !== 'accepted' && (
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => handleAcceptCode(c.id)}>Accept</Button>
-                      )}
-                      {c.status !== 'rejected' && (
-                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => handleRejectCode(c.id)}>Reject</Button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Provenance Panel */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Provenance & Audio</span>
-              {playingAudio && (
-                <Button size="sm" variant="secondary" onClick={stopAudio} className="text-red-600 hover:text-red-700">
-                  Stop Audio
-                </Button>
-              )}
-            </CardTitle>
-            <CardDescription>Tap sentences to play audio snippets. Confidence badges show section accuracy.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {provenance.length === 0 ? (
-              <div className="text-sm text-stone-500">No provenance data available</div>
-            ) : (
-              <div className="space-y-4">
-                {/* Section Confidence Overview */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {['subjective', 'objective', 'assessment', 'plan'].map(section => {
-                    const conf = getSectionConfidence(section);
-                    return (
-                      <div key={section} className="p-3 rounded-lg bg-stone-50 dark:bg-gray-800">
-                        <div className="text-xs font-medium text-stone-600 dark:text-gray-300 capitalize">{section}</div>
-                        <div className="mt-1">{confidenceBadge(conf)}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Sentence-by-sentence provenance */}
-                <div className="space-y-2">
-                  <div className="text-sm font-medium text-stone-700 dark:text-gray-300">Sentences with Audio</div>
-                  <div className="space-y-1">
-                    {provenance.map(p => (
-                      <div key={p.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-stone-50 dark:hover:bg-gray-800">
-                        <div className="flex-shrink-0 mt-1">
-                          {playingAudio === p.id ? (
-                            <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
-                          ) : (
-                            <button
-                              onClick={() => playAudioSnippet(p.id, p.audio_start_ms, p.audio_end_ms)}
-                              className="w-4 h-4 bg-blue-500 rounded-full hover:bg-blue-600 transition-colors"
-                              title="Play audio snippet"
-                            />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm text-stone-800 dark:text-gray-100">{p.text}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            {p.section && (
-                              <span className="text-xs px-2 py-0.5 bg-stone-200 dark:bg-gray-700 text-stone-600 dark:text-gray-300 rounded">
-                                {p.section}
-                              </span>
-                            )}
-                            {confidenceBadge(p.confidence)}
-                            {p.transcript_start_ms !== undefined && p.transcript_end_ms !== undefined && (
-                              <span className="text-xs text-stone-500">
-                                {Math.round(p.transcript_start_ms / 1000)}s - {Math.round(p.transcript_end_ms / 1000)}s
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Full Transcript - Show if transcript exists */}
-        {note.transcript && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <DocumentTextIcon className="w-5 h-5 mr-2" />
-                Full Transcript
-              </CardTitle>
-              <CardDescription>
-                Complete transcribed conversation from audio recording
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="prose dark:prose-invert max-w-none">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono text-sm">
-                    {note.transcript}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* SOAP Note Review */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center">
-                <SparklesIcon className="w-5 h-5 mr-2" />
-                SOAP Note
-              </span>
-              <Button size="sm" variant="secondary" onClick={generateSoap} disabled={isGeneratingSoap || isFinalized(note)}>
-                {isFinalized(note) ? 'Finalized note' : isGeneratingSoap ? 'Generating...' : 'Summarize Conversation to SOAP'}
-              </Button>
-            </CardTitle>
-            <CardDescription>
-              Generate SOAP from transcript/content, then approve or disprove each section before finalizing.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {reviewableSections.length === 0 ? (
-              <div className="text-sm text-stone-500">
-                No SOAP sections yet. Click <strong>Summarize Conversation to SOAP</strong> to generate them.
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {reviewableSections.map(section => (
-                  <div key={section.key}>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">
-                        {section.label}
-                      </h4>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant={soapReview[section.key] === 'approved' ? 'default' : 'secondary'}
-                          onClick={() => setSoapDecision(section.key, 'approved')}
-                          disabled={isFinalized(note)}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={soapReview[section.key] === 'disproved' ? 'destructive' : 'secondary'}
-                          onClick={() => setSoapDecision(section.key, 'disproved')}
-                          disabled={isFinalized(note)}
-                        >
-                          Disprove
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="bg-emerald-50 dark:bg-emerald-900/10 rounded-lg p-4">
-                      <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                        {section.value}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Clinical Notes - Always show as fallback */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <DocumentTextIcon className="w-5 h-5 mr-2" />
-              Clinical Notes
-            </CardTitle>
-            <CardDescription>
-              {note.transcript || (note.soap_subjective || note.soap_objective || note.soap_assessment || note.soap_plan) 
-                ? 'Additional clinical notes and observations'
-                : 'Clinical notes and observations'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="prose dark:prose-invert max-w-none">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {note.content}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Comments sections removed */}
-
-        {/* Change History Section - using dedicated ChangeHistory component */}
-
-        {/* Actions */}
-        <div className="flex justify-center gap-4 py-6">
-          <Link href={`/notes/${note.id}/edit`}>
-            <Button size="lg">
-              <PencilIcon className="w-5 h-5 mr-2" />
-              Edit Note
-            </Button>
+        <div className={styles.actions}>
+          <Link
+            href={`/patients/${note.patient_id}`}
+            className={styles.secondaryButton}
+          >
+            Open patient chart
           </Link>
-          <Link href="/notes/new">
-            <Button variant="ghost" size="lg">
-              <DocumentTextIcon className="w-5 h-5 mr-2" />
-              Create New Note
-            </Button>
-          </Link>
-          <Button variant="secondary" size="lg" onClick={exportPlain}>
-            Export TXT
-          </Button>
-          <Button variant="secondary" size="lg" onClick={exportCCD}>
-            Export CCD
-          </Button>
-          <Button variant="secondary" size="lg" onClick={exportPDF}>
-            Export PDF
-          </Button>
-          {note.audio_file && (
-            <Button variant="secondary" size="lg" onClick={exportAudio}>
-              Export Audio
-            </Button>
+          {!finalized && !editing && (
+            <button
+              className={styles.secondaryButton}
+              onClick={() => {
+                setEditing(true);
+                setEditedSoap(noteSoap(note));
+                setContent(rawSource);
+              }}
+              disabled={!!busy}
+            >
+              Edit
+            </button>
           )}
         </div>
-
-        {/* Comments Section removed */}
-
-        {/* Change History Section */}
-        {note && (
-          <ChangeHistory noteId={note.id} />
+      </header>
+      {error && (
+        <p role="alert" className={styles.error}>
+          {error}
+        </p>
+      )}
+      {finalized && (
+        <div className={styles.banner}>
+          <span>
+            Finalized{" "}
+            {note.signed_at
+              ? parseDate(note.signed_at).toLocaleString("en-US")
+              : ""}
+            . This record is locked for editing.
+          </span>
+          <button
+            className={styles.quietButton}
+            disabled={!!busy}
+            onClick={() => void exportPDF()}
+          >
+            <Download size={14} />
+            Download PDF
+          </button>
+        </div>
+      )}
+      {note.audio_file && (
+        <div className={styles.audio}>
+          <div className={styles.actions}>
+            <label>Visit recording</label>
+            {!audioUrl && (
+              <button
+                className={styles.secondaryButton}
+                onClick={() => void loadAudio()}
+                disabled={!!busy}
+              >
+                <Volume2 size={15} />
+                {busy === "audio" ? "Loading…" : "Load recording"}
+              </button>
+            )}
+            <button
+              className={styles.quietButton}
+              disabled={!!busy}
+              onClick={() => void exportAudio()}
+            >
+              Download audio
+            </button>
+          </div>
+          {audioUrl && (
+            <audio
+              aria-label="Visit recording"
+              src={audioUrl}
+              controls
+              preload="metadata"
+            />
+          )}
+        </div>
+      )}
+      {!finalized && needsSourceReview && (
+        <p className={styles.error} role="status">
+          Some suggested codes or source references have low model confidence.
+          Review those entries before approving the note.
+        </p>
+      )}
+      <ClinicalNote
+        title={`${note.note_type} · ${finalized ? "Approved record" : "Visit draft"}`}
+        metadata={parseDate(note.created_at).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+        })}
+        transcript={note.transcript || rawSource}
+        sourceLabel={note.transcript ? "Transcript" : "Visit notes"}
+        soap={soap}
+        plainNote={!hasSoap && !editing ? rawSource : undefined}
+        finalized={finalized}
+        editing={editing}
+        onSectionChange={(key, value) =>
+          setEditedSoap((previous) => ({ ...previous, [key]: value }))
+        }
+        draftTools={
+          !hasSoap && !editing && !finalized ? (
+            <p className={styles.notice}>
+              No SOAP draft yet. Generate one from the visit text or use Edit to
+              document each section.
+            </p>
+          ) : null
+        }
+        sectionControls={(key) =>
+          !finalized && !editing && soap[key]?.trim() ? (
+            <button
+              className={styles.reviewButton}
+              aria-label={`Approve ${key}`}
+              aria-pressed={!!approved[key]}
+              onClick={() =>
+                setApproved((previous) => ({
+                  ...previous,
+                  [key]: !previous[key],
+                }))
+              }
+            >
+              <Check size={12} />
+              {approved[key] ? "Approved" : "Approve"}
+            </button>
+          ) : null
+        }
+        caption={
+          finalized
+            ? "Reviewed and finalized by the author."
+            : "AI-generated text requires clinician review before finalization."
+        }
+        actions={
+          editing ? (
+            <>
+              <button
+                className={styles.secondaryButton}
+                disabled={!!busy}
+                onClick={() => {
+                  setEditedSoap(noteSoap(note));
+                  setContent(sourceContent(note));
+                  setEditing(false);
+                }}
+              >
+                Cancel edits
+              </button>
+              <button
+                className={styles.primaryButton}
+                disabled={!!busy || !content.trim()}
+                onClick={() => void save()}
+              >
+                {busy === "save" ? "Saving…" : "Save changes"}
+              </button>
+            </>
+          ) : finalized ? (
+            <button
+              className={styles.primaryButton}
+              disabled={!!busy}
+              onClick={() => void exportPDF()}
+            >
+              <Download size={15} />
+              Download PDF
+            </button>
+          ) : (
+            <>
+              <button
+                className={styles.secondaryButton}
+                disabled={!!busy}
+                onClick={() => setEditing(true)}
+              >
+                Edit draft
+              </button>
+              <button
+                className={styles.primaryButton}
+                disabled={!!busy || !canFinalize}
+                onClick={() => setConfirmOpen(true)}
+              >
+                Approve & export
+              </button>
+              {hasSoap && !canFinalize && (
+                <p className={styles.notice}>
+                  {allComplete
+                    ? "Approve all four sections to finalize."
+                    : "Complete all four SOAP sections before finalizing."}
+                </p>
+              )}
+            </>
+          )
+        }
+      />
+      {editing && (
+        <section className={styles.sourceNotes}>
+          <h2>
+            <label htmlFor="source-note">Visit notes</label>
+          </h2>
+          <textarea
+            id="source-note"
+            className="w-full min-h-40 rounded-md border border-[var(--border)] bg-transparent p-3"
+            value={content}
+            onChange={(event) => setContent(event.target.value)}
+          />
+        </section>
+      )}
+      <div className={styles.tools}>
+        {!finalized && !editing && (
+          <button
+            disabled={!!busy}
+            className={styles.secondaryButton}
+            onClick={() => void generateSoap()}
+          >
+            <Sparkles size={15} />
+            {busy === "generate"
+              ? "Generating…"
+              : hasSoap
+                ? "Regenerate SOAP"
+                : "Generate SOAP"}
+          </button>
+        )}
+        <button
+          className={styles.secondaryButton}
+          onClick={() => void copyNote()}
+        >
+          <Clipboard size={15} />
+          Copy note
+        </button>
+        <button
+          className={styles.secondaryButton}
+          disabled={!!busy}
+          onClick={() => void exportText()}
+        >
+          <FileText size={15} />
+          Download TXT
+        </button>
+        <button
+          className={styles.secondaryButton}
+          disabled={!!busy}
+          onClick={() => void exportCCD()}
+        >
+          Download CCD XML
+        </button>
+        {!finalized && (
+          <button
+            disabled={!!busy}
+            className="text-red-700 text-xs underline ml-auto"
+            onClick={() => void deleteNote()}
+          >
+            Delete draft
+          </button>
         )}
       </div>
-
-      {/* Finalize Confirmation Dialog */}
-      <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Low Confidence Items Detected</DialogTitle>
-            <DialogDescription>
-              This note contains items with low confidence scores. Review them before finalizing.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {(() => {
-              const lowItems = getLowConfidenceItems();
-              return (
-                <>
-                  {lowItems.codes.length > 0 && (
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Low Confidence Codes:</h4>
-                      <div className="space-y-1">
-                        {lowItems.codes.map(code => (
-                          <div key={code.id} className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
-                            <span className="text-sm">{code.system}: {code.code} - {code.display}</span>
-                            <span className="text-xs text-amber-600 dark:text-amber-400">
-                              {Math.round((code.confidence || 0) * 100)}% confidence
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {lowItems.provenance.length > 0 && (
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Low Confidence Text:</h4>
-                      <div className="space-y-1">
-                        {lowItems.provenance.slice(0, 3).map(prov => (
-                          <div key={prov.id} className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-900/20 rounded">
-                            <span className="text-sm truncate flex-1 mr-2">{prov.text}</span>
-                            <span className="text-xs text-amber-600 dark:text-amber-400">
-                              {Math.round((prov.confidence || 0) * 100)}% confidence
-                            </span>
-                          </div>
-                        ))}
-                        {lowItems.provenance.length > 3 && (
-                          <div className="text-xs text-amber-600 dark:text-amber-400">
-                            +{lowItems.provenance.length - 3} more items
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
+      {rawSource && note.transcript && (
+        <details className={styles.details}>
+          <summary>Visit notes</summary>
+          <div>
+            <p className="whitespace-pre-wrap text-sm">{rawSource}</p>
           </div>
-
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setShowFinalizeDialog(false)}>
-              Review Items
-            </Button>
-            <Button onClick={handleFinalizeConfirm} className="bg-amber-600 hover:bg-amber-700">
-              Finalize Anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </DashboardLayout>
+        </details>
+      )}
+      <details className={styles.details}>
+        <summary>Change history ({history.length})</summary>
+        <div>
+          {history.length ? (
+            history.map((entry) => (
+              <div className={styles.historyRow} key={entry.id}>
+                <time>
+                  {parseDate(entry.created_at).toLocaleString("en-US")}
+                </time>
+                <strong>
+                  {entry.username} · {entry.action.toLowerCase()}
+                </strong>
+                <p>{entry.summary}</p>
+              </div>
+            ))
+          ) : (
+            <p className={styles.notice}>No saved changes yet.</p>
+          )}
+        </div>
+      </details>
+      {!!codes.length && (
+        <details className={styles.details}>
+          <summary>Extracted codes ({codes.length})</summary>
+          <div>
+            {codes.map((code) => (
+              <div key={code.id} className={styles.historyRow}>
+                <strong>
+                  {code.system}: {code.code} · {code.display}
+                </strong>
+                <span>
+                  {code.status}
+                  {typeof code.confidence === "number"
+                    ? ` · Model confidence ${Math.round(code.confidence * 100)}%`
+                    : ""}
+                </span>
+                {!finalized && (
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.quietButton}
+                      disabled={!!busy}
+                      onClick={() => void updateCode(code, true)}
+                    >
+                      Accept code
+                    </button>
+                    <button
+                      className={styles.quietButton}
+                      disabled={!!busy}
+                      onClick={() => void updateCode(code, false)}
+                    >
+                      Reject code
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+      {!!provenance.length && (
+        <details className={styles.details}>
+          <summary>Source references ({provenance.length})</summary>
+          <div>
+            {provenance.map((item) => (
+              <div className={styles.historyRow} key={item.id}>
+                <strong>{item.section || "Note"}</strong>
+                <p>{item.text}</p>
+                {typeof item.confidence === "number" && (
+                  <p className={styles.notice}>
+                    Model confidence {Math.round(item.confidence * 100)}%
+                  </p>
+                )}
+                {note.audio_file && (
+                  <button
+                    className={styles.quietButton}
+                    disabled={!!busy}
+                    onClick={() => void playSnippet(item)}
+                  >
+                    <Volume2 size={14} />
+                    {playingSnippet === item.id
+                      ? "Stop source audio"
+                      : "Play source audio"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+      <ApprovalDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void exportPDF(true)}
+        busy={busy === "export"}
+      />
+    </div>
   );
 }

@@ -194,3 +194,7 @@ body {
 .workspace-main { flex: 1; min-width: 0; overflow-y: auto; background: #f3f8f6; }
 .dark .workspace-main { background: #102018; }
 @media (max-width: 760px) { .workspace-shell { flex-direction: column; } }
+
+@font-face { font-family: 'Scribsy Plex'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/plex-sans-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Scribsy Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/plex-mono-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Scribsy Mono'; font-style: normal; font-weight: 500; font-display: swap; src: url('/fonts/plex-mono-medium-latin.woff2') format('woff2'); }
