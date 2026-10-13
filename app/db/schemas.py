@@ -149,7 +149,7 @@ class NoteRead(NoteBase):
     class Config:
         from_attributes = True
 
-class NoteWithPatientInfo(BaseModel):
+class NoteWithPatientInfo(NoteRead):
     """Enhanced note schema that includes patient details for display"""
     id: int
     patient_id: int

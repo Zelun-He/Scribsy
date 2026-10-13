@@ -25,6 +25,7 @@ import { burstConfetti } from '@/lib/confetti';
 // Comments component removed
 import { ChangeHistory } from '@/components/ui/change-history';
 import { formatDateOnly } from '@/utils/date';
+import { isFinalized } from '@/lib/dashboard';
 
 export default function NotePage() {
   const params = useParams();
@@ -57,7 +58,7 @@ export default function NotePage() {
 
   useEffect(() => {
     if (!note) return;
-    const key = `soap_review_${note.id}`;
+    const key = `soap_review_${note.id}_${note.updated_at}`;
     try {
       const raw = window.localStorage.getItem(key);
       if (raw) setSoapReview(JSON.parse(raw));
@@ -165,7 +166,12 @@ export default function NotePage() {
       
       // Create audio element for streaming
       const audio = new Audio();
-      audio.src = `${process.env.NEXT_PUBLIC_API_URL}/notes/${note.id}/audio?start=${startMs ?? 0}&end=${endMs ?? 0}`;
+      const audioBlob = await apiClient.exportNoteAudio(note.id);
+      audio.src = URL.createObjectURL(audioBlob);
+      audio.currentTime = (startMs || 0) / 1000;
+      audio.onloadedmetadata = () => { audio.currentTime = (startMs || 0) / 1000; };
+      audio.ontimeupdate = () => { if (endMs && audio.currentTime >= endMs / 1000) audio.pause(); };
+      audio.onpause = () => { URL.revokeObjectURL(audio.src); setPlayingAudio(null); };
       
       audio.onended = () => setPlayingAudio(null);
       audio.onerror = () => {
@@ -214,7 +220,7 @@ export default function NotePage() {
     setStatusLoading(true);
     try {
       const updatedNote = await apiClient.updateNote(note.id, { status: newStatus });
-      setNote(updatedNote);
+      setNote(previous => previous ? { ...previous, ...updatedNote } : updatedNote);
       setError('');
       if (newStatus === 'finalized') {
         show('Note signed successfully');
@@ -240,14 +246,15 @@ export default function NotePage() {
   ].filter(section => !!section.value);
 
   const hasRequiredSoapReview = note?.status === 'pending_review' && note?.provider_id === user?.id && reviewableSections.length > 0;
-  const isSoapReviewComplete = !hasRequiredSoapReview || reviewableSections.every(section => !!soapReview[section.key]);
+  const isSoapReviewComplete = !hasRequiredSoapReview || (reviewableSections.length === 4 && reviewableSections.every(section => soapReview[section.key] === 'approved'));
+  const soapReviewKey = note ? `soap_review_${note.id}_${note.updated_at}` : '';
 
   const setSoapDecision = (sectionKey: string, decision: 'approved' | 'disproved') => {
     if (!note) return;
     const next = { ...soapReview, [sectionKey]: decision };
     setSoapReview(next);
     try {
-      window.localStorage.setItem(`soap_review_${note.id}`, JSON.stringify(next));
+      window.localStorage.setItem(soapReviewKey, JSON.stringify(next));
     } catch {}
   };
 
@@ -256,7 +263,7 @@ export default function NotePage() {
     setIsGeneratingSoap(true);
     try {
       const updated = await apiClient.generateSoap(note.id);
-      setNote(updated);
+      setNote(previous => previous ? { ...previous, ...updated } : updated);
       show('SOAP note generated from full conversation');
     } catch (e) {
       show(e instanceof Error ? e.message : 'Failed to generate SOAP note');
@@ -485,12 +492,12 @@ export default function NotePage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Link href={`/notes/${note.id}/edit`}>
+            {!isFinalized(note) && <Link href={`/notes/${note.id}/edit`}>
               <Button variant="ghost">
                 <PencilIcon className="w-4 h-4 mr-2" />
                 Edit
               </Button>
-            </Link>
+            </Link>}
             <Button
               variant="destructive"
               onClick={deleteNote}
@@ -599,7 +606,7 @@ export default function NotePage() {
                 </div>
                 
                 {/* Status Change Buttons - Only author can finalize */}
-                {note.status === 'pending_review' && note.provider_id === user?.id && (
+                {!isFinalized(note) && note.status === 'pending_review' && note.provider_id === user?.id && (
                   <Button
                     size="sm"
                     onClick={() => changeStatus('finalized')}
@@ -612,11 +619,11 @@ export default function NotePage() {
                 )}
                 {hasRequiredSoapReview && !isSoapReviewComplete && (
                   <span className="text-xs text-amber-600 dark:text-amber-400">
-                    Review SOAP sections (approve/disprove) before finalizing.
+                    Approve all SOAP sections before finalizing. Edit any section that needs correction.
                   </span>
                 )}
                 
-                {note.status === 'draft' && note.provider_id === user?.id && (
+                {!isFinalized(note) && note.status === 'draft' && note.provider_id === user?.id && (
                   <Button
                     size="sm"
                     onClick={() => changeStatus('pending_review')}
@@ -776,8 +783,8 @@ export default function NotePage() {
                 <SparklesIcon className="w-5 h-5 mr-2" />
                 SOAP Note
               </span>
-              <Button size="sm" variant="secondary" onClick={generateSoap} disabled={isGeneratingSoap}>
-                {isGeneratingSoap ? 'Generating...' : 'Summarize Conversation to SOAP'}
+              <Button size="sm" variant="secondary" onClick={generateSoap} disabled={isGeneratingSoap || isFinalized(note)}>
+                {isFinalized(note) ? 'Finalized note' : isGeneratingSoap ? 'Generating...' : 'Summarize Conversation to SOAP'}
               </Button>
             </CardTitle>
             <CardDescription>
@@ -802,6 +809,7 @@ export default function NotePage() {
                           size="sm"
                           variant={soapReview[section.key] === 'approved' ? 'default' : 'secondary'}
                           onClick={() => setSoapDecision(section.key, 'approved')}
+                          disabled={isFinalized(note)}
                         >
                           Approve
                         </Button>
@@ -809,6 +817,7 @@ export default function NotePage() {
                           size="sm"
                           variant={soapReview[section.key] === 'disproved' ? 'destructive' : 'secondary'}
                           onClick={() => setSoapDecision(section.key, 'disproved')}
+                          disabled={isFinalized(note)}
                         >
                           Disprove
                         </Button>

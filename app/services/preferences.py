@@ -5,11 +5,11 @@ In production, move this to a proper database table.
 import json
 import os
 from typing import Any, Dict, Optional
-from threading import Lock
+from threading import RLock
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'data')
 PREFS_PATH = os.path.abspath(os.path.join(DATA_DIR, 'user_prefs.json'))
-_lock = Lock()
+_lock = RLock()
 
 DEFAULT_PREFS: Dict[str, Any] = {
     "format": "soap",              # soap | narrative | bulleted
@@ -69,5 +69,3 @@ def reset_user_preferences(user_id: int) -> Dict[str, Any]:
         with open(PREFS_PATH, 'w', encoding='utf-8') as f:
             json.dump(data, f)
     return DEFAULT_PREFS.copy()
-
-

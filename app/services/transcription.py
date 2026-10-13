@@ -3,6 +3,9 @@ transcription.py: Placeholder for audio transcription service (e.g., Whisper).
 """
 from pathlib import Path
 import logging
+import asyncio
+from threading import Lock
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +17,9 @@ class TranscriptionService:
         Args:
             model_size: Size of the Whisper model to use (base, small, medium, large)
         """
-        self.model_size = model_size or "base"
+        self.model_size = model_size or settings.whisper_model
         self.model = None
+        self._inference_lock = Lock()
 
     def _load_model(self):
         """Lazy load the Whisper model only when needed."""
@@ -38,6 +42,11 @@ class TranscriptionService:
                     logger.error(f"Failed to load base model as fallback: {fallback_error}")
                     raise Exception(f"Failed to load any Whisper model: {str(e)}")
 
+    def _transcribe_file(self, path: str):
+        with self._inference_lock:
+            self._load_model()
+            return self.model.transcribe(path)
+
     async def transcribe(self, audio_path: Path) -> str:
         """
         Transcribe an audio file using the loaded Whisper model.
@@ -49,10 +58,8 @@ class TranscriptionService:
             Transcribed text
         """
         try:
-            self._load_model()
             logger.info(f"Transcribing audio file: {audio_path}")
-            # Use Whisper to transcribe the audio file
-            result = self.model.transcribe(str(audio_path))
+            result = await asyncio.to_thread(self._transcribe_file, str(audio_path))
             transcript = result["text"].strip()
             logger.info(f"Transcription completed: {len(transcript)} characters")
             
@@ -77,12 +84,11 @@ class TranscriptionService:
             Transcribed text for the chunk
         """
         try:
-            self._load_model()
             import tempfile
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=True) as tmp:
                 tmp.write(audio_bytes)
                 tmp.flush()
-                result = self.model.transcribe(tmp.name)
+                result = await asyncio.to_thread(self._transcribe_file, tmp.name)
                 return result["text"]
         except Exception as e:
             logger.error(f"Chunk transcription failed: {e}")

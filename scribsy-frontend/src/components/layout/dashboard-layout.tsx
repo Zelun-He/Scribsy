@@ -25,8 +25,8 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   // Sidebar and toggle are handled globally by SidebarFrame in the root layout
   return (
-    <div className="min-h-screen bg-transparent">
-      <div className="p-6">
+    <div className="bg-transparent">
+      <div className="p-4 md:p-6">
         {children}
       </div>
     </div>

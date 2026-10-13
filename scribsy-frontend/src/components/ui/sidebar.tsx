@@ -103,7 +103,7 @@ type SidebarMenuButtonProps = {
 
 export const SidebarMenuButton: React.FC<SidebarMenuButtonProps> = ({ asChild, children, className = '', ...rest }) => {
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children as React.ReactElement, {
+    return React.cloneElement(children as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
       className: `${(children as any).props?.className ?? ''} group flex items-center gap-2 w-full px-2 py-2 rounded-md hover:bg-[var(--sidebar-accent)]`.trim(),
       style: { color: 'var(--sidebar-foreground)' },
     });
@@ -176,5 +176,3 @@ export const SidebarFloatingTrigger: React.FC<React.ButtonHTMLAttributes<HTMLBut
     </button>
   );
 };
-
-

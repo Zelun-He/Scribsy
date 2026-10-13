@@ -51,6 +51,14 @@ def init_db():
         # Best-effort; avoid blocking app startup in dev
         pass
 
+def backfill_tenant_namespaces():
+    """Normalize legacy namespaces after all required columns exist."""
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default'"))
+        conn.execute(text("UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default'"))
+        conn.execute(text("UPDATE notes SET tenant_id = ('user-' || CAST(provider_id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default'"))
+
+
 def get_db():
     db = SessionLocal()
     try:

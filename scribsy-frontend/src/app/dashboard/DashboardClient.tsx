@@ -435,7 +435,7 @@ export default function DashboardClient() {
                         </span>
                         {day.notes && day.notes.length > 0 && (
                           <div className="flex-1 mt-1">
-                            {day.notes.slice(0, 2).map((note, idx) => (
+                            {day.notes.slice(0, 2).map((note: Note, idx: number) => (
                               <div key={idx} className="w-full h-1 bg-emerald-400 dark:bg-emerald-400 rounded mb-1" />
                             ))}
                             {day.notes.length > 2 && (
@@ -631,5 +631,3 @@ export default function DashboardClient() {
     </div>
   );
 }
-
-

@@ -26,6 +26,15 @@ class SummarizeTextRequest(BaseModel):
     text: str
 
 
+def compose_note_content(content: str, soap_values: dict) -> str:
+    """Keep the displayed/exported note consistent with its saved SOAP sections."""
+    if not any(soap_values.values()):
+        return content
+    base = content.split("=== GENERATED SOAP NOTE ===")[0].strip()
+    sections = "\n\n".join(f"{key.removeprefix('soap_').title()}: {value or ''}" for key, value in soap_values.items())
+    return base + "\n\n=== GENERATED SOAP NOTE ===\n" + sections
+
+
 @router.post("/summarize-text")
 async def summarize_text(
     payload: SummarizeTextRequest,
@@ -65,8 +74,20 @@ def create_note_json(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    # Force provider_id to current user
+    if not crud_patients.get_patient(db, payload.patient_id, current_user.id):
+        raise HTTPException(status_code=404, detail="Patient not found")
+    if not payload.content.strip():
+        raise HTTPException(status_code=400, detail="Note content is required")
+    # Force ownership and tenant namespace; never trust IDs supplied by clients.
     data = payload.model_dump()
+    data["tenant_id"] = current_user.tenant_id
+    data["content"] = compose_note_content(data["content"], {key: data.get(key) for key in ("soap_subjective", "soap_objective", "soap_assessment", "soap_plan")})
+    data["original_content"] = data["content"]
+    data["accuracy_score"] = 100.0
+    data["content_changes_count"] = 0
+    data["signed_at"] = None
+    if data["status"] not in ("draft", "pending_review"):
+        raise HTTPException(status_code=400, detail="New notes must be drafts or pending review")
     data["provider_id"] = current_user.id
     # Ensure visit_id
     if not data.get("visit_id"):
@@ -103,9 +124,19 @@ async def create_note(
     soap_objective: Optional[str] = Form(None),
     soap_assessment: Optional[str] = Form(None),
     soap_plan: Optional[str] = Form(None),
+    creation_method: str = Form("voice_transcription"),
+    creation_started_at: Optional[datetime] = Form(None),
+    creation_completed_at: Optional[datetime] = Form(None),
+    baseline_time_minutes: Optional[int] = Form(None),
+    actual_time_minutes: Optional[int] = Form(None),
+    time_saved_minutes: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
+    if not crud_patients.get_patient(db, patient_id, current_user.id):
+        raise HTTPException(status_code=404, detail="Patient not found")
+    if status not in ("draft", "pending_review"):
+        raise HTTPException(status_code=400, detail="New notes must be drafts or pending review")
     audio_file_path = None
     transcription = ""
     soap_summary = None
@@ -116,8 +147,15 @@ async def create_note(
             raise HTTPException(status_code=400, detail="Only audio files are accepted.")
         
         # Generate unique filename
-        filename = f"{current_user.id}_{datetime.utcnow().isoformat().replace(':', '-')}_{audio_file.filename}"
+        import uuid
+        suffix = Path(audio_file.filename or "recording.webm").suffix
+        filename = f"{current_user.id}_{uuid.uuid4().hex}{suffix}"
         file_path = os.path.join(UPLOAD_DIR, filename)
+        audio_file.file.seek(0, os.SEEK_END)
+        file_size = audio_file.file.tell()
+        audio_file.file.seek(0)
+        if not file_size or file_size > settings.max_audio_file_size * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Audio file is empty or exceeds the upload size limit")
         
         try:
             # Save audio file
@@ -186,6 +224,7 @@ async def create_note(
         final_assessment = final_assessment or soap_summary.assessment
         final_plan = final_plan or soap_summary.plan
 
+    content = compose_note_content(content, {"soap_subjective": final_subjective, "soap_objective": final_objective, "soap_assessment": final_assessment, "soap_plan": final_plan})
     note_data = {
         "patient_id": patient_id,
         "provider_id": current_user.id,
@@ -193,13 +232,20 @@ async def create_note(
         "note_type": note_type,
         "content": content,
         "status": status,
-        "signed_at": signed_at,
+        "signed_at": None,
+        "tenant_id": current_user.tenant_id,
         "audio_file": audio_file_path,
         "transcript": final_transcript,
         "soap_subjective": final_subjective,
         "soap_objective": final_objective,
         "soap_assessment": final_assessment,
         "soap_plan": final_plan,
+        "creation_method": creation_method,
+        "creation_started_at": creation_started_at,
+        "creation_completed_at": creation_completed_at,
+        "baseline_time_minutes": baseline_time_minutes,
+        "actual_time_minutes": actual_time_minutes,
+        "time_saved_minutes": time_saved_minutes,
     }
     
     try:
@@ -263,6 +309,84 @@ def read_notes(
         created_to=created_to,
     )
 
+@router.get("/timing-stats")
+def get_note_timing_stats(
+    method: Optional[str] = Query(None, description="Filter by creation method"),
+    days: int = Query(30, description="Number of days to look back"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Get timing statistics for note creation methods"""
+    from datetime import timedelta
+
+    # Calculate date range
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=days)
+
+    # Base query for user's notes
+    query = db.query(models.Note).filter(
+        models.Note.provider_id == current_user.id,
+        models.Note.created_at >= start_date,
+        models.Note.created_at <= end_date,
+        models.Note.creation_completed_at.isnot(None)  # Only completed timing sessions
+    )
+
+    # Filter by method if specified
+    if method:
+        query = query.filter(models.Note.creation_method == method)
+
+    notes = query.all()
+
+    if not notes:
+        return {
+            "message": "No timing data available",
+            "total_notes": 0,
+            "methods": {}
+        }
+
+    # Calculate statistics by method
+    methods = {}
+    for note in notes:
+        method = note.creation_method or "unknown"
+        if method not in methods:
+            methods[method] = {
+                "total_notes": 0,
+                "total_baseline_minutes": 0,
+                "total_actual_minutes": 0,
+                "total_time_saved_minutes": 0,
+                "avg_baseline_minutes": 0,
+                "avg_actual_minutes": 0,
+                "avg_time_saved_minutes": 0,
+                "avg_efficiency_percentage": 0
+            }
+
+        methods[method]["total_notes"] += 1
+        methods[method]["total_baseline_minutes"] += note.baseline_time_minutes or 0
+        methods[method]["total_actual_minutes"] += note.actual_time_minutes or 0
+        methods[method]["total_time_saved_minutes"] += note.time_saved_minutes or 0
+
+    # Calculate averages
+    for method, stats in methods.items():
+        if stats["total_notes"] > 0:
+            stats["avg_baseline_minutes"] = round(stats["total_baseline_minutes"] / stats["total_notes"], 1)
+            stats["avg_actual_minutes"] = round(stats["total_actual_minutes"] / stats["total_notes"], 1)
+            stats["avg_time_saved_minutes"] = round(stats["total_time_saved_minutes"] / stats["total_notes"], 1)
+            if stats["avg_baseline_minutes"] > 0:
+                stats["avg_efficiency_percentage"] = round(
+                    (stats["avg_time_saved_minutes"] / stats["avg_baseline_minutes"]) * 100, 1
+                )
+
+    return {
+        "total_notes": len(notes),
+        "date_range": {
+            "start": start_date.isoformat(),
+            "end": end_date.isoformat(),
+            "days": days
+        },
+        "methods": methods
+    }
+
+
 # GET /notes/{note_id} - Retrieve a specific note by ID for the authenticated provider.
 # Returns audio_file field if present.
 # Requires authentication.
@@ -281,17 +405,7 @@ def read_note(note_id: int, db: Session = Depends(get_db), current_user=Depends(
     history = db.query(models.NoteHistory).filter(models.NoteHistory.note_id == db_note.id).order_by(models.NoteHistory.created_at.desc()).all()
 
     return schemas.NoteWithPatientInfo(
-        id=db_note.id,
-        patient_id=db_note.patient_id,
-        provider_id=db_note.provider_id,
-        visit_id=db_note.visit_id,
-        note_type=db_note.note_type,
-        content=db_note.content,
-        status=db_note.status,
-        created_at=db_note.created_at,
-        updated_at=db_note.updated_at,
-        signed_at=db_note.signed_at,
-        audio_file=db_note.audio_file,
+        **schemas.NoteRead.model_validate(db_note).model_dump(exclude={"comments", "history"}),
         patient_first_name=patient.first_name if patient else None,
         patient_last_name=patient.last_name if patient else None,
         patient_date_of_birth=patient.date_of_birth if patient else None,
@@ -689,6 +803,18 @@ def update_note(note_id: int, note: schemas.NoteUpdate, db: Session = Depends(ge
     if db_note.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=403, detail="Access denied: Note belongs to different tenant")
     
+    if db_note.status in ("finalized", "signed", "completed") or db_note.signed_at:
+        raise HTTPException(status_code=409, detail="Finalized notes are locked and cannot be edited")
+    if note.status is not None and note.status not in ("draft", "pending_review", "finalized", "cancelled"):
+        raise HTTPException(status_code=400, detail="Invalid note status")
+    if note.signed_at is not None and note.status != "finalized":
+        raise HTTPException(status_code=400, detail="Only finalization can set the signing timestamp")
+    if note.status == "finalized" and not (note.content or db_note.content).strip():
+        raise HTTPException(status_code=400, detail="An empty note cannot be finalized")
+    if note.status == "finalized":
+        values = [getattr(note, key) if key in note.model_fields_set else getattr(db_note, key) for key in ("soap_subjective", "soap_objective", "soap_assessment", "soap_plan")]
+        if any(values) and not all(value and value.strip() for value in values):
+            raise HTTPException(status_code=400, detail="Complete all SOAP sections before finalizing; mark unrecorded sections as not documented")
     # Track which fields are being updated
     changed_fields = [k for k, v in note.model_dump(exclude_unset=True).items() if v is not None]
     
@@ -711,6 +837,10 @@ def update_note(note_id: int, note: schemas.NoteUpdate, db: Session = Depends(ge
         accuracy_info = f" (accuracy: {new_accuracy}%)"
         changed_fields.append(f"accuracy{accuracy_info}")
     
+    soap_keys = ("soap_subjective", "soap_objective", "soap_assessment", "soap_plan")
+    if any(key in changed_fields for key in soap_keys):
+        values = {key: getattr(note, key) if key in changed_fields else getattr(db_note, key) for key in soap_keys}
+        note.content = compose_note_content(note.content if note.content is not None else db_note.content, values)
     db_note = crud_notes.update_note(db, note_id, note)
     try:
         hist = models.NoteHistory(
@@ -738,6 +868,8 @@ async def generate_soap_for_note(
     if db_note is None or db_note.provider_id != current_user.id:
         raise HTTPException(status_code=404, detail="Note not found")
 
+    if db_note.status in ("finalized", "signed", "completed") or db_note.signed_at:
+        raise HTTPException(status_code=409, detail="Finalized notes are locked and cannot be edited")
     source_text = (db_note.transcript or "").strip() or (db_note.content or "").strip()
     if not source_text:
         raise HTTPException(status_code=400, detail="No transcript or note content available to summarize")
@@ -749,6 +881,7 @@ async def generate_soap_for_note(
     db_note.soap_objective = summary.objective
     db_note.soap_assessment = summary.assessment
     db_note.soap_plan = summary.plan
+    db_note.content = compose_note_content(db_note.content, {"soap_subjective": summary.subjective, "soap_objective": summary.objective, "soap_assessment": summary.assessment, "soap_plan": summary.plan})
     if db_note.status == "draft":
         db_note.status = "pending_review"
 
@@ -880,80 +1013,3 @@ def complete_note_creation_timing(
         "efficiency_percentage": round((time_saved_minutes / baseline_minutes) * 100, 1) if baseline_minutes > 0 else 0,
         "completed_at": completion_time.isoformat()
     }
-
-@router.get("/timing-stats")
-def get_note_timing_stats(
-    method: Optional[str] = Query(None, description="Filter by creation method"),
-    days: int = Query(30, description="Number of days to look back"),
-    db: Session = Depends(get_db),
-    current_user=Depends(get_current_user)
-):
-    """Get timing statistics for note creation methods"""
-    from datetime import timedelta
-    
-    # Calculate date range
-    end_date = datetime.now(timezone.utc)
-    start_date = end_date - timedelta(days=days)
-    
-    # Base query for user's notes
-    query = db.query(models.Note).filter(
-        models.Note.provider_id == current_user.id,
-        models.Note.created_at >= start_date,
-        models.Note.created_at <= end_date,
-        models.Note.creation_completed_at.isnot(None)  # Only completed timing sessions
-    )
-    
-    # Filter by method if specified
-    if method:
-        query = query.filter(models.Note.creation_method == method)
-    
-    notes = query.all()
-    
-    if not notes:
-        return {
-            "message": "No timing data available",
-            "total_notes": 0,
-            "methods": {}
-        }
-    
-    # Calculate statistics by method
-    methods = {}
-    for note in notes:
-        method = note.creation_method or "unknown"
-        if method not in methods:
-            methods[method] = {
-                "total_notes": 0,
-                "total_baseline_minutes": 0,
-                "total_actual_minutes": 0,
-                "total_time_saved_minutes": 0,
-                "avg_baseline_minutes": 0,
-                "avg_actual_minutes": 0,
-                "avg_time_saved_minutes": 0,
-                "avg_efficiency_percentage": 0
-            }
-        
-        methods[method]["total_notes"] += 1
-        methods[method]["total_baseline_minutes"] += note.baseline_time_minutes or 0
-        methods[method]["total_actual_minutes"] += note.actual_time_minutes or 0
-        methods[method]["total_time_saved_minutes"] += note.time_saved_minutes or 0
-    
-    # Calculate averages
-    for method, stats in methods.items():
-        if stats["total_notes"] > 0:
-            stats["avg_baseline_minutes"] = round(stats["total_baseline_minutes"] / stats["total_notes"], 1)
-            stats["avg_actual_minutes"] = round(stats["total_actual_minutes"] / stats["total_notes"], 1)
-            stats["avg_time_saved_minutes"] = round(stats["total_time_saved_minutes"] / stats["total_notes"], 1)
-            if stats["avg_baseline_minutes"] > 0:
-                stats["avg_efficiency_percentage"] = round(
-                    (stats["avg_time_saved_minutes"] / stats["avg_baseline_minutes"]) * 100, 1
-                )
-    
-    return {
-        "total_notes": len(notes),
-        "date_range": {
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-            "days": days
-        },
-        "methods": methods
-    } 
