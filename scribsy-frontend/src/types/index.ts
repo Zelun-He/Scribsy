@@ -158,6 +158,12 @@ export interface CreateNoteRequest {
   soap_plan?: string;
   auto_transcribe?: boolean;
   auto_summarize?: boolean;
+  creation_method?: string;
+  creation_started_at?: string;
+  creation_completed_at?: string;
+  baseline_time_minutes?: number;
+  actual_time_minutes?: number;
+  time_saved_minutes?: number;
 }
 
 export interface ApiError {

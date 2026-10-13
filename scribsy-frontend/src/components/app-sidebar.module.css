@@ -1,0 +1,191 @@
+.sidebar {
+  width: 234px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #12251e;
+  border-right: 1px solid #dce8e3;
+  padding: 28px 16px 22px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+  padding: 0 8px;
+}
+.brand > span {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  width: 34px;
+  background: #007f5f;
+  color: white;
+  border-radius: 9px;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+.newNote {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px;
+  background: #007f5f;
+  color: white;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  margin: 27px 0;
+}
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sidebar nav a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #40574d;
+}
+.sidebar nav a:hover {
+  background: #f3f8f6;
+}
+.sidebar nav a.active {
+  background: #e6f4ef;
+  color: #00674d;
+  font-weight: 700;
+}
+.sidebar nav a b {
+  margin-left: auto;
+  border-radius: 50%;
+  background: #ffebc9;
+  color: #874908;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+}
+.account {
+  margin-top: auto;
+  padding: 12px 10px;
+  border: 1px solid #dce8e3;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  background: #12251e;
+  color: white;
+  border-radius: 50%;
+  width: 37px;
+  height: 37px;
+  font-weight: 700;
+}
+.account div {
+  min-width: 0;
+  flex: 1;
+}
+.account strong {
+  font-size: 12px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account small {
+  font-size: 11px;
+  display: block;
+  color: #50665e;
+}
+.account button {
+  color: #50665e;
+  padding: 4px;
+}
+.mobileBar,
+.backdrop {
+  display: none;
+}
+.sidebar :is(a, button):focus-visible {
+  outline: 3px solid #38bfa0;
+  outline-offset: 2px;
+}
+:global(.dark) .sidebar {
+  background: #172c23;
+  color: #e7f2ec;
+  border-color: #2c4439;
+}
+:global(.dark) .sidebar nav a,
+:global(.dark) .account small,
+:global(.dark) .account button {
+  color: #b8ccc1;
+}
+:global(.dark) .sidebar nav a:hover,
+:global(.dark) .sidebar nav a.active {
+  background: #224538;
+  color: #7ae1bd;
+}
+:global(.dark) .account {
+  border-color: #2c4439;
+}
+@media (max-width: 760px) {
+  .mobileBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    color: #12251e;
+    padding: 12px 16px;
+    border-bottom: 1px solid #dce8e3;
+    flex-shrink: 0;
+  }
+  .mobileBar .brand {
+    font-size: 19px;
+    padding: 0;
+  }
+  .mobileBar .brand span {
+    width: 29px;
+    height: 29px;
+    font-size: 15px;
+  }
+  .mobileBar button {
+    padding: 6px;
+  }
+  .sidebar {
+    display: none;
+  }
+  .sidebar.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    width: 250px;
+    box-shadow: 10px 0 40px #12251e30;
+  }
+  .backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: #12251e60;
+    z-index: 99;
+  }
+  :global(.dark) .mobileBar {
+    background: #172c23;
+    color: #e7f2ec;
+    border-color: #2c4439;
+  }
+}

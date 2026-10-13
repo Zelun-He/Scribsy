@@ -1,19 +1,25 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import AuthenticatedDashboard from './AuthenticatedDashboard';
-import { AppSidebar } from '@/components/app-sidebar';
+import Link from "next/link";
+import AuthenticatedDashboard from "./AuthenticatedDashboard";
+import { AppSidebar } from "@/components/app-sidebar";
 
 export default function ShowcaseDashboard() {
-  return <div className="flex h-screen bg-[var(--background-pattern)]">
-    <AppSidebar />
-    <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
-        <Link href="/" className="inline-flex items-center gap-1 hover:underline"><ArrowLeft size={14} /> Back to Scribsy</Link>
-        <span>Dashboard preview · Sample data only</span>
-      </div>
-      <main className="flex-1 overflow-y-auto p-6">
+  return (
+    <div className="workspace-shell">
+      <AppSidebar preview />
+      <main className="workspace-main">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 bg-emerald-50 px-5 py-2 text-xs text-emerald-900">
+          <Link href="/" className="font-semibold hover:underline">
+            ← Back to Scribsy
+          </Link>
+          <span>
+            Dashboard preview · Sample data only ·{" "}
+            <Link href="/login" className="font-semibold underline">
+              Sign in to use your workspace
+            </Link>
+          </span>
+        </div>
         <AuthenticatedDashboard preview />
       </main>
     </div>
-  </div>;
+  );
 }

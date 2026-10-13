@@ -10,6 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 import importlib
+from app.api.endpoints.dashboard import router as dashboard_router
 from app.api.endpoints.transcribe import router as transcribe_router
 from app.api.endpoints.notes import router as notes_router
 from app.api.endpoints.auth import router as auth_router
@@ -24,9 +25,6 @@ from app.api.endpoints.export import router as export_router
 from app.api.endpoints.audio_retention import router as audio_retention_router
 from app.api.endpoints.tenant_management import router as tenant_management_router
 from app.api.endpoints.migrate import router as migrate_router
-from app.api.endpoints.simple_auth import router as simple_auth_router
-from app.api.endpoints.working_auth import router as working_auth_router
-from app.api.endpoints.emergency_auth import router as emergency_auth_router
 from app.utils.exceptions import ScribsyException, handle_scribsy_exception
 from app.utils.logging import logger, log_error
 from dotenv import load_dotenv
@@ -34,7 +32,7 @@ import os
 import time
 from app.config import settings
 import logging
-from app.db.database import engine, init_db
+from app.db.database import engine, init_db, backfill_tenant_namespaces
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
@@ -263,6 +261,7 @@ app.add_middleware(SessionTimeoutMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # Mount API routers
+app.include_router(dashboard_router)
 app.include_router(transcribe_router)
 app.include_router(notes_router)
 app.include_router(auth_router)
@@ -277,9 +276,7 @@ app.include_router(export_router)
 app.include_router(audio_retention_router)
 app.include_router(tenant_management_router)
 app.include_router(migrate_router)
-app.include_router(simple_auth_router)
-app.include_router(working_auth_router)
-app.include_router(emergency_auth_router)
+# Legacy bypass authentication routes are intentionally not mounted.
 
 @app.on_event("startup")
 def on_startup():
@@ -294,36 +291,40 @@ def on_startup():
             from sqlalchemy import text
             from app.db.database import engine
             
-            with engine.connect() as conn:
-                # Always run additive migrations with IF NOT EXISTS so partially-migrated
-                # databases (e.g. role exists but last_login does not) self-heal on boot.
-                migrations = [
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP;",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
-                    "ALTER TABLE patients ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
-                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
-                    "UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default';",
-                    "UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE (tenant_id IS NULL OR tenant_id = 'default') AND user_id IS NOT NULL;",
-                ]
+            if engine.dialect.name == "postgresql":
+                with engine.connect() as conn:
+                    # Always run additive migrations with IF NOT EXISTS so partially-migrated
+                    # databases (e.g. role exists but last_login does not) self-heal on boot.
+                    migrations = [
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP;",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
+                        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
+                        "UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default';",
+                        "UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE (tenant_id IS NULL OR tenant_id = 'default') AND user_id IS NOT NULL;",
+                    ]
 
-                trans = conn.begin()
-                try:
-                    for migration in migrations:
-                        conn.execute(text(migration))
-                    trans.commit()
-                    # logger.info("Database migration completed")
-                except Exception as e:
-                    trans.rollback()
-                    logger.error(f"Migration failed: {e}")
+                    trans = conn.begin()
+                    try:
+                        for migration in migrations:
+                            conn.execute(text(migration))
+                        trans.commit()
+                        # logger.info("Database migration completed")
+                    except Exception as e:
+                        trans.rollback()
+                        logger.error(f"Migration failed: {e}")
+
                     
         except Exception as e:
             logger.error(f"Migration error: {e}")
+
+        backfill_tenant_namespaces()
             
     except Exception as e:
         log_error(e, context="DB init on startup")

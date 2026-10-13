@@ -15,6 +15,7 @@ from app.db.database import get_db
 import os
 import uuid
 from datetime import datetime
+from app.config import settings
 
 router = APIRouter()
 
@@ -37,7 +38,7 @@ async def transcribe(
     If summarize=true, also returns a structured SOAP note summary.
     """
     # Validate file type
-    if not file.content_type.startswith("audio/"):
+    if not (file.content_type or "").startswith("audio/"):
         raise HTTPException(status_code=400, detail="Only audio files are accepted.")
     
     temp_path = None
@@ -46,7 +47,9 @@ async def transcribe(
         suffix = Path(file.filename).suffix or ".wav"
         fd, temp_path = tempfile.mkstemp(suffix=suffix)
         with os.fdopen(fd, "wb") as tmp:
-            contents = await file.read()
+            contents = await file.read(settings.max_audio_file_size * 1024 * 1024 + 1)
+            if len(contents) > settings.max_audio_file_size * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Audio file exceeds the upload size limit")
             if not contents:
                 raise HTTPException(status_code=400, detail="Empty file uploaded.")
             tmp.write(contents)
@@ -122,7 +125,7 @@ async def transcribe(
             except Exception as e:
                 print(f"Failed to generate SOAP summary: {e}")
                 # If OpenAI API fails, still return the transcript but with an error message
-                response["summary_error"] = f"Failed to generate SOAP summary: {str(e)}"
+                response["summary_error"] = getattr(e, "detail", None) or f"Failed to generate SOAP summary: {str(e)}"
                 response["summary"] = None
 
         return JSONResponse(status_code=200, content=response)

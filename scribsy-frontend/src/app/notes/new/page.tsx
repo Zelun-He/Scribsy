@@ -83,6 +83,10 @@ function NewNotePageContent() {
   const [patientAddress, setPatientAddress] = useState('');
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const autoStartedRef = useRef(false);
+  const captureMode = searchParams.get('mode') || 'type';
+  const creationStartedRef = useRef(Date.now());
   const audioChunksRef = useRef<Blob[]>([]);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const router = useRouter();
@@ -122,14 +126,20 @@ function NewNotePageContent() {
     fetchPatients();
   }, [searchParams]);
 
-  // Auto-start dictation if requested via query
   useEffect(() => {
-    const shouldStart = searchParams.get('start_dictation') === '1';
-    if (shouldStart && !isRecording) {
-      startRecording().catch(() => {});
+    if (!user || autoStartedRef.current) return;
+    autoStartedRef.current = true;
+    if (captureMode === 'record' || searchParams.get('start_dictation') === '1') {
+      void startRecording();
+    } else if (captureMode === 'upload') {
+      document.querySelector<HTMLInputElement>('input[type="file"]')?.focus();
+    } else {
+      document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     }
-  }, [searchParams, isRecording]);
+  }, [user, captureMode, searchParams]);
 
+  useEffect(() => () => { streamRef.current?.getTracks().forEach(track => track.stop()); }, []);
+  useEffect(() => () => { if (audioUrl) URL.revokeObjectURL(audioUrl); }, [audioUrl]);
 
   // Update selected patient when patient ID changes
   useEffect(() => {
@@ -144,7 +154,9 @@ function NewNotePageContent() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      const supportedType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus'].find(type => MediaRecorder.isTypeSupported(type));
+      const mediaRecorder = new MediaRecorder(stream, supportedType ? { mimeType: supportedType } : undefined);
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -154,8 +166,10 @@ function NewNotePageContent() {
       };
       
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-        const file = new File([audioBlob], 'recording.wav', { type: 'audio/wav' });
+        const mimeType = mediaRecorder.mimeType || 'audio/webm';
+        const extension = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('ogg') ? 'ogg' : 'webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const file = new File([audioBlob], `recording.${extension}`, { type: mimeType });
         const url = URL.createObjectURL(audioBlob);
         
         setAudioFile(file);
@@ -163,9 +177,11 @@ function NewNotePageContent() {
         stream.getTracks().forEach(track => track.stop());
       };
       
+      setError('');
       mediaRecorder.start();
       setIsRecording(true);
     } catch {
+      streamRef.current?.getTracks().forEach(track => track.stop());
       setError('Failed to start recording. Please check microphone permissions.');
     }
   };
@@ -195,7 +211,7 @@ function NewNotePageContent() {
     if (audioFile && audioUrl) {
       const link = document.createElement('a');
       link.href = audioUrl;
-      link.download = `recording_${new Date().toISOString().split('T')[0]}.wav`;
+      link.download = audioFile.name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -311,6 +327,8 @@ function NewNotePageContent() {
           ...(patientAddress.trim() && { address: patientAddress.trim() })
         });
         finalPatientId = newPatient.id.toString();
+        setSelectedPatientId(finalPatientId);
+        setPatients(previous => [...previous, newPatient]);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to create patient');
         setLoading(false);
@@ -373,8 +391,14 @@ function NewNotePageContent() {
         note_type: noteType,
         content: finalContent,
         status: status,
-        auto_transcribe: !!audioFile,
-        auto_summarize: !!audioFile,
+        auto_transcribe: !!audioFile && !transcription,
+        auto_summarize: !!audioFile && !soapNote,
+        creation_method: audioFile ? 'voice_transcription' : soapNote ? 'ai_assisted' : 'handwritten',
+        creation_started_at: new Date(creationStartedRef.current).toISOString(),
+        creation_completed_at: new Date().toISOString(),
+        baseline_time_minutes: 15,
+        actual_time_minutes: Math.max(1, Math.ceil((Date.now() - creationStartedRef.current) / 60000)),
+        time_saved_minutes: Math.max(0, 15 - Math.ceil((Date.now() - creationStartedRef.current) / 60000)),
         transcript: transcription || undefined,
         soap_subjective: soapNote?.subjective || undefined,
         soap_objective: soapNote?.objective || undefined,
@@ -387,10 +411,10 @@ function NewNotePageContent() {
 
       const created = await apiClient.createNote(noteData);
       const savedAt = Date.now();
-      try { recordNoteSession(user?.id ?? null, created.id, 'new', startedAt, savedAt); } catch {}
+      try { recordNoteSession({ id: String(created.id), startTime: new Date(creationStartedRef.current), baselineMinutes: 15 }); } catch {}
       setCreatedNoteId(created.id);
       show('Saved just now');
-      router.push('/notes');
+      router.push(`/notes/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create note');
     } finally {
@@ -446,6 +470,7 @@ function NewNotePageContent() {
                     Patient *
                   </label>
                   <select
+                    aria-label="Patient"
                     value={selectedPatientId}
                     onChange={(e) => setSelectedPatientId(e.target.value)}
                     className="w-full h-10 px-3 py-2 text-sm border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-emerald-100"
@@ -610,6 +635,7 @@ function NewNotePageContent() {
                     Note Type *
                   </label>
                   <select
+                    aria-label="Note type"
                     value={noteType}
                     onChange={(e) => setNoteType(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 dark:bg-gray-800 dark:text-emerald-100"
@@ -772,6 +798,7 @@ function NewNotePageContent() {
             </CardHeader>
             <CardContent>
               <textarea
+                aria-label="Manual notes"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Enter your clinical notes here..."

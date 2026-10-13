@@ -190,3 +190,7 @@ body {
   border-color: var(--ring);
   box-shadow: 0 0 0 2px var(--ring);
 }
+.workspace-shell { display: flex; height: 100dvh; overflow: hidden; }
+.workspace-main { flex: 1; min-width: 0; overflow-y: auto; background: #f3f8f6; }
+.dark .workspace-main { background: #102018; }
+@media (max-width: 760px) { .workspace-shell { flex-direction: column; } }

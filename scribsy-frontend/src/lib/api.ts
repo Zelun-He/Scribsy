@@ -1,3 +1,4 @@
+import type { DashboardData } from './dashboard';
 import { 
   LoginRequest, 
   RegisterRequest, 
@@ -60,7 +61,9 @@ class ApiClient {
           if (data?.access_token) this.setToken(data.access_token);
         } catch {}
         // Retry original
-        return await fetch(url, init);
+        const retryHeaders = new Headers(init.headers);
+        if (this.token) retryHeaders.set('Authorization', `Bearer ${this.token}`);
+        return await fetch(url, { ...init, headers: retryHeaders });
       }
     } catch {}
     // Fallthrough: return original 401
@@ -158,6 +161,11 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
     }
+  }
+
+  async getDashboard(): Promise<DashboardData> {
+    const response = await this.doFetch(`${this.baseURL}/dashboard`, { headers: this.getHeaders(), credentials: this.requestCredentials() });
+    return this.handleResponse<DashboardData>(response);
   }
 
   // Auth endpoints
@@ -280,60 +288,10 @@ class ApiClient {
   }
 
   async getNote(id: number): Promise<Note> {
-    this.refreshTokenFromStorage();
-    const url = `${this.baseURL}/notes/${id}`;
-
-    // Try cookie-only first (most stable locally), then both, then header-only.
-    const attempts: Array<RequestInit> = [
-      { credentials: this.requestCredentials() },
-      { credentials: this.requestCredentials(), headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined },
-      { credentials: 'omit', headers: this.token ? { Authorization: `Bearer ${this.token}` } : undefined },
-    ];
-
-    let lastResponse: Response | null = null;
-    for (const opts of attempts) {
-      try {
-        const resp = await fetch(url, opts);
-        lastResponse = resp;
-        if (resp.ok) {
-          // parse as JSON text for consistency with handleResponse
-          const text = await resp.text();
-          if (!text) throw new Error('Empty response received');
-          try {
-            return JSON.parse(text);
-          } catch {
-            throw new Error(`Failed to parse JSON response: ${text.substring(0, 200)}...`);
-          }
-        }
-        // On auth errors, try next attempt without triggering global auth failure yet
-        if (resp.status === 401 || resp.status === 403) {
-          continue;
-        }
-        // For any other error, construct a readable error without global auth failure
-        const errorText = await resp.text();
-        let detail = `HTTP ${resp.status}: ${resp.statusText}`;
-        try {
-          const parsed = JSON.parse(errorText);
-          if (parsed && parsed.detail) detail = parsed.detail;
-        } catch {}
-        throw new Error(detail);
-      } catch (_err) {
-        // Network/parse error; continue to next attempt
-        continue;
-      }
-    }
-
-    // If we're here, all attempts failed; use the last response for a consistent error
-    if (lastResponse) {
-      let detail = `HTTP ${lastResponse.status}: ${lastResponse.statusText}`;
-      try {
-        const txt = await lastResponse.text();
-        const parsed = JSON.parse(txt);
-        if (parsed && parsed.detail) detail = parsed.detail;
-      } catch {}
-      throw new Error(detail);
-    }
-    throw new Error('Failed to fetch note');
+    const response = await this.doFetch(`${this.baseURL}/notes/${id}`, {
+      headers: this.getHeaders(), credentials: this.requestCredentials(),
+    });
+    return this.handleResponse<Note>(response);
   }
 
   async listComments(noteId: number): Promise<Array<{id:number;note_id:number;user_id:number;username:string;body:string;created_at:string;}>> {
@@ -481,40 +439,12 @@ class ApiClient {
   }
 
   async createNote(noteData: CreateNoteRequest): Promise<Note> {
-    // Prefer JSON endpoint when no audio_file is included
     if (!noteData.audio_file) {
-      try {
-        const response = await fetch(`${this.baseURL}/notes/create-json`, {
-          method: 'POST',
-          headers: { ...this.getJsonHeaders(), ...this.getHeaders() },
-          body: JSON.stringify({
-            patient_id: noteData.patient_id,
-            provider_id: noteData.provider_id,
-            visit_id: noteData.visit_id,
-            note_type: noteData.note_type,
-            content: noteData.content,
-            status: noteData.status,
-            signed_at: noteData.signed_at,
-            transcript: noteData.transcript,
-            soap_subjective: noteData.soap_subjective,
-            soap_objective: noteData.soap_objective,
-            soap_assessment: noteData.soap_assessment,
-            soap_plan: noteData.soap_plan,
-          }),
-          credentials: this.requestCredentials(),
-        });
-        if (response.ok) {
-          return this.handleResponse<Note>(response);
-        }
-        // Fallback in case server doesn't recognize JSON route
-        if (response.status === 404 || response.status === 405) {
-          // continue to multipart fallback below
-        } else {
-          return this.handleResponse<Note>(response);
-        }
-      } catch (_err) {
-        // Fallback to multipart below
-      }
+      const { audio_file, auto_transcribe, auto_summarize, ...payload } = noteData;
+      const response = await this.doFetch(`${this.baseURL}/notes/create-json`, {
+        method: 'POST', headers: this.getHeaders(), body: JSON.stringify(payload), credentials: this.requestCredentials(),
+      });
+      return this.handleResponse<Note>(response);
     }
 
     // Fallback to multipart when audio is present
@@ -535,6 +465,10 @@ class ApiClient {
     if (noteData.auto_transcribe !== undefined) formData.append('auto_transcribe', noteData.auto_transcribe.toString());
     if (noteData.auto_summarize !== undefined) formData.append('auto_summarize', noteData.auto_summarize.toString());
 
+    for (const key of ['creation_method', 'creation_started_at', 'creation_completed_at', 'baseline_time_minutes', 'actual_time_minutes', 'time_saved_minutes'] as const) {
+      if (noteData[key] != null) formData.append(key, String(noteData[key]));
+    }
+    this.refreshTokenFromStorage();
     const response = await fetch(`${this.baseURL}/notes/`, {
       method: 'POST',
       headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },

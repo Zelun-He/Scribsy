@@ -1,7 +1,6 @@
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from openai import OpenAI
 import os
-import json
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -19,7 +18,7 @@ You are an expert medical scribe trained in creating detailed, clinically accura
 
 When provided with a raw medical conversation, transcription, or provider dictation, extract and summarize into clinical documentation.
 
-Avoid adding any extra commentary or disclaimers. Do not invent information — only include details mentioned in the input or reasonably inferred from the provided context.
+Avoid adding any extra commentary or disclaimers. Do not invent information — only include details explicitly documented in the input.
 """
     )
     if not preferences:
@@ -85,95 +84,28 @@ async def summarize_note(user_message: str, db: Optional[Session] = None,
                         patient_id: Optional[int] = None, visit_id: Optional[int] = None,
                         preferences: Optional[dict] = None) -> NoteSummary:
     from app.config import settings
-    # Initialize OpenAI client once per process
-    global client
+    import asyncio
+    api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="SOAP generation requires a configured OpenAI API key. Your notes can still be saved manually.")
+    client = OpenAI(api_key=api_key, timeout=90, max_retries=1)
+    system_prompt = _build_system_prompt(preferences) + """
+Return a JSON object with exactly four string keys: subjective, objective, assessment, plan.
+Apply style preferences within those fields. Do not output markdown fences or headings outside the JSON.
+Do not invent or infer symptoms, findings, diagnoses, or treatments. If a section is not documented, use an empty string.
+"""
     try:
-        client
-    except NameError:
-        client = OpenAI(api_key=settings.openai_api_key or os.getenv("OPENAI_API_KEY"))
-
-    # Optional RAG service; guard import to avoid hard dependency
-    rag_service = None
-    try:
-        # Try to import RAG service if it exists
-        import importlib.util
-        spec = importlib.util.find_spec("app.services.rag_service")
-        if spec is not None:
-            from app.services.rag_service import rag_service as _rag_service  # type: ignore
-            rag_service = _rag_service
-    except (ImportError, ModuleNotFoundError):
-        # RAG service is optional, continue without it
-        rag_service = None
-    
-    # Build system prompt with user preferences
-    system_prompt = _build_system_prompt(preferences)
-
-    # Use RAG context if available
-    if db and patient_id and visit_id and rag_service:
-        try:
-            context = rag_service.get_patient_context(db, patient_id, visit_id, user_message)
-            contextual_prompt = rag_service.create_contextual_prompt(user_message, context)
-            
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {"role": "user", "content": contextual_prompt},
-                ],
-                temperature=0.3,
-            )
-        except Exception as e:
-            print(f"RAG context retrieval failed: {e}, falling back to basic summarization")
-            # Fall back to basic summarization if RAG fails
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=0.3,
-            )
-    else:
-        # Basic summarization without RAG context
-        response = client.chat.completions.create(
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
             model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt
-                },
-                {"role": "user", "content": user_message},
-            ],
+            messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
             temperature=0.3,
+            response_format={"type": "json_object"},
         )
-
-    content = response.choices[0].message.content
-    # Convert plain text SOAP note to a dictionary
-    lines = content.strip().split("\n")
-    summary_data = {"subjective": "", "objective": "", "assessment": "", "plan": ""}
-    current_key = None
-
-    for line in lines:
-        if line.lower().startswith("subjective:"):
-            current_key = "subjective"
-            summary_data[current_key] = line.partition(":")[2].strip()
-        elif line.lower().startswith("objective:"):
-            current_key = "objective"
-            summary_data[current_key] = line.partition(":")[2].strip()
-        elif line.lower().startswith("assessment:"):
-            current_key = "assessment"
-            summary_data[current_key] = line.partition(":")[2].strip()
-        elif line.lower().startswith("plan:"):
-            current_key = "plan"
-            summary_data[current_key] = line.partition(":")[2].strip()
-        elif current_key:
-            # Append additional lines to the current section
-            summary_data[current_key] += " " + line.strip()
-
-    return NoteSummary(**summary_data)
+        return NoteSummary.model_validate_json(response.choices[0].message.content or "")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="SOAP generation failed. Your transcript is available; retry or continue editing manually.") from exc
+    finally:
+        client.close()

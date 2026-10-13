@@ -1,428 +1,229 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Suspense, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Search, Plus } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { apiClient } from "@/lib/api";
 import { 
-  DocumentPlusIcon, 
-  DocumentTextIcon, 
-  TrashIcon,
-  PencilIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  DocumentCheckIcon,
-  ArrowDownTrayIcon,
-  SpeakerWaveIcon,
-  ShareIcon,
-  DocumentArrowDownIcon
-} from '@heroicons/react/24/outline';
-import { apiClient } from '@/lib/api';
-import { Note } from '@/types';
+  DashboardData,
+  isFinalized,
+  needsReview,
+  parseDate,
+  patientName,
+  weekDays,
+} from "@/lib/dashboard";
+import styles from "../dashboard/dashboard.module.css";
 
-export default function NotesPage() {
-  // Apply drilldown filters if present
-  const [drill, setDrill] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [filteredNotes, setFilteredNotes] = useState<Note[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'status'>('newest');
+function NotesList() {
+  const { user } = useAuth();
+  const params = useSearchParams();
+  const filter = params.get("filter") || "all";
+  const weekly = params.get("range") === "week";
+  const [data, setData] = useState<DashboardData>({
+    notes: [],
+    patients: [],
+    appointments: [],
+  });
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [deleteLoading, setDeleteLoading] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchNotes();
-    // Read drill parameter from URL on mount
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      const d = url.searchParams.get('drill');
-      setDrill(d);
-    }
-  }, []);
-
-  const shouldTreatAsEmptyState = (message: string) => {
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes('404') ||
-      normalized.includes('not found') ||
-      normalized.includes('no notes')
-    );
-  };
-
-  const fetchNotes = async () => {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState<number | null>(null);
+  const refresh = useCallback(async () => {
+    if (!user) return;
     try {
-      const fetchedNotes = await apiClient.getNotes();
-      setNotes(fetchedNotes);
-      setError('');
-    } catch (err) {
-      console.warn('Notes list unavailable, showing empty state:', err);
-      // New accounts should see an empty state rather than an error banner.
-      setNotes([]);
-      setError('');
+      setData(await apiClient.getDashboard());
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load notes");
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterAndSortNotes = useCallback(() => {
-    let filtered = notes;
-
-    // Filter by search query
-    if (searchQuery) {
-      filtered = notes.filter(note =>
-        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.patient_id.toString().includes(searchQuery) ||
-        note.visit_id.toString().includes(searchQuery) ||
-        note.note_type.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    // Optional: apply drilldown views
-    if (drill === 'accuracy') {
-      filtered = filtered.filter(n => n.status === 'completed' || n.status === 'signed' || !!n.signed_at);
-    }
-    // Sort notes
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case 'oldest':
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        case 'status':
-          return a.status.localeCompare(b.status);
-        default:
-          return 0;
-      }
-    });
-
-    setFilteredNotes(filtered);
-  }, [notes, searchQuery, sortBy, drill]);
-
+  }, [user]);
   useEffect(() => {
-    filterAndSortNotes();
-  }, [filterAndSortNotes]);
-
-  const deleteNote = async (noteId: number) => {
-    if (!confirm('Are you sure you want to delete this note?')) return;
-
-    setDeleteLoading(noteId.toString());
+    void refresh();
+  }, [refresh]);
+  const notes = data.notes.filter((note) => {
+    const hasSoap = [
+      note.soap_subjective,
+      note.soap_objective,
+      note.soap_assessment,
+      note.soap_plan,
+    ].some(Boolean);
+    const edited = (note.content_changes_count || 0) > 0;
+    if (filter === "review" && !needsReview(note)) return false;
+    if (filter === "draft" && !(needsReview(note) && !hasSoap && !edited))
+      return false;
+    if (filter === "ready" && !(needsReview(note) && hasSoap && !edited))
+      return false;
+    if (filter === "edited" && !(needsReview(note) && edited)) return false;
+    if (filter === "finalized" && !isFinalized(note)) return false;
+    if (weekly) {
+      const start = weekDays(new Date())[0];
+      const end = new Date(start);
+      end.setDate(end.getDate() + 7);
+      if (
+        parseDate(note.created_at) < start ||
+        parseDate(note.created_at) >= end
+      )
+        return false;
+    }
+    const text =
+      `${patientName(data.patients.find((patient) => patient.id === note.patient_id))} ${note.note_type} ${note.content}`.toLowerCase();
+    return text.includes(search.trim().toLowerCase());
+  });
+  const exportPDF = async (id: number) => {
+    setBusy(id);
     try {
-      await apiClient.deleteNote(noteId);
-      setNotes(notes.filter(note => note.id !== noteId));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete note');
+      const blob = await apiClient.exportNotePDF(id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `note-${id}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "PDF export failed");
     } finally {
-      setDeleteLoading(null);
+      setBusy(null);
     }
   };
-
-  const exportNotePDF = async (noteId: number) => {
-    try {
-      const blob = await apiClient.exportNotePDF(noteId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${noteId}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Failed to export PDF:', e);
-    }
-  };
-
-  const exportNoteAudio = async (noteId: number) => {
-    try {
-      const blob = await apiClient.exportNoteAudio(noteId);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `note-${noteId}-audio${blob.type.includes('mp3') ? '.mp3' : blob.type.includes('wav') ? '.wav' : '.audio'}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      console.error('Failed to export audio:', e);
-    }
-  };
-
-  const shareNote = async (note: Note) => {
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: `Note ${note.id}`,
-          text: `Medical note for ${note.patient_first_name} ${note.patient_last_name}`,
-          url: window.location.origin + `/notes/${note.id}`
-        });
-      } else {
-        // Fallback: copy to clipboard
-        await navigator.clipboard.writeText(`${window.location.origin}/notes/${note.id}`);
-        alert('Note link copied to clipboard');
-      }
-    } catch (error) {
-      console.error('Failed to share note:', error);
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const truncateContent = (content: string, maxLength: number = 150) => {
-    if (content.length <= maxLength) return content;
-    return content.substring(0, maxLength) + '...';
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending_review':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
-      case 'finalized':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
-      case 'draft':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pending_review':
-        return <ClockIcon className="w-4 h-4" />;
-      case 'finalized':
-        return <DocumentCheckIcon className="w-4 h-4" />;
-      default:
-        return <DocumentTextIcon className="w-4 h-4" />;
-    }
-  };
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
+  if (!user) return null;
   return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <h1 className="text-2xl font-bold text-emerald-600">
-            Notes History
-          </h1>
-          <Link href="/notes/new?from_action=true">
-            <Button>
-              <DocumentPlusIcon className="w-4 h-4 mr-2" />
-              New Note
-            </Button>
-          </Link>
+    <div className={styles.dashboard}>
+      <header className={styles.header}>
+        <div>
+          <p className={styles.eyebrow}>
+            {weekly ? "This week" : "Clinical documentation"}
+          </p>
+          <h1>{filter === "review" ? "Review queue" : "Notes history"}</h1>
         </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-sm text-red-600">{error}</p>
-          </div>
-        )}
-
-        {/* Search and Filter */}
-        <Card>
-          <CardContent className="py-8 px-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-center gap-4 w-full min-h-[80px]">
-              <div className="flex-1 relative">
-                <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Search notes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <FunnelIcon className="w-4 h-4 text-gray-400" />
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'newest' | 'oldest' | 'status')}
-                  className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-gray-900"
-                >
-                  <option value="newest">Newest First</option>
-                  <option value="oldest">Oldest First</option>
-                  <option value="status">By Status</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Notes List */}
-        {filteredNotes.length > 0 ? (
-          <div className="grid gap-4">
-            {filteredNotes.map((note) => (
-              <Card key={note.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      {/* Patient Information */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg">
-                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                            Patient #{note.patient_id}
-                          </span>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 px-3 py-1 rounded-lg">
-                          <span className="text-sm font-medium text-green-700 dark:text-green-300">
-                            Visit #{note.visit_id}
-                          </span>
-                        </div>
-                        <div className="bg-emerald-50 dark:bg-emerald-900/20 px-3 py-1 rounded-lg">
-                          <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300 capitalize">
-                            {note.note_type}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Status Badge */}
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className={`flex items-center gap-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(note.status)}`}>
-                          {getStatusIcon(note.status)}
-                          <span className="capitalize">{note.status.replace('_', ' ')}</span>
-                        </div>
-                      </div>
-                      
-                      {/* Date Information */}
-                      <CardDescription className="mt-1">
-                        Created: {formatDate(note.created_at)}
-                        {note.updated_at !== note.created_at && (
-                          <span className="ml-2">
-                            • Updated: {formatDate(note.updated_at)}
-                          </span>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => exportNotePDF(note.id)}
-                        title="Export PDF"
-                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                      >
-                        <ArrowDownTrayIcon className="w-4 h-4" />
-                      </Button>
-                      {note.audio_file && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => exportNoteAudio(note.id)}
-                          title="Export Audio"
-                          className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                        >
-                          <SpeakerWaveIcon className="w-4 h-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => shareNote(note)}
-                        title="Share Note"
-                        className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
-                      >
-                        <ShareIcon className="w-4 h-4" />
-                      </Button>
-                      <Link href={`/notes/${note.id}/edit`}>
-                        <Button variant="ghost" size="sm" title="Edit Note">
-                          <PencilIcon className="w-4 h-4" />
-                        </Button>
-                      </Link>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteNote(note.id)}
-                        disabled={deleteLoading === note.id.toString()}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Delete Note"
-                      >
-                        {deleteLoading === note.id.toString() ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                        ) : (
-                          <TrashIcon className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-2">
-                        Content
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {truncateContent(note.content)}
-                      </p>
-                    </div>
-                    <div className="flex justify-end">
-                      <Link href={`/notes/${note.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <DocumentTextIcon className="w-4 h-4 mr-2" />
-                          View Full Note
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <Card>
-            <CardContent className="py-16">
-              <div className="flex flex-col items-center justify-center">
-                <DocumentTextIcon className="h-16 w-16 text-gray-400 mb-3" />
-                <h3 className="mt-1 text-base font-semibold text-gray-900 dark:text-gray-100">
-                  {searchQuery ? 'No notes found' : 'No notes yet'}
-                </h3>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 max-w-lg text-center">
-                  {searchQuery 
-                    ? 'Try adjusting your search query or filters.' 
-                    : 'Get started by creating your first clinical note.'
-                  }
-                </p>
-                <div className="mt-6">
-                  <Link href="/notes/new">
-                    <Button>
-                      <DocumentPlusIcon className="w-4 h-4 mr-2" />
-                      Create Note
-                    </Button>
-                  </Link>
-                </div>
-                <div className="mt-4">
-                  <video className="mx-auto rounded-md shadow" width="320" height="180" autoPlay muted loop playsInline>
-                    <source src="/demo/create-note.mp4" type="video/mp4" />
-                  </video>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        <Link href="/notes/new?mode=type" className={styles.primaryButton}>
+          <Plus size={15} className="inline mr-2" />
+          New note
+        </Link>
+      </header>
+      {error && (
+        <div className={styles.error} role="alert">
+          {error}
+          <button onClick={() => void refresh()}>Retry</button>
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-3 mb-5">
+        <Link
+          href="/notes"
+          className={
+            filter === "all" ? styles.primaryButton : "text-sm underline"
+          }
+        >
+          All notes
+        </Link>
+        <Link
+          href="/notes?filter=review"
+          className={
+            filter === "review" ? styles.primaryButton : "text-sm underline"
+          }
+        >
+          Needs review
+        </Link>
+        <Link
+          href="/notes?filter=finalized"
+          className={
+            filter === "finalized" ? styles.primaryButton : "text-sm underline"
+          }
+        >
+          Finalized
+        </Link>
+        <label className={`${styles.search} ml-auto`}>
+          <Search size={16} />
+          <input
+            aria-label="Search notes"
+            placeholder="Search patient or note"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
       </div>
-    </DashboardLayout>
+      <section className={styles.reviewCard}>
+        {loading ? (
+          <p className={styles.loading} role="status">
+            Loading your notes…
+          </p>
+        ) : notes.length ? (
+          notes.map((note) => (
+            <article key={note.id} className={styles.reviewRow}>
+              <div className={styles.reviewContent}>
+                <div className={styles.rowTitle}>
+                  <h2>
+                    {patientName(
+                      data.patients.find(
+                        (patient) => patient.id === note.patient_id,
+                      ),
+                    )}
+                  </h2>
+                  <span
+                    className={`${styles.status} ${isFinalized(note) ? styles.green : styles.amber}`}
+                  >
+                    {note.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className={styles.muted}>
+                  {note.note_type} ·{" "}
+                  {parseDate(note.created_at).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+                <p className={`${styles.excerpt} mt-3`}>
+                  {note.soap_subjective || note.content}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  className={styles.primaryButton}
+                  href={`/notes/${note.id}`}
+                >
+                  {isFinalized(note) ? "View note" : "Review draft"}
+                </Link>
+                <button
+                  onClick={() => void exportPDF(note.id)}
+                  disabled={busy === note.id}
+                  className="text-xs font-semibold underline"
+                >
+                  {busy === note.id ? "Exporting…" : "Export PDF"}
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <div className={styles.empty}>
+            <h2>
+              {search
+                ? "No matching notes"
+                : filter === "review"
+                  ? "You’re all caught up"
+                  : "No notes in this view"}
+            </h2>
+            <p>
+              {search
+                ? "Try another patient name or search term."
+                : "Create a note or select another filter."}
+            </p>
+            <Link href="/notes/new?mode=type">Create a clinical note</Link>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export default function NotesPage() {
+  return (
+    <Suspense fallback={<p className="p-6">Loading notes…</p>}>
+      <NotesList />
+    </Suspense>
   );
 }

@@ -18,3 +18,4 @@ gunicorn>=21.2.0
 sentry-sdk>=2.7.0
 slowapi>=0.1.9
 PyJWT>=2.8.0
+reportlab>=4.0.0

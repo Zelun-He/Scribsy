@@ -17,13 +17,13 @@ export function Popover({ open, onOpenChange, children }: { open: boolean; onOpe
   );
 }
 
-export function PopoverTrigger({ asChild = false, children }: { asChild?: boolean; children: React.ReactElement }) {
+export function PopoverTrigger({ asChild = false, children }: { asChild?: boolean; children: React.ReactElement<React.HTMLAttributes<HTMLElement>> }) {
   const ctx = useContext(PopoverContext);
   if (!ctx) throw new Error('PopoverTrigger must be used within Popover');
   const { open, setOpen } = ctx;
   if (asChild) {
     return React.cloneElement(children, {
-      onClick: (e: React.MouseEvent) => {
+      onClick: (e: React.MouseEvent<HTMLElement>) => {
         children.props.onClick?.(e);
         setOpen(!open);
       },
@@ -62,5 +62,3 @@ export function PopoverContent({ className = '', align = 'start', children }: { 
     </div>
   );
 }
-
-

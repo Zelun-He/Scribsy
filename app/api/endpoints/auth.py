@@ -71,7 +71,7 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
         raise credentials_exception
     user = crud_notes.get_user_by_username(db, username)
 
-    if user is None:
+    if user is None or not user.is_active:
         logger.warning(f"User '{username}' not found after token validation")
         raise credentials_exception
     return user
