@@ -135,6 +135,18 @@
   flex-direction: column;
   gap: 28px;
 }
+.demoButton {
+  color: var(--landing-blue);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  min-height: 44px;
+}
+.demoButton:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 .eyebrow {
   font:
     13px "Scribsy Mono",

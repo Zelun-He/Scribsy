@@ -74,6 +74,13 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
     if user is None or not user.is_active:
         logger.warning(f"User '{username}' not found after token validation")
         raise credentials_exception
+    if user.is_demo:
+        if not settings.demo_enabled:
+            raise HTTPException(status_code=403, detail="The public demo is disabled.")
+        path = request.url.path.rstrip("/")
+        allowed = path in ("/dashboard", "/auth/me", "/auth/refresh", "/notes", "/patients") or path.startswith(("/notes/", "/patients/"))
+        if not allowed or (request.method not in ("GET", "HEAD", "OPTIONS") and path != "/auth/refresh"):
+            raise HTTPException(status_code=403, detail="This demo workspace is view-only. Create an account to save your own visits.")
     return user
 
 # POST /auth/register - Register a new user.
@@ -84,6 +91,9 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     # Normalize/validate username format
     user.username = user.username.strip()
+    from app.services.demo_workspace import DEMO_USERNAME, DEMO_EMAIL
+    if user.username.lower() == DEMO_USERNAME or user.email.strip().lower() == DEMO_EMAIL:
+        raise HTTPException(status_code=400, detail="This account name is reserved for the public demo.")
     if len(user.username) < 3:
         raise HTTPException(status_code=400, detail="Username must be at least 3 characters long")
     if len(user.username) > 50:
@@ -165,6 +175,26 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Cookie-based login that also returns the token for backward compatibility
+@router.post("/demo", response_model=schemas.Token)
+def login_demo(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Issue a normal session only for the explicitly marked public demo account."""
+    from app.services.demo_workspace import DEMO_USERNAME, DEMO_PASSWORD
+    user = crud_notes.get_user_by_username(db, DEMO_USERNAME)
+    if not settings.demo_enabled or not user or not user.is_demo or not user.is_active:
+        raise HTTPException(status_code=503, detail="The public demo is unavailable. Please try again later.")
+    if not crud_notes.verify_password(DEMO_PASSWORD, user.hashed_password):
+        raise HTTPException(status_code=503, detail="The public demo is unavailable. Please try again later.")
+    access_token = create_access_token(data={"sub": user.username})
+    secure = request.url.scheme == "https"
+    response.set_cookie("auth_token", access_token, httponly=True, secure=secure,
+                        samesite="none" if secure else "lax", path="/",
+                        max_age=settings.access_token_expire_minutes * 60)
+    HIPAAAuditLogger.log_login_attempt(db=db, username=user.username,
+                                      ip_address=request.client.host if request.client else "unknown",
+                                      user_agent=request.headers.get("user-agent", ""), success=True)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @router.post("/token-cookie")
 def login_cookie(request: Request, response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     username = (form_data.username or "").strip()
@@ -281,7 +311,7 @@ def request_password_reset(
         # Always return success message for security (don't reveal if email exists)
         success_message = "If an account with that email exists, a password reset link has been sent."
         
-        if not user:
+        if not user or user.is_demo:
             return schemas.PasswordResetResponse(
                 message=success_message,
                 success=True
@@ -371,6 +401,8 @@ def verify_password_reset(
         user = db.query(models.User).filter(models.User.id == reset_token_record.user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        if user.is_demo:
+            raise HTTPException(status_code=403, detail="The public demo password cannot be changed.")
         
         # Update password
         new_hashed_password = crud_notes.get_password_hash(request_data.new_password)

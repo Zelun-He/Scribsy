@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import { DemoLoginButton } from '@/components/demo-login-button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,6 +69,12 @@ export default function LoginPage() {
         </div>
         <Button type="submit" className="w-full" loading={loading} disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</Button>
       </form>
+      <div className="mx-auto mt-6 max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center">
+        <h2 className="font-semibold text-slate-900">Explore Scribsy</h2>
+        <p className="mt-2 mb-4 text-sm text-slate-600">Browse fictional patients, notes, and the schedule in a view-only workspace.</p>
+        <DemoLoginButton className="button-secondary w-full rounded-md px-4 py-3 text-sm font-semibold disabled:opacity-50" />
+        <p className="mt-3 text-xs text-slate-500">Username: <code>testuser</code> · Password: <code>123456</code></p>
+      </div>
     </div>
   );
 }

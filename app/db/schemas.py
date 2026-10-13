@@ -254,6 +254,7 @@ class UserRead(UserBase):
     id: int
     is_active: bool
     is_admin: Optional[bool] = False
+    is_demo: bool = False
 
     class Config:
         # Pydantic v2

@@ -4,6 +4,7 @@ export interface User {
   email: string;
   is_active: boolean;
   is_admin?: boolean;
+  is_demo?: boolean;
   role?: string;
   last_login?: string;
   work_start_time?: string;

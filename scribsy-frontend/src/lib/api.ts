@@ -169,6 +169,16 @@ class ApiClient {
   }
 
   // Auth endpoints
+  async loginDemo(): Promise<LoginResponse> {
+    const response = await fetch(`${this.baseURL}/auth/demo`, {
+      method: 'POST',
+      credentials: this.requestCredentials(),
+    });
+    const data = await this.handleResponse<LoginResponse>(response);
+    this.setToken(data.access_token);
+    return data;
+  }
+
   async login(credentials: LoginRequest): Promise<LoginResponse> {
     const form = new URLSearchParams();
     form.append('username', credentials.username.trim());

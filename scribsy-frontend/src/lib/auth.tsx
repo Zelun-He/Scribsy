@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   isLoading: boolean;
   login: (_credentials: LoginRequest) => Promise<void>;
+  loginDemo: () => Promise<void>;
   register: (_userData: RegisterRequest) => Promise<void>;
   logout: () => void;
   handleAuthFailure: () => void;
@@ -53,6 +54,12 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
     setUser(currentUser);
   };
 
+  const loginDemo = async () => {
+    await apiClient.loginDemo();
+    const currentUser = await apiClient.getCurrentUser();
+    setUser(currentUser);
+  };
+
   const register = async (userData: RegisterRequest) => {
     await apiClient.register(userData);
     await login(userData);
@@ -66,7 +73,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, isLoading: loading, login, register, logout, handleAuthFailure }}>
+    <AuthContext.Provider value={{ user, loading, isLoading: loading, login, loginDemo, register, logout, handleAuthFailure }}>
       {children}
     </AuthContext.Provider>
   );

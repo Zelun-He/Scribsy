@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Activity, Check, Menu, ShieldCheck, X } from "lucide-react";
 import { ClinicalNote } from "@/components/notes/clinical-note";
+import { DemoLoginButton } from "@/components/demo-login-button";
 import { SAMPLE_SOAP, SAMPLE_TRANSCRIPT } from "@/lib/sample-visit";
 import styles from "./landing.module.css";
 
@@ -108,6 +109,7 @@ export default function Home() {
               <ShieldCheck size={18} />
               Every generated note stays in review until you finalize it.
             </p>
+            <DemoLoginButton className={styles.demoButton} />
           </div>
           <div className={styles.heroPreview}>
             <ClinicalNote

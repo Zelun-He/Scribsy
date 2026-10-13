@@ -195,6 +195,11 @@ def authenticate_user(db: Session, username: str, password: str):
     if not user:
         return None, "User not found"
 
+    if user.is_demo:
+        from app.config import settings
+        if not settings.demo_enabled:
+            return None, "The public demo is disabled"
+
     # Verify password using User ORM object attributes
     if not verify_password(password, user.hashed_password):
         return None, "Incorrect password"

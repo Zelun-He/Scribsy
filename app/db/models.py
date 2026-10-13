@@ -210,6 +210,10 @@ class User(Base):
     
     # HIPAA Role-based access control
     role = Column(String, default="provider")  # provider, admin, auditor, read_only
+
+    @property
+    def is_demo(self):
+        return self.role == "read_only" and self.tenant_id == "scribsy-public-demo"
     last_login = Column(DateTime(timezone=True), nullable=True)
     failed_login_attempts = Column(Integer, default=0)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)

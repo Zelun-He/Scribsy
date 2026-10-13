@@ -135,3 +135,14 @@ README.md                  # Project overview
 
 ## License
 MIT (or your chosen license)
+
+## Public dashboard demo
+
+The backend creates a dedicated, view-only workspace on startup with three fictional patients, six sample notes, and a sample schedule. Visitors can click **View demo dashboard** on the landing or sign-in page, or sign in with:
+
+- Username: `testuser`
+- Password: `123456`
+
+These are intentionally public demo credentials. Demo sessions can browse their own sample records and download note exports. The API rejects record changes, uploads, AI requests, settings changes, and administrative access. Visitors can use the separate sample visit to try editing and PDF export. Real accounts retain their normal workflow.
+
+Set `DEMO_ENABLED=false` on the backend to disable demo provisioning and access. Deploy the frontend and backend changes together. Provisioning is idempotent and will not overwrite an existing non-demo account with the same username.
