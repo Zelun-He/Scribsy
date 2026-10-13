@@ -10,6 +10,7 @@ export function SidebarFrame({ children }: { children: React.ReactNode }) {
   const isPublic =
     [
       "/",
+      "/sample-visit",
       "/login",
       "/register",
       "/contact",

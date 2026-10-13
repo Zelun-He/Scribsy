@@ -14,7 +14,6 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timezone
 from pathlib import Path
-import io
 import difflib
 import os
 import shutil
@@ -544,67 +543,10 @@ def export_note_pdf(
     patient = crud_patients.get_patient_by_id(db, db_note.patient_id)
 
     try:
-        # Lazy import so service can run without PDF deps
-        from reportlab.pdfgen import canvas  # type: ignore
-        from reportlab.lib.pagesizes import letter  # type: ignore
-        from reportlab.pdfbase import pdfmetrics  # type: ignore
-    except Exception:
+        from app.services.note_pdf import build_note_pdf
+        pdf_bytes = build_note_pdf(db_note, patient, current_user.username)
+    except ImportError:
         raise HTTPException(status_code=503, detail="PDF export unavailable on server")
-
-    buf = io.BytesIO()
-    c = canvas.Canvas(buf, pagesize=letter)
-    width, height = letter
-    margin = 54  # 3/4 inch
-    x = margin
-    y = height - margin
-    c.setTitle(f"Clinical Note {note_id}")
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(x, y, f"Clinical Note #{db_note.id}")
-    y -= 20
-    c.setFont("Helvetica", 10)
-    c.drawString(x, y, f"Type: {db_note.note_type}")
-    y -= 14
-    pat_name = f"{getattr(patient, 'first_name', '')} {getattr(patient, 'last_name', '')}".strip()
-    c.drawString(x, y, f"Patient: {pat_name or 'N/A'} (ID {db_note.patient_id})")
-    y -= 14
-    c.drawString(x, y, f"Created: {db_note.created_at.isoformat()}")
-    y -= 20
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(x, y, "Content")
-    y -= 16
-    c.setFont("Helvetica", 10)
-
-    max_width = width - 2 * margin
-    def draw_wrapped(text: str, start_y: float) -> float:
-        nonlocal x
-        y_loc = start_y
-        for line in (text or "").splitlines():
-            words = line.split(" ") if line else [""]
-            current = ""
-            for w in words:
-                test = (current + (" " if current else "") + w).strip()
-                sw = pdfmetrics.stringWidth(test, "Helvetica", 10)
-                if sw <= max_width:
-                    current = test
-                else:
-                    c.drawString(x, y_loc, current)
-                    y_loc -= 12
-                    current = w
-                    if y_loc < margin:
-                        c.showPage(); c.setFont("Helvetica", 10)
-                        y_loc = height - margin
-            if current:
-                c.drawString(x, y_loc, current)
-                y_loc -= 12
-            if y_loc < margin:
-                c.showPage(); c.setFont("Helvetica", 10)
-                y_loc = height - margin
-        return y_loc
-
-    y = draw_wrapped(db_note.content or "", y)
-    c.showPage()
-    c.save()
-    pdf_bytes = buf.getvalue()
 
     # Audit
     try:

@@ -24,6 +24,7 @@ import {
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Patient } from '@/types';
+import { ClinicalNote } from '@/components/notes/clinical-note';
 import { useToast } from '@/lib/toast';
 import { burstConfetti } from '@/lib/confetti';
 import { recordNoteSession } from '@/lib/metrics';
@@ -808,45 +809,14 @@ function NewNotePageContent() {
             </CardContent>
           </Card>
 
-          {/* Transcription Results */}
-          {transcription && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <DocumentTextIcon className="w-5 h-5 mr-2" />
-                  Transcription
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 dark:text-emerald-300 whitespace-pre-wrap">
-                    {transcription}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* SOAP Note Results */}
-          {soapNote && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <SparklesIcon className="w-5 h-5 mr-2" />
-                  Generated SOAP Note
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
-                  <div className="space-y-2">
-                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Subjective:</span> {soapNote.subjective}</div>
-                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Objective:</span> {soapNote.objective}</div>
-                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Assessment:</span> {soapNote.assessment}</div>
-                    <div><span className="font-semibold text-emerald-700 dark:text-emerald-300">Plan:</span> {soapNote.plan}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {(transcription || soapNote) && (
+            <ClinicalNote
+              title="Visit result · Draft for review"
+              transcript={transcription || content}
+              sourceLabel={transcription ? 'Transcript' : 'Visit notes'}
+              soap={soapNote || { subjective: '', objective: '', assessment: '', plan: '' }}
+              caption="Save the note to review, edit, approve, and export it."
+            />
           )}
         </form>
       </div>
