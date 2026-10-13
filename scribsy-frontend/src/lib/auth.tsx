@@ -66,8 +66,9 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    const logoutRequest = apiClient.logoutServer();
     apiClient.clearToken();
-    apiClient.logoutServer().catch(() => {});
+    logoutRequest.catch(() => {});
     setUser(null);
     router.push('/');
   };

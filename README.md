@@ -138,11 +138,13 @@ MIT (or your chosen license)
 
 ## Public dashboard demo
 
-The backend creates a dedicated, view-only workspace on startup with three fictional patients, six sample notes, and a sample schedule. Visitors can click **View demo dashboard** on the landing or sign-in page, or sign in with:
+The demo runs in Next.js API routes on the frontend deployment. It does not require Railway, a database, or an AI API key. Visitors can click **View demo dashboard** on the landing or sign-in page, or use:
 
 - Username: `testuser`
 - Password: `123456`
 
-These are intentionally public demo credentials. Demo sessions can browse their own sample records and download note exports. The API rejects record changes, uploads, AI requests, settings changes, and administrative access. Visitors can use the separate sample visit to try editing and PDF export. Real accounts retain their normal workflow.
+The session grants access only to public fictional fixtures: three patients, six notes, and a sample schedule. Demo requests never reach the real-account backend. Visitors can browse records and export PDF, text, and sample XML; writes, uploads, settings, AI requests, and admin access are rejected. The separate sample visit supports editing and PDF export.
 
-Set `DEMO_ENABLED=false` on the backend to disable demo provisioning and access. Deploy the frontend and backend changes together. Provisioning is idempotent and will not overwrite an existing non-demo account with the same username.
+Set `DEMO_ENABLED=false` on the frontend to disable its demo. The optional FastAPI demo provisioning has its own `DEMO_ENABLED` switch and never overwrites an existing real account. Real accounts still require a running FastAPI backend configured through `BACKEND_URL`.
+
+Demo traffic uses `/api/demo`; ordinary-account requests retain the existing `/api` backend rewrite, including audio uploads. An unavailable backend returns a clear sign-in error instead of Railway's raw “Application not found” response. Run `npm run test:api` in `scribsy-frontend` to verify demo isolation and proxy behavior.

@@ -1,4 +1,5 @@
 import type { DashboardData } from './dashboard';
+import { DEMO_TOKEN } from './demo-data';
 import { 
   LoginRequest, 
   RegisterRequest, 
@@ -40,6 +41,7 @@ class ApiClient {
       if (this.isLocalDev) {
         this.baseURL = '/api';
       }
+      if (this.token === DEMO_TOKEN) this.baseURL = '/api/demo';
     }
   }
 
@@ -124,6 +126,9 @@ class ApiClient {
         throw new Error(parsedMsg || 'Authentication failed');
       }
 
+      if (parsedMsg === 'Application not found') {
+        throw new Error('Account sign-in is unavailable because the configured backend is offline. You can still use View demo dashboard.');
+      }
       // No body or no parsable message
       throw new Error(parsedMsg || `HTTP ${response.status}: ${response.statusText}`);
     }
@@ -151,6 +156,7 @@ class ApiClient {
 
   setToken(token: string) {
     this.token = token;
+    this.baseURL = token === DEMO_TOKEN ? '/api/demo' : '/api';
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth_token', token);
     }
@@ -158,6 +164,7 @@ class ApiClient {
 
   clearToken() {
     this.token = null;
+    this.baseURL = '/api';
     if (typeof window !== 'undefined') {
       localStorage.removeItem('auth_token');
     }
@@ -170,7 +177,7 @@ class ApiClient {
 
   // Auth endpoints
   async loginDemo(): Promise<LoginResponse> {
-    const response = await fetch(`${this.baseURL}/auth/demo`, {
+    const response = await fetch('/api/demo/auth/demo', {
       method: 'POST',
       credentials: this.requestCredentials(),
     });
@@ -180,11 +187,12 @@ class ApiClient {
   }
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {
+    const demo = ['testuser', 'public-demo@scribsy.example'].includes(credentials.username.trim().toLowerCase());
     const form = new URLSearchParams();
     form.append('username', credentials.username.trim());
     form.append('password', credentials.password);
 
-    const response = await fetch(`${this.baseURL}/auth/token`, {
+    const response = await fetch(`${demo ? '/api/demo' : '/api'}/auth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString(),
