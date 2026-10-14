@@ -5,7 +5,7 @@ from contextlib import nullcontext
 
 ADDITIVE_COLUMNS = {
     "users": (
-        "role", "last_login", "failed_login_attempts", "account_locked_until",
+        "token_version", "role", "last_login", "failed_login_attempts", "account_locked_until",
         "tenant_id", "work_start_time", "work_end_time", "timezone", "working_days",
     ),
     "patients": ("tenant_id",),

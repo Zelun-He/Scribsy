@@ -3,14 +3,17 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db import schemas, models
 from app.crud import notes as crud_notes
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from app.db.database import get_db
 from app.audit.logger import HIPAAAuditLogger
 from app.services.email_service import email_service
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 import logging
+import os
+import hashlib
+from urllib.parse import urlencode, urlsplit
 from typing import Optional
 
 from app.config import settings
@@ -73,6 +76,8 @@ def get_current_user(request: Request, token: Optional[str] = Depends(oauth2_sch
 
     if user is None or not user.is_active:
         logger.warning(f"User '{username}' not found after token validation")
+        raise credentials_exception
+    if payload.get("ver", 0) != user.token_version:
         raise credentials_exception
     if user.is_demo:
         if not settings.demo_enabled:
@@ -171,7 +176,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         success=True
     )
     
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.username, "ver": user.token_version})
     return {"access_token": access_token, "token_type": "bearer"}
 
 # Cookie-based login that also returns the token for backward compatibility
@@ -184,7 +189,7 @@ def login_demo(request: Request, response: Response, db: Session = Depends(get_d
         raise HTTPException(status_code=503, detail="The public demo is unavailable. Please try again later.")
     if not crud_notes.verify_password(DEMO_PASSWORD, user.hashed_password):
         raise HTTPException(status_code=503, detail="The public demo is unavailable. Please try again later.")
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.username, "ver": user.token_version})
     secure = request.url.scheme == "https"
     response.set_cookie("auth_token", access_token, httponly=True, secure=secure,
                         samesite="none" if secure else "lax", path="/",
@@ -225,7 +230,7 @@ def login_cookie(request: Request, response: Response, form_data: OAuth2Password
         success=True
     )
     
-    access_token = create_access_token(data={"sub": user.username})
+    access_token = create_access_token(data={"sub": user.username, "ver": user.token_version})
 
     # Set HttpOnly auth cookie
     # Mark Secure only when request is HTTPS (avoids cookie drop in local HTTP)
@@ -271,7 +276,7 @@ def logout(response: Response):
 @router.post("/refresh", response_model=schemas.Token)
 def refresh_session(request: Request, response: Response, current_user=Depends(get_current_user)):
     # Issue a new token for the current user
-    access_token = create_access_token(data={"sub": current_user.username})
+    access_token = create_access_token(data={"sub": current_user.username, "ver": current_user.token_version})
 
     secure_cookie = (request.url.scheme == "https")
     samesite_policy = "none" if secure_cookie else "lax"
@@ -294,146 +299,112 @@ def refresh_session(request: Request, response: Response, current_user=Depends(g
 def read_users_me(current_user: schemas.UserRead = Depends(get_current_user)):
     return current_user
 
-# POST /auth/request-password-reset - Request password reset via email verification
-# No authentication required.
-# Request body: PasswordResetRequest (email)
-# Returns: PasswordResetResponse
-@router.post("/request-password-reset", response_model=schemas.PasswordResetResponse)
-def request_password_reset(
-    request_data: schemas.PasswordResetRequest,
-    db: Session = Depends(get_db)
-):
-    """Request password reset via email verification"""
-    try:
-        # Find user by email
-        user = db.query(models.User).filter(models.User.email == request_data.email).first()
-        
-        # Always return success message for security (don't reveal if email exists)
-        success_message = "If an account with that email exists, a password reset link has been sent."
-        
-        if not user or user.is_demo:
-            return schemas.PasswordResetResponse(
-                message=success_message,
-                success=True
-            )
-        
-        # Generate secure token
-        reset_token = secrets.token_urlsafe(32)
-        
-        # Set expiration time (1 hour from now)
-        expires_at = datetime.utcnow() + timedelta(hours=1)
-        
-        # Create password reset token record
-        reset_token_record = models.PasswordResetToken(
-            user_id=user.id,
-            token=reset_token,
-            expires_at=expires_at,
-            tenant_id=user.tenant_id
-        )
-        
-        # Invalidate any existing tokens for this user
-        db.query(models.PasswordResetToken).filter(
-            models.PasswordResetToken.user_id == user.id,
-            models.PasswordResetToken.used == False
-        ).update({"used": True})
-        
-        db.add(reset_token_record)
-        db.commit()
-        
-        # Generate reset URL (in production, this should be your frontend URL)
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        reset_url = f"{frontend_url}/auth/reset-password?token={reset_token}"
-        
-        # Send verification email
-        email_sent = email_service.send_password_reset_email(
-            user_email=user.email,
-            username=user.username,
-            reset_token=reset_token,
-            reset_url=reset_url
-        )
-        
-        if not email_sent:
-            logger.warning(f"Failed to send password reset email to {user.email}")
-        
-        return schemas.PasswordResetResponse(
-            message=success_message,
-            success=True
-        )
-        
-    except Exception as e:
-        logger.error(f"Error in password reset request: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while processing your request. Please try again later."
-        )
+RESET_MESSAGE = "If an active account matches that email, a password reset link has been sent."
+RESET_UNAVAILABLE = "Password reset email is unavailable right now. Please try again later."
 
-# POST /auth/verify-password-reset - Verify token and reset password
-# No authentication required.
-# Request body: PasswordResetVerify (token, new_password)
-# Returns: PasswordResetResponse
-@router.post("/verify-password-reset", response_model=schemas.PasswordResetResponse)
-def verify_password_reset(
-    request_data: schemas.PasswordResetVerify,
-    db: Session = Depends(get_db)
-):
-    """Verify reset token and update password"""
+
+def reset_frontend_url():
+    # Use a configured, trusted origin; never derive reset links from Host/Origin headers.
+    default = "http://localhost:3000" if settings.debug else "https://scribsy.vercel.app"
+    value = os.getenv("FRONTEND_URL", default).strip().rstrip("/")
+    parsed = urlsplit(value)
+    local = settings.debug and parsed.hostname in ("localhost", "127.0.0.1")
+    if (parsed.scheme != "https" and not (local and parsed.scheme == "http")) or not parsed.netloc or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ValueError("FRONTEND_URL must be a trusted HTTPS URL")
+    return value
+
+
+@router.post("/request-password-reset", response_model=schemas.PasswordResetResponse)
+def request_password_reset(request_data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
     try:
-        # Validate password strength
-        if len(request_data.new_password) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
-        if len(request_data.new_password) > 100:
-            raise HTTPException(status_code=400, detail="Password must be less than 100 characters")
-        
-        # Find valid reset token
-        reset_token_record = db.query(models.PasswordResetToken).filter(
-            models.PasswordResetToken.token == request_data.token,
-            models.PasswordResetToken.used == False,
-            models.PasswordResetToken.expires_at > datetime.utcnow()
+        # Fail consistently for all addresses when mail is not set up.
+        if not email_service.is_configured():
+            raise HTTPException(status_code=503, detail=RESET_UNAVAILABLE)
+        frontend_url = reset_frontend_url()
+        user = db.query(models.User).filter(
+            func.lower(models.User.email) == request_data.email.strip().lower()
+        ).with_for_update().first()
+        if not user or user.is_demo or not user.is_active:
+            return schemas.PasswordResetResponse(message=RESET_MESSAGE, success=True)
+        now = datetime.now(timezone.utc)
+        recent = db.query(models.PasswordResetToken.id).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.created_at > now - timedelta(seconds=60)
         ).first()
-        
-        if not reset_token_record:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid or expired reset token. Please request a new password reset."
-            )
-        
-        # Get user
-        user = db.query(models.User).filter(models.User.id == reset_token_record.user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        if user.is_demo:
-            raise HTTPException(status_code=403, detail="The public demo password cannot be changed.")
-        
-        # Update password
-        new_hashed_password = crud_notes.get_password_hash(request_data.new_password)
-        user.hashed_password = new_hashed_password
-        
-        # Mark token as used
-        reset_token_record.used = True
-        
-        # Log the password change
-        HIPAAAuditLogger.log_password_change(
-            db=db,
-            user_id=user.id,
-            username=user.username,
-            success=True
-        )
-        
+        hourly_count = db.query(models.PasswordResetToken.id).filter(
+            models.PasswordResetToken.user_id == user.id,
+            models.PasswordResetToken.created_at > now - timedelta(hours=1)
+        ).count()
+        if recent or hourly_count >= 3:
+            return schemas.PasswordResetResponse(message=RESET_MESSAGE, success=True)
+        reset_token = secrets.token_urlsafe(32)
+        db.query(models.PasswordResetToken).filter_by(user_id=user.id, used=False).update({"used": True})
+        db.add(models.PasswordResetToken(
+            user_id=user.id, token="sha256:" + hashlib.sha256(reset_token.encode()).hexdigest(),
+            expires_at=now + timedelta(hours=1), created_at=now, tenant_id=user.tenant_id,
+        ))
+        db.flush()
+        reset_url = frontend_url + "/auth/reset-password?" + urlencode({"token": reset_token})
+        if not email_service.send_password_reset_email(
+            user_email=user.email, username=user.username,
+            reset_token=reset_token, reset_url=reset_url,
+        ):
+            raise HTTPException(status_code=503, detail=RESET_UNAVAILABLE)
         db.commit()
-        
-        return schemas.PasswordResetResponse(
-            message="Password has been successfully reset. You can now log in with your new password.",
-            success=True
-        )
-        
+        return schemas.PasswordResetResponse(message=RESET_MESSAGE, success=True)
     except HTTPException:
+        db.rollback()
         raise
-    except Exception as e:
-        logger.error(f"Error in password reset verification: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="An error occurred while resetting your password. Please try again later."
+    except Exception as exc:
+        db.rollback()
+        logger.error("Password reset request failed (%s)", type(exc).__name__)
+        raise HTTPException(status_code=503, detail=RESET_UNAVAILABLE)
+
+
+@router.post("/verify-password-reset", response_model=schemas.PasswordResetResponse)
+def verify_password_reset(request_data: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
+    try:
+        password = request_data.new_password
+        if len(password) < 8 or not any(c in "0123456789" for c in password):
+            raise HTTPException(status_code=400, detail="Use at least 8 characters, including a number.")
+        if len(password.encode("utf-8")) > 72:
+            raise HTTPException(status_code=400, detail="Password must be no more than 72 bytes long.")
+        now = datetime.now(timezone.utc)
+        # Accept existing, unexpired legacy links; new tokens are only stored as hashes.
+        token_match = or_(
+            models.PasswordResetToken.token == "sha256:" + hashlib.sha256(request_data.token.encode()).hexdigest(),
+            models.PasswordResetToken.token == request_data.token,
         )
+        record = db.query(models.PasswordResetToken).filter(token_match).first()
+        invalid = HTTPException(status_code=400, detail="This reset link is invalid or has expired. Please request a new one.")
+        if not record:
+            raise invalid
+        # Serialize against other reset requests for the same account.
+        user = db.query(models.User).filter_by(id=record.user_id).with_for_update().first()
+        if not user or not user.is_active or user.is_demo:
+            raise invalid
+        claimed = db.query(models.PasswordResetToken).filter(
+            models.PasswordResetToken.id == record.id,
+            models.PasswordResetToken.used == False,
+            models.PasswordResetToken.expires_at > now,
+        ).update({"used": True}, synchronize_session=False)
+        if claimed != 1:
+            raise invalid
+        user.hashed_password = crud_notes.get_password_hash(password)
+        user.token_version += 1  # Revoke previous sessions, including legacy tokens (version 0).
+        user.failed_login_attempts = 0
+        user.account_locked_until = None
+        db.query(models.PasswordResetToken).filter_by(user_id=user.id, used=False).update({"used": True})
+        db.commit()
+        HIPAAAuditLogger.log_password_change(db=db, user_id=user.id, username=user.username, success=True)
+        return schemas.PasswordResetResponse(message="Password updated. Sign in with your new password.", success=True)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        logger.error("Password reset verification failed (%s)", type(exc).__name__)
+        raise HTTPException(status_code=500, detail="Unable to update your password. Please try again later.")
 
 # POST /auth/change-password - Change password for authenticated user
 # Requires authentication.

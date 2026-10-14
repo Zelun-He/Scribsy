@@ -1,7 +1,7 @@
 """
 schemas.py: Defines Pydantic schemas for request/response validation.
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, date
 
@@ -266,11 +266,22 @@ class Token(BaseModel):
 
 # Password reset schemas
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: str = Field(max_length=254)
+
+    @field_validator("email")
+    @classmethod
+    def valid_email(cls, value):
+        value = value.strip()
+        if "@" not in value or any(c.isspace() for c in value):
+            raise ValueError("Enter a valid email address")
+        local, domain = value.rsplit("@", 1)
+        if not local or "@" in local or "." not in domain or domain.startswith(".") or domain.endswith("."):
+            raise ValueError("Enter a valid email address")
+        return value
 
 class PasswordResetVerify(BaseModel):
-    token: str
-    new_password: str
+    token: str = Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9_-]+$")
+    new_password: str = Field(min_length=1, max_length=100)
 
 class PasswordChangeRequest(BaseModel):
     current_password: str

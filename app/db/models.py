@@ -214,6 +214,7 @@ class User(Base):
     @property
     def is_demo(self):
         return self.role == "read_only" and self.tenant_id == "scribsy-public-demo"
+    token_version = Column(Integer, default=0, nullable=False)
     last_login = Column(DateTime(timezone=True), nullable=True)
     failed_login_attempts = Column(Integer, default=0)
     account_locked_until = Column(DateTime(timezone=True), nullable=True)

@@ -1,0 +1,14 @@
+.panel { grid-template-rows: auto 1fr; }
+.helper { margin: 0; color: #556270; font-size: 14px; line-height: 1.6; }
+.helper a, .textLink { color: #214bdc; font-weight: 600; text-underline-offset: 4px; }
+.textLink { display: inline-flex; align-items: center; min-height: 44px; }
+.textLink:hover, .helper a:hover { text-decoration: underline; }
+.actions { display: grid; gap: 16px; }
+.backLink { display: inline-flex; align-items: center; min-height: 44px; margin-top: 20px; color: #214bdc; font-size: 14px; font-weight: 600; text-underline-offset: 4px; }
+.backLink:hover { text-decoration: underline; }
+.asideHeading { margin: 0 0 28px; font-size: clamp(26px, 2.8vw, 38px); line-height: 1.2; letter-spacing: -0.8px; font-weight: 600; }
+.steps { list-style: none; counter-reset: recovery; margin: 0; padding: 0; }
+.steps li { position: relative; counter-increment: recovery; padding: 22px 0 22px 48px; border-top: 1px solid #2c3c49; }
+.steps li::before { content: '0' counter(recovery); position: absolute; top: 25px; left: 0; color: #9bb8ff; font-family: 'Scribsy Mono', monospace; font-size: 13px; }
+.steps strong { display: block; margin-bottom: 5px; font-size: 18px; font-weight: 600; }
+.steps span { color: #bdcad4; font-size: 15px; line-height: 1.6; }
