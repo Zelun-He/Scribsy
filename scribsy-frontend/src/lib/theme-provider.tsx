@@ -5,7 +5,7 @@ import { ThemeProvider as NextThemesProvider, type ThemeProviderProps } from 'ne
 
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="dark" enableSystem={false} {...props}>
+    <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false} themes={['light', 'dark']} storageKey="scribsy-color-theme" {...props}>
       {children}
     </NextThemesProvider>
   );

@@ -1,32 +1,23 @@
 'use client';
 
-import * as React from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
+import { Sun, Moon } from 'lucide-react';
+import styles from './theme-toggle.module.css';
 
-export function ThemeToggle() {
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  if (!mounted) {
-    return null;
-  }
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   return (
-    <Button
-      variant="custom"
-      size="sm"
-      onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-      className="relative h-9 w-9 bg-white dark:bg-gray-800 border border-gray-300 dark:border-emerald-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-    >
-      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-gray-800 dark:text-gray-200" />
-      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-gray-800 dark:text-gray-200" />
-      <span className="sr-only">Toggle theme</span>
-    </Button>
+    <div role="group" aria-label="Color theme" className={`${styles.toggle} ${compact ? styles.compact : ''}`}>
+      <button type="button" aria-label="Light mode" title="Light mode" aria-pressed={mounted ? theme === 'light' : true} disabled={!mounted} onClick={() => setTheme('light')}>
+        <Sun size={16} aria-hidden="true" /><span>Light</span>
+      </button>
+      <button type="button" aria-label="Dark mode" title="Dark mode" aria-pressed={mounted && theme === 'dark'} disabled={!mounted} onClick={() => setTheme('dark')}>
+        <Moon size={16} aria-hidden="true" /><span>Dark</span>
+      </button>
+    </div>
   );
 }
