@@ -1,8 +1,14 @@
 """Add newer note fields without replacing legacy tables or records."""
 from sqlalchemy import inspect, literal, text
+from contextlib import nullcontext
 
 
 ADDITIVE_COLUMNS = {
+    "users": (
+        "role", "last_login", "failed_login_attempts", "account_locked_until",
+        "tenant_id", "work_start_time", "work_end_time", "timezone", "working_days",
+    ),
+    "patients": ("tenant_id",),
     "notes": (
         "audio_file", "s3_key", "file_size", "content_type", "storage_provider",
         "transcript", "soap_subjective", "soap_objective", "soap_assessment", "soap_plan",
@@ -19,7 +25,8 @@ ADDITIVE_COLUMNS = {
 def upgrade_legacy_tables(engine):
     from app.db.database import Base
 
-    with engine.begin() as conn:
+    context = engine.begin() if hasattr(engine, "connect") else nullcontext(engine)
+    with context as conn:
         quote = conn.dialect.identifier_preparer.quote
         for table_name, names in ADDITIVE_COLUMNS.items():
             existing = {c["name"] for c in inspect(conn).get_columns(table_name)}

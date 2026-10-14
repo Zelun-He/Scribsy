@@ -1,3 +1,4 @@
+import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 
@@ -20,6 +21,8 @@ def test_old_notes_become_readable_without_losing_records(tmp_path):
                 VALUES (41, 7, 9, 1, 'Progress', 'Preserved legacy note', 'draft')"""))
             conn.execute(text("CREATE TABLE appointments (id INTEGER PRIMARY KEY)"))
             conn.execute(text("INSERT INTO appointments (id) VALUES (12)"))
+            conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY)"))
+            conn.execute(text("CREATE TABLE patients (id INTEGER PRIMARY KEY)"))
 
         upgrade_legacy_tables(engine)
         first_columns = [(c["name"], str(c["type"]), c["nullable"], c["default"])
@@ -46,10 +49,11 @@ def test_failed_database_initialization_is_not_ready(monkeypatch):
     from app import main
 
     monkeypatch.setattr(main.app.state, "database_ready", True, raising=False)
-    def fail_init():
+    def fail_init(**_):
         raise RuntimeError("Simulated schema initialization failure")
-    monkeypatch.setattr(main, "init_db", fail_init)
-    main.on_startup()
+    monkeypatch.setattr(main, "initialize_database", fail_init)
+    with pytest.raises(RuntimeError, match="Simulated schema"):
+        main.on_startup()
     response = main.readyz()
     assert response.status_code == 503
     assert b"schema_not_ready" in response.body
