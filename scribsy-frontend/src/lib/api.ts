@@ -240,22 +240,22 @@ class ApiClient {
 
   // Password reset endpoints
   async requestPasswordReset(email: string): Promise<{ message: string; success: boolean }> {
-    const response = await fetch(`${this.baseURL}/auth/request-password-reset`, {
+    const response = await fetch(`${API_BASE_URL}/auth/request-password-reset`, {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify({ email }),
-      credentials: this.requestCredentials(),
+      credentials: 'omit',
     });
 
     return this.handleResponse<{ message: string; success: boolean }>(response);
   }
 
   async verifyPasswordReset(token: string, newPassword: string): Promise<{ message: string; success: boolean }> {
-    const response = await fetch(`${this.baseURL}/auth/verify-password-reset`, {
+    const response = await fetch(`${API_BASE_URL}/auth/verify-password-reset`, {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify({ token, new_password: newPassword }),
-      credentials: this.requestCredentials(),
+      credentials: 'omit',
     });
 
     return this.handleResponse<{ message: string; success: boolean }>(response);

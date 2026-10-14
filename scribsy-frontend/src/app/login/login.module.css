@@ -1,0 +1,77 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 100svh;
+  background: #fff;
+  color: #0f1a24;
+  font-family: 'Scribsy Plex', 'Helvetica Neue', system-ui, sans-serif;
+  line-height: 1.5;
+}
+.signInPanel { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; padding: 40px clamp(28px, 5vw, 88px); }
+.brandRow, .footer, .formContent { width: 100%; max-width: 420px; margin-inline: auto; }
+.brand { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; color: #0f1a24; font-size: 24px; font-weight: 700; letter-spacing: -0.8px; }
+.formArea { display: flex; align-items: center; padding-block: 52px; }
+.formContent h1 { margin: 0; font-size: clamp(30px, 2.6vw, 40px); font-weight: 700; line-height: 1.15; letter-spacing: -1.2px; }
+.subtitle { margin: 12px 0 34px; color: #465362; font-size: 17px; }
+.form { display: grid; gap: 22px; }
+.field { display: grid; gap: 9px; }
+.field label { font-size: 15px; font-weight: 600; }
+.labelRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.labelRow a, .footer a { color: #214bdc; font-weight: 600; text-underline-offset: 4px; }
+.labelRow a { font-size: 14px; }
+.labelRow a:hover, .footer a:hover { text-decoration: underline; }
+.input { width: 100%; min-width: 0; height: 54px; border: 1px solid #bfc9d3; border-radius: 7px; background: #fff; color: #0f1a24; padding: 12px 14px; font: inherit; font-size: 16px; }
+.input:focus { outline: 3px solid #d7e2ff; outline-offset: 1px; border-color: #214bdc; }
+.input:disabled { background: #f4f6f7; }
+.passwordField { position: relative; }
+.passwordField input { padding-right: 78px; }
+.passwordToggle { position: absolute; inset: 5px 6px 5px auto; min-width: 60px; border-radius: 4px; color: #465362; font-size: 14px; font-weight: 600; }
+.passwordToggle:hover { background: #f4f6f7; }
+.signInButton, .demoButton { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; padding: 12px 20px; border-radius: 7px; font: inherit; font-size: 17px; font-weight: 600; transition: background-color 150ms; }
+.signInButton { background: #214bdc; color: #fff; border: 1px solid #214bdc; }
+.signInButton:hover { background: #193cba; }
+.demoButton { background: #fff; color: #0f1a24; border: 1px solid #bfc9d3; }
+.demoButton:hover { background: #f4f6f7; }
+.signInButton:disabled, .demoButton:disabled { opacity: 0.6; cursor: wait; }
+.page a:focus-visible, .page button:focus-visible { outline: 3px solid #8eafff; outline-offset: 4px; }
+.divider { display: flex; align-items: center; gap: 18px; margin: 28px 0; color: #677585; font-family: 'Scribsy Mono', monospace; font-size: 12px; letter-spacing: 1px; }
+.divider::before, .divider::after { content: ''; height: 1px; flex: 1; background: #dce1e5; }
+.demoDescription { margin: 15px 0 0; color: #556270; font-size: 14px; text-align: center; line-height: 1.6; }
+.footer { color: #556270; font-size: 14px; }
+.footer p { margin: 0; }
+.footer a { display: inline-flex; align-items: center; min-height: 44px; }
+.error { margin: 0; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 7px; background: #fef2f2; color: #b91c1c; font-size: 14px; }
+.previewPanel { display: flex; align-items: center; justify-content: center; min-width: 0; background: #0f1b24; color: #fff; padding: 80px clamp(28px, 5vw, 88px); }
+.previewContent { width: 100%; max-width: 560px; }
+.eyebrow { margin: 0 0 30px; color: #acbac5; font-family: 'Scribsy Mono', monospace; font-size: 12px; font-weight: 400; line-height: 1.6; letter-spacing: 1.6px; text-transform: uppercase; }
+.noteCard { padding: 24px; border-radius: 12px; background: #fff; color: #0f1a24; box-shadow: 0 20px 44px #00000014; }
+.noteHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.noteHeader h3, .followUp h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.badge { flex-shrink: 0; padding: 3px 9px; border: 1px solid #ffc7a9; border-radius: 20px; background: #fff3eb; color: #ad3e13; font-size: 12px; font-weight: 600; }
+.soapExcerpt { display: grid; gap: 16px; margin: 0; font-size: 15px; line-height: 1.6; }
+.soapExcerpt > div { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 14px; }
+.soapExcerpt dt { color: #214bdc; font-weight: 600; }
+.soapExcerpt abbr { text-decoration: none; }
+.soapExcerpt dd { margin: 0; color: #374554; }
+.followUp { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 24px; padding: 19px 24px; border: 1px solid #2c3c49; border-radius: 10px; background: #1c2c38; }
+.followUp span { color: #b5c3cd; font-family: 'Scribsy Mono', monospace; font-size: 12px; white-space: nowrap; }
+.previewCaption { margin: 34px 0 0; font-size: clamp(21px, 2vw, 27px); font-weight: 500; line-height: 1.4; letter-spacing: -0.5px; }
+.sampleDisclaimer { margin: 14px 0 0; color: #acbac5; font-size: 12px; }
+@media (max-width: 960px) {
+  .signInPanel { padding: 28px; }
+  .previewPanel { padding: 48px 28px; }
+  .noteCard { padding: 20px; }
+  .followUp { padding: 18px 20px; }
+}
+@media (max-width: 760px) {
+  .page { grid-template-columns: minmax(0, 1fr); }
+  .signInPanel { min-height: 100svh; padding: 24px; }
+  .formArea { padding-block: 40px; }
+  .formContent h1 { font-size: 34px; }
+  .subtitle { font-size: 16px; margin-bottom: 28px; }
+  .previewPanel { padding: 48px 24px; }
+  .footer { padding-top: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signInButton, .demoButton { transition: none; }
+}
