@@ -1,228 +1,81 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Suspense, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { apiClient } from '@/lib/api';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/lib/auth';
+import { PasswordRecoveryLayout } from '@/components/password-recovery-layout';
+import authStyles from '@/app/login/login.module.css';
+import styles from '../recovery.module.css';
 
 function ResetPasswordForm() {
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const token = useSearchParams().get('token');
+  const { handleAuthFailure } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirmation, setConfirmation] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const token = searchParams.get('token');
-
-  useEffect(() => {
-    if (!token) {
-      setError('Invalid or missing reset token. Please request a new password reset.');
-    }
-  }, [token]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!token) {
-      setError('Invalid or missing reset token.');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
-      return;
-    }
-
-    setError('');
-    setShowConfirm(true);
-  };
-
-  const confirmPasswordReset = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      await apiClient.verifyPasswordReset(token!, newPassword);
-      setSuccess(true);
-      setShowConfirm(false);
-    } catch (error: any) {
-      setError(error.message || 'Failed to reset password. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (success) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-green-600 dark:text-green-400">
-              Password Reset Successful
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-center text-gray-600 dark:text-gray-400">
-              Your password has been successfully reset. You can now log in with your new password.
-            </p>
-            <Button 
-              onClick={() => router.push('/login')} 
-              className="w-full"
-            >
-              Go to Login
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center">Reset Your Password</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-3">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label htmlFor="newPassword" className="text-sm font-medium">
-                New Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="newPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                  required
-                  disabled={loading || !token}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? (
-                    <EyeSlashIcon className="w-5 h-5" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
+    <PasswordRecoveryLayout
+      title={success ? 'Password updated' : !token ? 'Request a reset link' : 'Choose a new password'}
+      description={success ? 'Sign in with your new password to return to your workspace.'
+        : !token ? 'Open the link in your reset email, or request a new one below.'
+        : 'Use at least eight characters, including a number.'}
+    >
+      {success ? (
+        <Link href="/login" className={authStyles.signInButton}>Sign in</Link>
+      ) : !token ? (
+        <Link href="/auth/forgot-password" className={authStyles.signInButton}>Request a reset link</Link>
+      ) : (
+        <form className={authStyles.form} aria-busy={loading} onSubmit={async event => {
+          event.preventDefault();
+          if (loading) return;
+          setError('');
+          if (password !== confirmation) { setError('Passwords do not match.'); return; }
+          if (password.length < 8 || !/[0-9]/.test(password)) { setError('Use at least 8 characters, including a number.'); return; }
+          if (new TextEncoder().encode(password).length > 72) { setError('Please use a shorter password (maximum 72 bytes).'); return; }
+          setLoading(true);
+          try {
+            const result = await apiClient.verifyPasswordReset(token, password);
+            if (!result.success) throw new Error('Unable to update your password. Please try again.');
+            handleAuthFailure();
+            setPassword('');
+            setConfirmation('');
+            setSuccess(true);
+            window.history.replaceState(null, '', '/auth/reset-password');
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Unable to update your password. Please try again.');
+          } finally { setLoading(false); }
+        }}>
+          {error && <p role="alert" className={authStyles.error}>{error}</p>}
+          <div className={authStyles.field}>
+            <label htmlFor="new-password">New password</label>
+            <div className={authStyles.passwordField}>
+              <input id="new-password" name="new-password" type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+                value={password} onChange={event => setPassword(event.target.value)} required minLength={8} maxLength={100}
+                pattern=".*[0-9].*" title="Use at least 8 characters, including a number." disabled={loading} className={authStyles.input} />
+              <button type="button" className={authStyles.passwordToggle} aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-controls="new-password" aria-pressed={showPassword} onClick={() => setShowPassword(prev => !prev)}>{showPassword ? 'Hide' : 'Show'}</button>
             </div>
-
-            <div className="space-y-2">
-              <label htmlFor="confirmPassword" className="text-sm font-medium">
-                Confirm New Password
-              </label>
-              <div className="relative">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Confirm new password"
-                  required
-                  disabled={loading || !token}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? (
-                    <EyeSlashIcon className="w-5 h-5" />
-                  ) : (
-                    <EyeIcon className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={loading || !token || !newPassword || !confirmPassword}
-            >
-              {loading ? 'Resetting Password...' : 'Reset Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Password Reset Confirmation Dialog */}
-      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Password Reset</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to reset your password? This action cannot be undone and you will need to use your new password for all future logins.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmPasswordReset}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
-            >
-              {loading ? 'Resetting...' : 'Yes, Reset Password'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+          </div>
+          <div className={authStyles.field}>
+            <label htmlFor="confirm-password">Confirm new password</label>
+            <input id="confirm-password" name="confirm-password" type="password" autoComplete="new-password"
+              value={confirmation} onChange={event => setConfirmation(event.target.value)} required disabled={loading} className={authStyles.input} />
+          </div>
+          <button type="submit" className={authStyles.signInButton} disabled={loading}>{loading ? 'Updating password…' : 'Update password'}</button>
+          <p className={styles.helper}>Link expired or already used? <Link href="/auth/forgot-password">Request a new link</Link>.</p>
+        </form>
+      )}
+      {!success && <Link href="/login" className={styles.backLink}>← Back to sign in</Link>}
+    </PasswordRecoveryLayout>
   );
 }
 
 export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Loading...</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center text-gray-600 dark:text-gray-400">
-              Loading password reset form...
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    }>
-      <ResetPasswordForm />
-    </Suspense>
-  );
+  return <Suspense fallback={<PasswordRecoveryLayout title="Loading reset link…" description="Please wait a moment."><p role="status">Loading…</p></PasswordRecoveryLayout>}><ResetPasswordForm /></Suspense>;
 }

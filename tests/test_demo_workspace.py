@@ -72,7 +72,9 @@ def test_demo_seed_is_idempotent_and_can_be_disabled(monkeypatch):
     assert client.post('/auth/demo').status_code == 503
 
 
-def test_demo_password_reset_does_not_issue_tokens():
+def test_demo_password_reset_does_not_issue_tokens(monkeypatch):
+    from app.api.endpoints.auth import email_service
+    monkeypatch.setattr(email_service, "is_configured", lambda: True)
     ensure_demo_workspace()
     with SessionLocal() as db:
         user = db.query(models.User).filter_by(username=DEMO_USERNAME).one()
