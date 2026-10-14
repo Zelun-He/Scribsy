@@ -32,7 +32,8 @@ import os
 import time
 from app.config import settings
 import logging
-from app.db.database import engine, init_db, backfill_tenant_namespaces
+from app.db.database import engine
+from app.db.bootstrap import initialize_database
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
@@ -283,55 +284,17 @@ def on_startup():
     """Initialize database tables on application startup."""
     app.state.database_ready = False
     try:
-        init_db()
-        # Reduced logging for Railway rate limits
-        # logger.info("Database initialized (tables ensured)")
-        
-        # Run one-time migration to fix missing columns (reduced logging)
-        try:
-            from sqlalchemy import text
-            from app.db.database import engine
-            
-            if engine.dialect.name == "postgresql":
-                with engine.connect() as conn:
-                    # Always run additive migrations with IF NOT EXISTS so partially-migrated
-                    # databases (e.g. role exists but last_login does not) self-heal on boot.
-                    migrations = [
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'provider';",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP;",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS account_locked_until TIMESTAMP;",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
-                        "ALTER TABLE patients ADD COLUMN IF NOT EXISTS tenant_id VARCHAR DEFAULT 'default';",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_start_time VARCHAR DEFAULT '09:00';",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS work_end_time VARCHAR DEFAULT '17:00';",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone VARCHAR DEFAULT 'UTC';",
-                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS working_days VARCHAR DEFAULT '1,2,3,4,5';",
-                        "UPDATE users SET tenant_id = ('user-' || CAST(id AS TEXT)) WHERE tenant_id IS NULL OR tenant_id = 'default';",
-                        "UPDATE patients SET tenant_id = ('user-' || CAST(user_id AS TEXT)) WHERE (tenant_id IS NULL OR tenant_id = 'default') AND user_id IS NOT NULL;",
-                    ]
-
-                    trans = conn.begin()
-                    try:
-                        for migration in migrations:
-                            conn.execute(text(migration))
-                        trans.commit()
-                        # logger.info("Database migration completed")
-                    except Exception as e:
-                        trans.rollback()
-                        logger.error(f"Migration failed: {e}")
-
-                    
-        except Exception as e:
-            logger.error(f"Migration error: {e}")
-
-        backfill_tenant_namespaces()
-        app.state.database_ready = True
-        from app.services.demo_workspace import ensure_demo_workspace
-        ensure_demo_workspace()
-            
+        initialize_database(max_attempts=3, retry_delay=1)
     except Exception as e:
         log_error(e, context="DB init on startup")
+        raise
+    app.state.database_ready = True
+    try:
+        from app.services.demo_workspace import ensure_demo_workspace
+        ensure_demo_workspace()
+    except Exception as e:
+        # The native frontend demo does not depend on a seeded backend account.
+        logger.warning("Optional backend demo initialization skipped: %s", e)
 
 @app.get("/")
 def root():
