@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -89,6 +90,12 @@ export default function RegisterPage() {
           />
         </div>
         <Button type="submit" className="w-full" loading={loading} disabled={loading}>{loading ? 'Creating account...' : 'Create account'}</Button>
+        <p className="text-center text-sm text-slate-600">
+          Already have an account?{' '}
+          <Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-800">
+            Sign in
+          </Link>
+        </p>
       </form>
     </div>
   );

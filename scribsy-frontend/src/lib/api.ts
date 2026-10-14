@@ -206,7 +206,8 @@ class ApiClient {
   }
 
   async register(userData: RegisterRequest): Promise<User> {
-    const response = await fetch(`${this.baseURL}/auth/register`, {
+    // Registration always creates a real account, including from a demo session.
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: this.getJsonHeaders(),
       body: JSON.stringify(userData),

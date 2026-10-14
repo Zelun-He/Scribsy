@@ -6,7 +6,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
-    "test:api": "node --import tsx --test tests/demo-api.test.ts",
+    "test:api": "node --import tsx --test tests/*.test.ts",
     "lint": "next lint"
   },
   "dependencies": {

@@ -69,6 +69,7 @@ export default function Home() {
           </nav>
           <div className={styles.navActions}>
             <Link href="/login">Sign in</Link>
+            <Link href="/register">Create account</Link>
             <Link href="/sample-visit" className={styles.primaryButton}>
               Try a sample visit
             </Link>
@@ -83,6 +84,7 @@ export default function Home() {
               <a href="#faq">FAQ</a>
               <Link href="/contact">Contact</Link>
               <Link href="/login">Sign in</Link>
+              <Link href="/register">Create account</Link>
               <Link href="/sample-visit">Try a sample visit</Link>
             </nav>
           </details>
@@ -109,7 +111,12 @@ export default function Home() {
               <ShieldCheck size={18} />
               Every generated note stays in review until you finalize it.
             </p>
-            <DemoLoginButton className={styles.demoButton} />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <DemoLoginButton className={styles.demoButton} />
+              <Link href="/register" className={`${styles.demoButton} inline-flex items-center`}>
+                Create an account
+              </Link>
+            </div>
           </div>
           <div className={styles.heroPreview}>
             <ClinicalNote
@@ -282,6 +289,7 @@ export default function Home() {
             <Link href="/contact">Contact</Link>
             <a href="#security">Privacy & security</a>
             <Link href="/login">Sign in</Link>
+            <Link href="/register">Create account</Link>
             <Link href="/dashboard">Dashboard preview</Link>
           </nav>
           <span>© {new Date().getFullYear()} Scribsy</span>
