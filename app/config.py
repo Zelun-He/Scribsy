@@ -105,9 +105,12 @@ class Settings(BaseSettings):
         # Use DATABASE_URL if set (Railway automatically provides this for PostgreSQL)
         database_url = os.getenv("DATABASE_URL")
         if database_url:
-            # Railway provides postgres:// but SQLAlchemy needs postgresql://
+            # Select the installed driver explicitly; SQLAlchemy's PostgreSQL
+            # default changed from psycopg2 to psycopg in version 2.1.
             if database_url.startswith("postgres://"):
-                database_url = database_url.replace("postgres://", "postgresql://", 1)
+                database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
+            elif database_url.startswith("postgresql://"):
+                database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
             return database_url
         # Default to SQLite for local development
         return "sqlite:///./scribsy.db"
