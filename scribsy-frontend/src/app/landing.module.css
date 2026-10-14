@@ -560,7 +560,7 @@
   .navInner {
     padding: 14px 20px;
   }
-  .navActions > a:first-child {
+  .navActions > a:not(.primaryButton) {
     display: none;
   }
   .navActions .primaryButton {

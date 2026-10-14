@@ -29,9 +29,12 @@ export function SidebarFrame({ children }: { children: React.ReactNode }) {
         {user.is_demo && (
           <div className="workspace-banner">
             <span>Demo workspace · Fictional data · View-only</span>
-            <button className="font-semibold underline" onClick={logout}>
-              Exit demo
-            </button>
+            <div className="flex items-center gap-4">
+              <Link href="/register" className="font-semibold underline">Create account</Link>
+              <button className="font-semibold underline" onClick={logout}>
+                Exit demo
+              </button>
+            </div>
           </div>
         )}
         {user.is_demo && !demoPage ? (

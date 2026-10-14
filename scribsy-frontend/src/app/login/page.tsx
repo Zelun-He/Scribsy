@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { DemoLoginButton } from '@/components/demo-login-button';
+import Link from 'next/link';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,6 +69,12 @@ export default function LoginPage() {
           />
         </div>
         <Button type="submit" className="w-full" loading={loading} disabled={loading}>{loading ? 'Signing in...' : 'Sign in'}</Button>
+        <p className="text-center text-sm text-slate-600">
+          New to Scribsy?{' '}
+          <Link href="/register" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-800">
+            Create an account
+          </Link>
+        </p>
       </form>
       <div className="mx-auto mt-6 max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center">
         <h2 className="font-semibold text-slate-900">Explore Scribsy</h2>
