@@ -1,0 +1,30 @@
+.registerPanel { grid-template-rows: auto 1fr; }
+.formArea { padding-block: 44px; }
+.subtitle a { color: #214bdc; font-weight: 600; text-underline-offset: 4px; }
+.subtitle a:hover { text-decoration: underline; }
+.helper { margin: 0; color: #556270; font-size: 13px; line-height: 1.5; }
+.requirements { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 2px 0 0; padding: 0; color: #556270; font-size: 13px; list-style: none; }
+.requirements li { display: inline-flex; align-items: center; gap: 7px; }
+.requirements li::before { content: ''; width: 9px; height: 9px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 50%; }
+.requirements li[data-met='true'] { color: #214bdc; }
+.requirements li[data-met='true']::before { background: currentColor; }
+.privacyNote { margin: 18px 0 0; color: #556270; font-size: 13px; line-height: 1.6; }
+.privacyNote a { text-decoration: underline; text-underline-offset: 3px; }
+.privacyNote a:hover { color: #214bdc; }
+.demoRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 28px; padding-top: 24px; border-top: 1px solid #dce1e5; color: #465362; font-size: 14px; }
+.demoRow p { margin: 0; }
+.demoLink { display: inline-flex; align-items: center; min-height: 44px; color: #214bdc; font: inherit; font-weight: 600; text-underline-offset: 4px; border-radius: 3px; }
+.demoLink:hover { text-decoration: underline; }
+.demoLink:disabled { opacity: 0.6; cursor: wait; }
+.steps { margin: 0; padding: 0; list-style: none; }
+.steps li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 24px; padding: 24px 0; border-top: 1px solid #2c3c49; }
+.steps li:last-child { border-bottom: 1px solid #2c3c49; }
+.stepNumber { padding-top: 3px; color: #9bb8ff; font-family: 'Scribsy Mono', monospace; font-size: 14px; }
+.steps h3 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.4; }
+.steps p { margin: 5px 0 0; color: #bdcad4; font-size: 16px; line-height: 1.6; }
+@media (max-width: 760px) {
+  .formArea { padding-block: 36px; }
+  .steps li { gap: 16px; }
+  .steps h3 { font-size: 19px; }
+  .steps p { font-size: 15px; }
+}
