@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DEMO_TOKEN } from '../src/lib/demo-data';
 
-test('a demo visitor can register and switch to a real account', async () => {
+test('a demo visitor uses the real API for account creation, recovery, and sign-in', async () => {
   const names = ['window', 'localStorage', 'fetch'] as const;
   const originals = names.map(name => Object.getOwnPropertyDescriptor(globalThis, name));
   const storage = new Map([['auth_token', DEMO_TOKEN]]);
@@ -21,6 +21,11 @@ test('a demo visitor can register and switch to a real account', async () => {
       assert.equal(new Headers(init?.headers).has('Authorization'), false);
       return Response.json(user);
     }
+    if (url === '/api/auth/request-password-reset' || url === '/api/auth/verify-password-reset') {
+      assert.equal(init?.credentials, 'omit');
+      assert.equal(new Headers(init?.headers).has('Authorization'), false);
+      return Response.json({ success: true, message: 'Recovery request handled' });
+    }
     if (url === '/api/auth/token') return Response.json({ access_token: 'real-account-session', token_type: 'bearer' });
     if (url === '/api/auth/me') return Response.json(user);
     return Response.json({ detail: 'Demo records are view-only' }, { status: 403 });
@@ -28,11 +33,13 @@ test('a demo visitor can register and switch to a real account', async () => {
   try {
     const { apiClient } = await import('../src/lib/api');
     const credentials = { username: user.username, email: user.email, password: 'test-password' };
+    assert.equal((await apiClient.requestPasswordReset(user.email)).success, true);
+    assert.equal((await apiClient.verifyPasswordReset('test-reset-token', 'test-new-password')).success, true);
     assert.equal((await apiClient.register(credentials)).username, user.username);
     await apiClient.login(credentials);
     assert.equal((await apiClient.getCurrentUser()).is_demo, false);
     assert.equal(storage.get('auth_token'), 'real-account-session');
-    assert.deepEqual(calls, ['/api/auth/register', '/api/auth/token', '/api/auth/me']);
+    assert.deepEqual(calls, ['/api/auth/request-password-reset', '/api/auth/verify-password-reset', '/api/auth/register', '/api/auth/token', '/api/auth/me']);
   } finally {
     names.forEach((name, index) => {
       const descriptor = originals[index];

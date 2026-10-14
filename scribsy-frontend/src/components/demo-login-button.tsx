@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 
-export function DemoLoginButton({ className = "" }: { className?: string }) {
+export function DemoLoginButton({ className = "", label = "View demo dashboard" }: { className?: string; label?: string }) {
   const { loginDemo, loading } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -32,7 +32,7 @@ export function DemoLoginButton({ className = "" }: { className?: string }) {
           }
         }}
       >
-        {busy ? "Opening demo…" : "View demo dashboard"}
+        {busy ? "Opening demo…" : label}
       </button>
       {error && (
         <p role="alert" className="mt-2 text-sm text-red-700">
