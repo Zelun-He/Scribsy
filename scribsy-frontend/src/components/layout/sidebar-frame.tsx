@@ -27,7 +27,7 @@ export function SidebarFrame({ children }: { children: React.ReactNode }) {
       <AppSidebar />
       <main className="workspace-main">
         {user.is_demo && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-200 bg-blue-50 px-6 py-3 text-sm text-blue-900">
+          <div className="workspace-banner">
             <span>Demo workspace · Fictional data · View-only</span>
             <button className="font-semibold underline" onClick={logout}>
               Exit demo

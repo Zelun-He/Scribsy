@@ -190,9 +190,28 @@ body {
   border-color: var(--ring);
   box-shadow: 0 0 0 2px var(--ring);
 }
-.workspace-shell { display: flex; height: 100dvh; overflow: hidden; }
-.workspace-main { flex: 1; min-width: 0; overflow-y: auto; background: #f3f8f6; }
-.dark .workspace-main { background: #102018; }
+.workspace-shell {
+  --primary: #1d4ed8;
+  --secondary: #f4f6f7;
+  --muted: #f4f6f7;
+  --accent: #eef2ff;
+  --accent-foreground: #0f1a24;
+  --border: #dce1e5;
+  --ring: #1d4ed8;
+  display: flex; height: 100dvh; overflow: hidden;
+  font-family: 'Scribsy Plex', 'Helvetica Neue', system-ui, sans-serif;
+}
+.workspace-main { flex: 1; min-width: 0; overflow-y: auto; background: #f4f6f7; }
+.dark .workspace-shell { --primary: #2755d6; --secondary: #172737; --muted: #172737; --accent: #20344f; --accent-foreground: #edf2f7; --border: #304455; --ring: #9bb8ff; }
+.dark .workspace-main { background: #101b26; }
+.workspace-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 30px; border-bottom: 1px solid #dce1e5;
+  background: #fff; color: #556270; font-size: 12px;
+}
+.workspace-banner a, .workspace-banner button { color: #1d4ed8; }
+.dark .workspace-banner { background: #172737; border-color: #304455; color: #a4b5c4; }
+.dark .workspace-banner a, .dark .workspace-banner button { color: #9bb8ff; }
 @media (max-width: 760px) { .workspace-shell { flex-direction: column; } }
 
 @font-face { font-family: 'Scribsy Plex'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/plex-sans-latin.woff2') format('woff2'); }

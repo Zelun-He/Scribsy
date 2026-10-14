@@ -1,11 +1,12 @@
 .sidebar {
-  width: 234px;
+  width: 240px;
+  font-family: "Scribsy Plex", "Helvetica Neue", system-ui, sans-serif;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   background: #fff;
-  color: #12251e;
-  border-right: 1px solid #dce8e3;
+  color: #0f1a24;
+  border-right: 1px solid #dce1e5;
   padding: 28px 16px 22px;
 }
 .brand {
@@ -13,7 +14,7 @@
   align-items: center;
   gap: 10px;
   font-size: 21px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: -0.7px;
   padding: 0 8px;
 }
@@ -22,7 +23,7 @@
   place-items: center;
   height: 34px;
   width: 34px;
-  background: #007f5f;
+  background: #0f1a24;
   color: white;
   border-radius: 9px;
   font-size: 18px;
@@ -34,9 +35,10 @@
   justify-content: center;
   gap: 10px;
   padding: 13px;
-  background: #007f5f;
-  color: white;
-  border-radius: 12px;
+  background: transparent;
+  color: #0f1a24;
+  border: 1px solid #c3cbd2;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 700;
   margin: 27px 0;
@@ -51,24 +53,24 @@
   align-items: center;
   gap: 12px;
   min-height: 42px;
-  border-radius: 10px;
+  border-radius: 6px;
   padding: 10px 12px;
   font-size: 13px;
-  color: #40574d;
+  color: #556270;
 }
 .sidebar nav a:hover {
-  background: #f3f8f6;
+  background: #f4f6f7;
 }
 .sidebar nav a.active {
-  background: #e6f4ef;
-  color: #00674d;
+  background: #eef2ff;
+  color: #0f1a24;
   font-weight: 700;
 }
 .sidebar nav a b {
   margin-left: auto;
   border-radius: 50%;
-  background: #ffebc9;
-  color: #874908;
+  background: #f4f6f7;
+  color: #556270;
   width: 21px;
   height: 21px;
   display: grid;
@@ -78,8 +80,9 @@
 .account {
   margin-top: auto;
   padding: 12px 10px;
-  border: 1px solid #dce8e3;
-  border-radius: 12px;
+  border: 0;
+  border-top: 1px solid #dce1e5;
+  border-radius: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -88,7 +91,7 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  background: #12251e;
+  background: #0f1a24;
   color: white;
   border-radius: 50%;
   width: 37px;
@@ -108,10 +111,10 @@
 .account small {
   font-size: 11px;
   display: block;
-  color: #50665e;
+  color: #556270;
 }
 .account button {
-  color: #50665e;
+  color: #556270;
   padding: 4px;
 }
 .mobileBar,
@@ -119,26 +122,26 @@
   display: none;
 }
 .sidebar :is(a, button):focus-visible {
-  outline: 3px solid #38bfa0;
+  outline: 3px solid #749aff;
   outline-offset: 2px;
 }
 :global(.dark) .sidebar {
-  background: #172c23;
-  color: #e7f2ec;
-  border-color: #2c4439;
+  background: #172737;
+  color: #edf2f7;
+  border-color: #304455;
 }
 :global(.dark) .sidebar nav a,
 :global(.dark) .account small,
 :global(.dark) .account button {
-  color: #b8ccc1;
+  color: #bac9d6;
 }
 :global(.dark) .sidebar nav a:hover,
 :global(.dark) .sidebar nav a.active {
-  background: #224538;
-  color: #7ae1bd;
+  background: #20344f;
+  color: #edf2f7;
 }
 :global(.dark) .account {
-  border-color: #2c4439;
+  border-color: #304455;
 }
 @media (max-width: 760px) {
   .mobileBar {
@@ -146,9 +149,9 @@
     justify-content: space-between;
     align-items: center;
     background: #fff;
-    color: #12251e;
+    color: #0f1a24;
     padding: 12px 16px;
-    border-bottom: 1px solid #dce8e3;
+    border-bottom: 1px solid #dce1e5;
     flex-shrink: 0;
   }
   .mobileBar .brand {
@@ -174,18 +177,29 @@
     left: 0;
     z-index: 100;
     width: 250px;
-    box-shadow: 10px 0 40px #12251e30;
+    box-shadow: 10px 0 40px #0f1a2430;
   }
   .backdrop {
     display: block;
     position: fixed;
     inset: 0;
-    background: #12251e60;
+    background: #0f1a2460;
     z-index: 99;
   }
   :global(.dark) .mobileBar {
-    background: #172c23;
-    color: #e7f2ec;
-    border-color: #2c4439;
+    background: #172737;
+    color: #edf2f7;
+    border-color: #304455;
   }
+}
+
+.newNote:hover {
+  background: #f4f6f7;
+}
+:global(.dark) .newNote {
+  color: #edf2f7;
+  border-color: #405368;
+}
+:global(.dark) .newNote:hover {
+  background: #20344f;
 }

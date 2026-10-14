@@ -7,7 +7,7 @@ export default function ShowcaseDashboard() {
     <div className="workspace-shell">
       <AppSidebar preview />
       <main className="workspace-main">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 bg-emerald-50 px-5 py-2 text-xs text-emerald-900">
+        <div className="workspace-banner">
           <Link href="/" className="font-semibold hover:underline">
             ← Back to Scribsy
           </Link>
