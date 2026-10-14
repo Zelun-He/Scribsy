@@ -1,0 +1,10 @@
+.toggle { display: flex; gap: 3px; padding: 3px; border: 1px solid #dce1e5; border-radius: 8px; background: #f4f6f7; }
+.toggle button { display: flex; flex: 1; align-items: center; justify-content: center; gap: 7px; padding: 7px 10px; border-radius: 5px; color: #556270; font-size: 12px; font-weight: 600; }
+.toggle button[aria-pressed="true"] { background: #fff; color: #0f1a24; box-shadow: 0 1px 3px rgb(15 26 36 / 10%); }
+.toggle button:focus-visible { outline: 2px solid #2755d6; outline-offset: 2px; }
+.toggle button:disabled { cursor: wait; }
+.compact button { padding: 6px; }
+.compact span { display: none; }
+:global(.dark) .toggle { background: #101b26; border-color: #304455; }
+:global(.dark) .toggle button { color: #bac9d6; }
+:global(.dark) .toggle button[aria-pressed="true"] { background: #304455; color: #fff; }

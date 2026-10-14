@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api";
 import { needsReview } from "@/lib/dashboard";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import styles from "./app-sidebar.module.css";
 
 const navigation = [
@@ -62,14 +63,17 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
         <Link href="/dashboard" className={styles.brand}>
           <span>S</span>Scribsy
         </Link>
-        <button
-          aria-label={open ? "Close navigation" : "Open navigation"}
-          aria-expanded={open}
-          aria-controls="workspace-navigation"
-          onClick={() => setOpen((previous) => !previous)}
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        <div className={styles.mobileActions}>
+          <ThemeToggle compact />
+          <button
+            aria-label={open ? "Close navigation" : "Open navigation"}
+            aria-expanded={open}
+            aria-controls="workspace-navigation"
+            onClick={() => setOpen((previous) => !previous)}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
       {open && (
         <button
@@ -130,6 +134,9 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
             );
           })}
         </nav>
+        <div className={styles.themeControls}>
+          <ThemeToggle />
+        </div>
         <div className={styles.account}>
           <span className={styles.avatar}>
             {preview ? "T" : user?.username.charAt(0).toUpperCase()}
