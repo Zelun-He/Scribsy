@@ -1,102 +1,165 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth';
-import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Activity } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { DemoLoginButton } from '@/components/demo-login-button';
+import authStyles from '../login/login.module.css';
+import styles from './register.module.css';
+
+const steps = [
+  { title: 'Record or upload a visit', description: 'In the browser, or drop in an audio file.' },
+  { title: 'Get a SOAP draft', description: 'Transcript on one side, structured note on the other.' },
+  { title: 'Review and approve', description: 'Nothing is final until you sign off.' },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuth();
-  const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' });
+  const { register, loading: authLoading } = useAuth();
+  const [formData, setFormData] = useState({ email: '', username: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const hasLength = formData.password.length >= 8;
+  const hasNumber = /[0-9]/.test(formData.password);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white px-4 py-10">
-      <div className="mx-auto mb-6 max-w-md text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Create your Scribsy account</h1>
-        <p className="mt-2 text-sm text-slate-600">Start generating clinical notes in minutes.</p>
-      </div>
-      <form
-        className="mx-auto w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/40 space-y-4"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (formData.password !== formData.confirmPassword) {
-            setError('Passwords do not match');
-            return;
-          }
-          setLoading(true);
-          setError('');
-          try {
-            await register({ username: formData.username, email: formData.email, password: formData.password });
-            router.push('/dashboard');
-          } catch (err) {
-            setError(err instanceof Error ? err.message : 'Registration failed');
-          } finally {
-            setLoading(false);
-          }
-        }}
-      >
-        <h2 className="text-xl font-semibold text-slate-900">Create account</h2>
-        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-
-        <div className="space-y-2">
-          <label htmlFor="username" className="block text-sm font-medium text-slate-700">Username</label>
-          <input
-            id="username"
-            name="username"
-            value={formData.username}
-            onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
-            required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-medium text-slate-700">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-            required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-medium text-slate-700">Password</label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            value={formData.password}
-            onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-            required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700">Confirm Password</label>
-          <input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-            required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-          />
-        </div>
-        <Button type="submit" className="w-full" loading={loading} disabled={loading}>{loading ? 'Creating account...' : 'Create account'}</Button>
-        <p className="text-center text-sm text-slate-600">
-          Already have an account?{' '}
-          <Link href="/login" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-800">
-            Sign in
+    <main className={authStyles.page}>
+      <section className={`${authStyles.signInPanel} ${styles.registerPanel}`} aria-labelledby="register-heading">
+        <header className={authStyles.brandRow}>
+          <Link href="/" className={authStyles.brand} aria-label="Scribsy home">
+            <Activity size={22} aria-hidden="true" />
+            Scribsy
           </Link>
-        </p>
-      </form>
-    </div>
+        </header>
+        <div className={`${authStyles.formArea} ${styles.formArea}`}>
+          <div className={authStyles.formContent}>
+            <h1 id="register-heading">Create your account</h1>
+            <p className={`${authStyles.subtitle} ${styles.subtitle}`}>
+              Already have one? <Link href="/login">Sign in</Link>
+            </p>
+            <form
+              className={authStyles.form}
+              aria-busy={loading}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (loading) return;
+                if (!hasLength || !hasNumber) {
+                  setError('Use at least 8 characters, including a number.');
+                  return;
+                }
+                setLoading(true);
+                setError('');
+                try {
+                  await register(formData);
+                  router.push('/dashboard');
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : 'Registration failed');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              {error && <p id="register-error" role="alert" className={authStyles.error}>{error}</p>}
+              <div className={authStyles.field}>
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  disabled={loading}
+                  required
+                  className={authStyles.input}
+                />
+              </div>
+              <div className={authStyles.field}>
+                <label htmlFor="username">Username</label>
+                <input
+                  id="username"
+                  name="username"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  value={formData.username}
+                  onChange={(e) => setFormData(prev => ({ ...prev, username: e.target.value }))}
+                  disabled={loading}
+                  aria-describedby="username-help"
+                  required
+                  className={authStyles.input}
+                />
+                <p id="username-help" className={styles.helper}>You can sign in with this or your email.</p>
+              </div>
+              <div className={authStyles.field}>
+                <label htmlFor="password">Password</label>
+                <div className={authStyles.passwordField}>
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    minLength={8}
+                    pattern=".*[0-9].*"
+                    title="Use at least 8 characters, including a number."
+                    value={formData.password}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    disabled={loading}
+                    aria-describedby="password-requirements"
+                    required
+                    className={authStyles.input}
+                  />
+                  <button
+                    type="button"
+                    className={authStyles.passwordToggle}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-controls="password"
+                    aria-pressed={showPassword}
+                    onClick={() => setShowPassword(prev => !prev)}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
+                <ul id="password-requirements" className={styles.requirements}>
+                  <li data-met={hasLength}>8+ characters<span className="sr-only">{hasLength ? ': met' : ': not met'}</span></li>
+                  <li data-met={hasNumber}>A number<span className="sr-only">{hasNumber ? ': met' : ': not met'}</span></li>
+                </ul>
+              </div>
+              <button type="submit" className={authStyles.signInButton} disabled={loading || authLoading}>
+                {loading ? 'Creating account…' : 'Create account'}
+              </button>
+            </form>
+            <p className={styles.privacyNote}>
+              Before your first visit, review our <Link href="/#security">privacy and security information</Link>.
+            </p>
+            <div className={styles.demoRow}>
+              <p>Just looking around?</p>
+              <DemoLoginButton className={styles.demoLink} label="Explore the demo →" />
+            </div>
+          </div>
+        </div>
+      </section>
+      <aside className={authStyles.previewPanel} aria-labelledby="onboarding-heading">
+        <div className={authStyles.previewContent}>
+          <h2 id="onboarding-heading" className={authStyles.eyebrow}>After you sign up</h2>
+          <ol className={styles.steps}>
+            {steps.map((step, index) => (
+              <li key={step.title}>
+                <span className={styles.stepNumber} aria-hidden="true">{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </aside>
+    </main>
   );
 }
