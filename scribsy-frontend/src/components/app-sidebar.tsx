@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { 
+import {
   LayoutDashboard,
   ClipboardList,
   Users,
@@ -88,11 +88,15 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
         </Link>
         <Link
           className={styles.newNote}
-          href={destination("/notes/new?mode=record")}
+          href={
+            user?.is_demo
+              ? "/sample-visit"
+              : destination("/notes/new?mode=record")
+          }
           onClick={() => setOpen(false)}
         >
           <Mic size={16} />
-          New note
+          {user?.is_demo ? "Try sample visit" : "New note"}
         </Link>
         <nav>
           {navigation.map((item) => {
@@ -132,7 +136,11 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
           </span>
           <div>
             <strong>{preview ? "Dr. Taylor" : user?.username}</strong>
-            <small>{preview ? "Sample workspace" : "Clinical workspace"}</small>
+            <small>
+              {preview || user?.is_demo
+                ? "Sample workspace"
+                : "Clinical workspace"}
+            </small>
           </div>
           <button
             aria-label={preview ? "Sign in" : "Log out"}

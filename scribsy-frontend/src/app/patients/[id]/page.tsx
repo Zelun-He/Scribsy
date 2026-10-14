@@ -248,10 +248,10 @@ export default function PatientProfilePage() {
               </p>
             </div>
           </div>
-          <Link href={`/notes/new?patient_id=${patient.id}`}>
+          <Link href={user?.is_demo ? "/sample-visit" : `/notes/new?patient_id=${patient.id}`}>
             <Button>
               <DocumentTextIcon className="w-4 h-4 mr-2" />
-              New Note
+              {user?.is_demo ? "Try Sample Visit" : "New Note"}
             </Button>
           </Link>
         </div>
@@ -334,6 +334,7 @@ export default function PatientProfilePage() {
                   </CardTitle>
                   <div className="flex items-center gap-2">
                     <button
+                      disabled={!!user?.is_demo}
                       onClick={() => setShowApptForm((v)=>!v)}
                       className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
                     >
@@ -437,12 +438,14 @@ export default function PatientProfilePage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button
+                              disabled={!!user?.is_demo}
                               onClick={() => openResched(nextAppt)}
                               className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
                             >
                               Reschedule
                             </button>
                             <button
+                              disabled={!!user?.is_demo}
                               onClick={() => apiClient.deleteAppointment(nextAppt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== nextAppt.id)))}
                               className="px-3 py-1 text-xs rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
                             >
@@ -465,12 +468,14 @@ export default function PatientProfilePage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <button
+                                disabled={!!user?.is_demo}
                                 onClick={() => openResched(appt)}
                                 className="px-3 py-1 text-xs rounded-md bg-stone-100 dark:bg-gray-800 text-stone-700 dark:text-gray-200 hover:bg-stone-200 dark:hover:bg-gray-700"
                               >
                                 Reschedule
                               </button>
                               <button
+                                disabled={!!user?.is_demo}
                                 onClick={() => apiClient.deleteAppointment(appt.id).then(() => setAppointments((prev) => prev.filter((a) => a.id !== appt.id)))}
                                 className="px-3 py-1 text-xs rounded-md bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30"
                               >
@@ -587,7 +592,7 @@ export default function PatientProfilePage() {
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                       Start by creating the first clinical note for {patient.first_name}.
                     </p>
-                    <Link href={`/notes/new?patient_id=${patient.id}`}>
+                    <Link href={user?.is_demo ? "/sample-visit" : `/notes/new?patient_id=${patient.id}`}>
                       <Button>
                         <DocumentTextIcon className="w-4 h-4 mr-2" />
                         Create First Note

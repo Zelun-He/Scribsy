@@ -346,6 +346,8 @@ export default function NotePage() {
       </div>
     );
   const finalized = isFinalized(note);
+  const readonly = !!user.is_demo;
+  const canEdit = !finalized && !readonly;
   const soap = editing ? editedSoap : noteSoap(note);
   const hasSoap = Object.values(noteSoap(note)).some((value) => value.trim());
   const allComplete = Object.values(noteSoap(note)).every((value) =>
@@ -353,7 +355,7 @@ export default function NotePage() {
   );
   const canFinalize =
     !editing &&
-    !finalized &&
+    canEdit &&
     (!hasSoap ||
       (allComplete && SOAP_SECTIONS.every((section) => approved[section.key])));
   const patient = note.patient_first_name
@@ -396,7 +398,7 @@ export default function NotePage() {
           >
             Open patient chart
           </Link>
-          {!finalized && !editing && (
+          {canEdit && !editing && (
             <button
               className={styles.secondaryButton}
               onClick={() => {
@@ -467,7 +469,7 @@ export default function NotePage() {
           )}
         </div>
       )}
-      {!finalized && needsSourceReview && (
+      {canEdit && needsSourceReview && (
         <p className={styles.error} role="status">
           Some suggested codes or source references have low model confidence.
           Review those entries before approving the note.
@@ -489,7 +491,7 @@ export default function NotePage() {
           setEditedSoap((previous) => ({ ...previous, [key]: value }))
         }
         draftTools={
-          !hasSoap && !editing && !finalized ? (
+          !hasSoap && !editing && canEdit ? (
             <p className={styles.notice}>
               No SOAP draft yet. Generate one from the visit text or use Edit to
               document each section.
@@ -497,7 +499,7 @@ export default function NotePage() {
           ) : null
         }
         sectionControls={(key) =>
-          !finalized && !editing && soap[key]?.trim() ? (
+          canEdit && !editing && soap[key]?.trim() ? (
             <button
               className={styles.reviewButton}
               aria-label={`Approve ${key}`}
@@ -515,9 +517,11 @@ export default function NotePage() {
           ) : null
         }
         caption={
-          finalized
-            ? "Reviewed and finalized by the author."
-            : "AI-generated text requires clinician review before finalization."
+          readonly
+            ? "Fictional demo note. This shared workspace is view-only."
+            : finalized
+              ? "Reviewed and finalized by the author."
+              : "AI-generated text requires clinician review before finalization."
         }
         actions={
           editing ? (
@@ -541,7 +545,7 @@ export default function NotePage() {
                 {busy === "save" ? "Saving…" : "Save changes"}
               </button>
             </>
-          ) : finalized ? (
+          ) : finalized || readonly ? (
             <button
               className={styles.primaryButton}
               disabled={!!busy}
@@ -591,7 +595,7 @@ export default function NotePage() {
         </section>
       )}
       <div className={styles.tools}>
-        {!finalized && !editing && (
+        {canEdit && !editing && (
           <button
             disabled={!!busy}
             className={styles.secondaryButton}
@@ -627,7 +631,7 @@ export default function NotePage() {
         >
           Download CCD XML
         </button>
-        {!finalized && (
+        {canEdit && (
           <button
             disabled={!!busy}
             className="text-red-700 text-xs underline ml-auto"
@@ -680,7 +684,7 @@ export default function NotePage() {
                     ? ` · Model confidence ${Math.round(code.confidence * 100)}%`
                     : ""}
                 </span>
-                {!finalized && (
+                {canEdit && (
                   <div className={styles.actions}>
                     <button
                       className={styles.quietButton}

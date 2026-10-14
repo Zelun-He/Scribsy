@@ -6,6 +6,7 @@
     "dev": "next dev --port 3000",
     "build": "next build",
     "start": "next start",
+    "test:api": "node --import tsx --test tests/demo-api.test.ts",
     "lint": "next lint"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
     "@types/react-dom": "^19.1.6",
     "eslint": "^9.31.0",
     "eslint-config-next": "^15.5.6",
+    "tsx": "^4.23.15",
     "typescript": "^5.8.3"
   }
 }

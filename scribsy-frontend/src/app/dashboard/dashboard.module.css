@@ -1,26 +1,29 @@
 .dashboard {
-  --ink: #12251e;
-  --subtle: #50665e;
-  --line: #dce8e3;
+  --ink: #0f1a24;
+  --subtle: #556270;
+  --line: #dce1e5;
   --surface: #fff;
-  --canvas: #f3f8f6;
-  --green: #007f5f;
-  --pale: #e6f4ef;
+  --canvas: #f4f6f7;
+  --action: #1d4ed8;
+  --action-fill: #1d4ed8;
+  --pale: #eef2ff;
   max-width: 1440px;
   margin: 0 auto;
-  padding: 28px 30px 48px;
+  padding: 32px 32px 48px;
   color: var(--ink);
+  font-family: "Scribsy Plex", "Helvetica Neue", system-ui, sans-serif;
   font-size: 14px;
   line-height: 1.45;
 }
 :global(.dark) .dashboard {
-  --ink: #e7f2ec;
-  --subtle: #a7bcb2;
-  --line: #2c4439;
-  --surface: #172c23;
-  --canvas: #102018;
-  --green: #009771;
-  --pale: #224538;
+  --ink: #edf2f7;
+  --subtle: #a4b5c4;
+  --line: #304455;
+  --surface: #172737;
+  --canvas: #101b26;
+  --action: #9bb8ff;
+  --action-fill: #2755d6;
+  --pale: #20344f;
 }
 .dashboard h1,
 .dashboard h2,
@@ -31,17 +34,17 @@
 .dashboard h1 {
   font-size: clamp(23px, 2.1vw, 30px);
   line-height: 1.2;
-  font-weight: 800;
-  letter-spacing: -1.1px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 .dashboard h2 {
   font-size: 17px;
-  font-weight: 750;
+  font-weight: 600;
   letter-spacing: -0.35px;
 }
 .dashboard h3 {
   font-size: 15px;
-  font-weight: 750;
+  font-weight: 600;
 }
 .header {
   display: flex;
@@ -53,7 +56,8 @@
 .eyebrow {
   color: var(--subtle);
   font:
-    12px ui-monospace,
+    12px "Scribsy Mono",
+    ui-monospace,
     SFMono-Regular,
     monospace;
   text-transform: uppercase;
@@ -71,7 +75,7 @@
   gap: 12px;
   padding: 12px 15px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--surface);
   color: var(--subtle);
 }
@@ -83,7 +87,7 @@
   outline: none;
 }
 .search:focus-within {
-  box-shadow: 0 0 0 2px var(--green);
+  box-shadow: 0 0 0 2px var(--action);
 }
 .searchResults {
   position: absolute;
@@ -94,9 +98,9 @@
   max-height: 400px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--surface);
-  box-shadow: 0 12px 30px #12251e18;
+  box-shadow: 0 12px 30px #0f1a2412;
   padding: 6px;
 }
 .searchResults a {
@@ -123,10 +127,11 @@
   margin-bottom: 24px;
 }
 .capture {
-  background: #007f5f;
-  color: white;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
   padding: 26px;
-  border-radius: 20px;
+  border-radius: 10px;
   min-height: 305px;
 }
 .capture h2 {
@@ -144,18 +149,18 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  border: 2px solid #ffffff30;
-  border-radius: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
   text-align: left;
   padding: 12px;
-  background: #006e511f;
+  background: var(--surface);
 }
 .modes button svg {
   flex-shrink: 0;
   margin-top: 2px;
 }
 .modes button:hover {
-  border-color: #fff9;
+  border-color: #a9b6c2;
 }
 .modes strong,
 .modes small {
@@ -165,9 +170,9 @@
   font-size: 12px;
 }
 .modes button.selectedMode {
-  background: white;
-  color: #005a43;
-  border-color: white;
+  background: var(--pale);
+  color: var(--ink);
+  border-color: var(--action);
 }
 .patientLabel {
   display: block;
@@ -183,10 +188,11 @@
   flex: 1;
   min-width: 0;
   width: 100%;
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 13px;
-  background: white;
-  color: #12251e;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 650;
   text-overflow: ellipsis;
@@ -197,17 +203,18 @@
   justify-content: center;
   gap: 9px;
   padding: 12px 18px;
-  border-radius: 12px;
-  background: white;
-  color: #005a43;
-  font-weight: 750;
+  border-radius: 6px;
+  background: var(--action-fill);
+  color: white;
+  border: 1px solid var(--action-fill);
+  font-weight: 600;
   white-space: nowrap;
 }
 .recordDot {
   height: 9px;
   width: 9px;
   border-radius: 50%;
-  background: #e32935;
+  background: currentColor;
 }
 .nextUp,
 .weekCard,
@@ -215,7 +222,7 @@
 .todayCard {
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 10px;
   overflow: hidden;
 }
 .nextUp {
@@ -231,7 +238,7 @@
 .sectionTop a,
 .reviewHeader a,
 .empty a {
-  color: var(--green);
+  color: var(--action);
   font-weight: 700;
   text-decoration: underline;
   white-space: nowrap;
@@ -241,12 +248,13 @@
   letter-spacing: -0.5px;
 }
 .nextBadge {
-  color: #006a4f;
-  background: #e6f4ef;
+  color: var(--subtle);
+  background: var(--canvas);
   border-radius: 5px;
   padding: 3px 8px;
   font:
-    12px ui-monospace,
+    12px "Scribsy Mono",
+    ui-monospace,
     monospace;
 }
 .muted {
@@ -255,7 +263,7 @@
 }
 .lastVisit {
   background: var(--canvas);
-  border-radius: 12px;
+  border-radius: 6px;
   padding: 14px;
   margin: 14px 0;
 }
@@ -286,13 +294,13 @@
   align-items: center;
   border: 1px solid var(--line);
   padding: 10px 4px;
-  border-radius: 9px;
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 700;
 }
 .nextActions button {
-  color: var(--green);
-  border-color: var(--green);
+  border-color: var(--line);
+  color: var(--ink);
 }
 .dashboard button:disabled {
   opacity: 0.55;
@@ -311,15 +319,16 @@
   display: flex;
   flex-direction: column;
   padding: 15px;
-  border-radius: 12px;
-  transition: transform 0.15s;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  transition: border-color 0.15s;
 }
 .stage:hover {
-  transform: translateY(-2px);
+  border-color: #a9b6c2;
 }
 .stage strong {
   font-size: 29px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1.4;
 }
 .stage b {
@@ -384,7 +393,7 @@
   padding: 3px 7px;
   border-radius: 6px;
   font-size: 10px;
-  font-weight: 750;
+  font-weight: 600;
   white-space: nowrap;
 }
 .soapFlags {
@@ -399,11 +408,11 @@
   height: 24px;
   border-radius: 6px;
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 600;
 }
 .complete {
   background: var(--pale);
-  color: var(--green);
+  color: var(--action);
 }
 .missing {
   border: 1px dashed var(--line);
@@ -418,12 +427,12 @@
   -webkit-box-orient: vertical;
 }
 .primaryButton {
-  background: var(--green);
+  background: var(--action-fill);
   color: white;
   padding: 12px 16px;
-  border-radius: 9px;
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
   white-space: nowrap;
 }
 .todayCard {
@@ -440,7 +449,7 @@
   flex-direction: column;
   align-items: center;
   padding: 7px 0 0;
-  border-radius: 9px;
+  border-radius: 6px;
   line-height: 1.4;
 }
 .days small {
@@ -453,11 +462,11 @@
   font-size: 14px;
 }
 .days span {
-  color: var(--green);
+  color: var(--action);
   height: 15px;
 }
 .days button.selectedDay {
-  background: var(--green);
+  background: var(--action-fill);
   color: white;
 }
 .days button.selectedDay small,
@@ -476,7 +485,8 @@
 }
 .appointment time {
   font:
-    11px ui-monospace,
+    11px "Scribsy Mono",
+    ui-monospace,
     monospace;
   color: var(--subtle);
   width: 59px;
@@ -504,7 +514,7 @@
   background: var(--surface);
   border: 1px solid var(--line);
   padding: 18px;
-  border-radius: 16px;
+  border-radius: 10px;
 }
 .metrics h2 {
   font-size: 12px;
@@ -515,7 +525,7 @@
 .metrics strong {
   display: block;
   font-size: 29px;
-  font-weight: 800;
+  font-weight: 700;
   margin-top: 5px;
   line-height: 1.35;
 }
@@ -536,13 +546,13 @@
   margin-top: 9px;
   border-radius: 6px;
   overflow: hidden;
-  accent-color: var(--green);
+  accent-color: var(--action);
 }
 .metrics progress::-webkit-progress-bar {
   background: var(--pale);
 }
 .metrics progress::-webkit-progress-value {
-  background: var(--green);
+  background: var(--action);
 }
 .empty {
   display: flex;
@@ -564,7 +574,7 @@
   background: #fff0ed;
   border: 1px solid #f4cbc5;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: 6px;
   margin-bottom: 20px;
 }
 .error button {
@@ -579,7 +589,7 @@
   color: var(--subtle);
 }
 .dashboard :is(button, a, select):focus-visible {
-  outline: 3px solid #38bfa0;
+  outline: 3px solid #749aff;
   outline-offset: 3px;
 }
 @media (max-width: 1180px) {
@@ -639,7 +649,7 @@
   }
   .capture {
     padding: 20px;
-    border-radius: 16px;
+    border-radius: 10px;
   }
   .capture h2 {
     font-size: 21px;
@@ -692,4 +702,72 @@
   .metrics a {
     padding: 16px;
   }
+}
+
+/* Color describes state in compact badges; the overview cards stay neutral. */
+.stage.blue,
+.stage.amber,
+.stage.gray,
+.stage.green {
+  background: var(--canvas);
+  color: var(--ink);
+}
+.stage small {
+  color: var(--subtle);
+}
+.status.blue {
+  background: var(--pale);
+  color: var(--action);
+}
+.status.amber {
+  background: #fff4ec;
+  color: #9a3412;
+  border: 1px solid #f5c9ae;
+}
+.status.gray {
+  background: var(--canvas);
+  color: var(--subtle);
+}
+.status.green {
+  background: #eaf6ef;
+  color: #166534;
+}
+.status {
+  border-radius: 99px;
+  font-weight: 600;
+}
+.complete {
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.reviewRow > .primaryButton {
+  background: transparent;
+  color: var(--action);
+  padding: 10px 0;
+  text-align: left;
+}
+.modes small {
+  color: var(--subtle);
+  margin-top: 2px;
+}
+.capture > p {
+  color: var(--subtle);
+}
+.startButton:hover,
+.primaryButton:hover {
+  filter: brightness(0.95);
+}
+.reviewRow > .primaryButton:hover {
+  filter: none;
+  text-decoration: underline;
+}
+:global(.dark) .status.amber {
+  background: #392a20;
+  color: #ffd1ae;
+  border-color: #72523d;
+}
+:global(.dark) .status.green {
+  background: #20372b;
+  color: #b4ddbd;
 }

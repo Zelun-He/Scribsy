@@ -325,6 +325,8 @@ def on_startup():
             logger.error(f"Migration error: {e}")
 
         backfill_tenant_namespaces()
+        from app.services.demo_workspace import ensure_demo_workspace
+        ensure_demo_workspace()
             
     except Exception as e:
         log_error(e, context="DB init on startup")

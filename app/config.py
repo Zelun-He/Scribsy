@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./scribsy.db"  # Will be overridden by get_database_url()
     
     # Authentication Configuration
+    demo_enabled: bool = True
     secret_key: str = os.getenv("SECRET_KEY", "supersecretkey")
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # HIPAA: shorter sessions

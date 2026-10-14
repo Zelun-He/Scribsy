@@ -83,10 +83,12 @@ export default function SchedulePage() {
           <p className={styles.eyebrow}>Your clinical workspace</p>
           <h1>Schedule</h1>
         </div>
-        <Link href="/appointments/new" className={styles.primaryButton}>
-          <Plus size={15} className="inline mr-2" />
-          New appointment
-        </Link>
+        {!user.is_demo && (
+          <Link href="/appointments/new" className={styles.primaryButton}>
+            <Plus size={15} className="inline mr-2" />
+            New appointment
+          </Link>
+        )}
       </header>
       {error && (
         <div role="alert" className={styles.error}>
@@ -172,7 +174,11 @@ export default function SchedulePage() {
               <div className="flex flex-wrap gap-3">
                 <button
                   className={styles.primaryButton}
-                  disabled={busy === appt.id || appt.status === "checked_in"}
+                  disabled={
+                    !!user.is_demo ||
+                    busy === appt.id ||
+                    appt.status === "checked_in"
+                  }
                   onClick={() => void checkIn(appt.id)}
                 >
                   {appt.status === "checked_in"
@@ -183,17 +189,23 @@ export default function SchedulePage() {
                 </button>
                 <Link
                   className={styles.primaryButton}
-                  href={`/notes/new?patient_id=${appt.patient_id}&mode=type`}
+                  href={
+                    user.is_demo
+                      ? "/sample-visit"
+                      : `/notes/new?patient_id=${appt.patient_id}&mode=type`
+                  }
                 >
-                  New note
+                  {user.is_demo ? "Try sample visit" : "New note"}
                 </Link>
-                <button
-                  disabled={busy === appt.id}
-                  className="text-red-600 text-xs"
-                  onClick={() => void remove(appt.id)}
-                >
-                  Delete appointment
-                </button>
+                {!user.is_demo && (
+                  <button
+                    disabled={busy === appt.id}
+                    className="text-red-600 text-xs"
+                    onClick={() => void remove(appt.id)}
+                  >
+                    Delete appointment
+                  </button>
+                )}
               </div>
             </div>
           ))

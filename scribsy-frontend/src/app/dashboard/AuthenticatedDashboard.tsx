@@ -227,6 +227,10 @@ export default function AuthenticatedDashboard({
     : [];
   const destination = (url: string) => (preview ? "/login" : url);
   const startNote = () => {
+    if (user?.is_demo) {
+      router.push("/sample-visit");
+      return;
+    }
     const params = new URLSearchParams({ mode });
     if (activePatientId) params.set("patient_id", activePatientId);
     router.push(destination(`/notes/new?${params}`));
@@ -347,7 +351,7 @@ export default function AuthenticatedDashboard({
                 aria-label="Note capture method"
               >
                 {modes.map((item) => (
-                  <button 
+                  <button
                     key={item.value}
                     aria-pressed={mode === item.value}
                     className={mode === item.value ? styles.selectedMode : ""}
@@ -383,7 +387,9 @@ export default function AuthenticatedDashboard({
                   ))}
                 </select>
                 <button className={styles.startButton} onClick={startNote}>
-                  {mode === "record" ? (
+                  {user?.is_demo ? (
+                    "Try sample visit"
+                  ) : mode === "record" ? (
                     <>
                       <span className={styles.recordDot} /> Start recording
                     </>
@@ -446,7 +452,9 @@ export default function AuthenticatedDashboard({
                     <button
                       onClick={() => void checkIn()}
                       disabled={
-                        checkingIn || nextAppointment.status === "checked_in"
+                        !!user?.is_demo ||
+                        checkingIn ||
+                        nextAppointment.status === "checked_in"
                       }
                     >
                       {checkingIn

@@ -1,7 +1,15 @@
 import type { SOAPNote } from "@/types";
 import { SOAP_SECTIONS } from "./sample-visit";
 
-export async function exportSamplePDF(soap: SOAPNote) {
+export async function createSampleDocument(
+  soap: SOAPNote,
+  options: {
+    title?: string;
+    subtitle?: string;
+    plainText?: string;
+    loadFont?: (filename: string) => Promise<Uint8Array>;
+  } = {},
+) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ unit: "pt", format: "letter" });
   await Promise.all(
@@ -10,9 +18,14 @@ export async function exportSamplePDF(soap: SOAPNote) {
       ["plex-sans-semibold", "PlexSans", "bold"],
       ["plex-mono", "PlexMono", "normal"],
     ].map(async ([file, family, weight]) => {
-      const response = await fetch(`/fonts/${file}.ttf`);
-      if (!response.ok) throw new Error("Sample export font unavailable.");
-      const bytes = new Uint8Array(await response.arrayBuffer());
+      const bytes = options.loadFont
+        ? await options.loadFont(`${file}.ttf`)
+        : await (async () => {
+            const response = await fetch(`/fonts/${file}.ttf`);
+            if (!response.ok)
+              throw new Error("Sample export font unavailable.");
+            return new Uint8Array(await response.arrayBuffer());
+          })();
       let binary = "";
       for (let offset = 0; offset < bytes.length; offset += 8192) {
         binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
@@ -54,14 +67,17 @@ export async function exportSamplePDF(soap: SOAPNote) {
   doc.setTextColor(ink);
   doc.setFont("PlexSans", "bold");
   doc.setFontSize(17);
-  doc.text("Right ankle injury", 48, y);
+  doc.text(options.title || "Right ankle injury", 48, y);
   y += 18;
   doc.setFont("PlexSans", "normal");
   doc.setTextColor(muted);
   doc.setFontSize(10);
-  doc.text("Reviewed sample SOAP note", 48, y);
+  doc.text(options.subtitle || "Reviewed sample SOAP note", 48, y);
   y += 35;
-  for (const section of SOAP_SECTIONS) {
+  const sections = options.plainText
+    ? [{ letter: "", title: "Clinical notes", key: "subjective" as const }]
+    : SOAP_SECTIONS;
+  for (const section of sections) {
     if (y > 670) newPage();
     doc.setTextColor(blue);
     doc.setFont("PlexMono", "normal");
@@ -76,7 +92,7 @@ export async function exportSamplePDF(soap: SOAPNote) {
     doc.setFontSize(11);
     doc.setTextColor(ink);
     const lines = doc.splitTextToSize(
-      plain(soap[section.key] || "Not documented."),
+      plain(options.plainText || soap[section.key] || "Not documented."),
       486,
     ) as string[];
     for (const line of lines) {
@@ -98,5 +114,10 @@ export async function exportSamplePDF(soap: SOAPNote) {
     doc.setTextColor(muted);
     doc.text(`SCRIBSY SAMPLE / ${page} OF ${doc.getNumberOfPages()}`, 48, 762);
   }
+  return doc;
+}
+
+export async function exportSamplePDF(soap: SOAPNote) {
+  const doc = await createSampleDocument(soap);
   doc.save("scribsy-sample-visit.pdf");
 }
