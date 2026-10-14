@@ -49,6 +49,7 @@ export default function RootLayout({
   const csp = [
     "default-src 'self'",
     "img-src 'self' data: blob: https:",
+    "media-src 'self' blob:",
     "style-src 'self' 'unsafe-inline'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
     "connect-src 'self' https: wss:",
