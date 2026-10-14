@@ -281,6 +281,7 @@ app.include_router(migrate_router)
 @app.on_event("startup")
 def on_startup():
     """Initialize database tables on application startup."""
+    app.state.database_ready = False
     try:
         init_db()
         # Reduced logging for Railway rate limits
@@ -325,6 +326,7 @@ def on_startup():
             logger.error(f"Migration error: {e}")
 
         backfill_tenant_namespaces()
+        app.state.database_ready = True
         from app.services.demo_workspace import ensure_demo_workspace
         ensure_demo_workspace()
             
@@ -355,6 +357,8 @@ from app.services.s3_service import s3_service
 
 @app.get("/readyz")
 def readyz():
+    if not getattr(app.state, "database_ready", False):
+        return JSONResponse(status_code=503, content={"status": "schema_not_ready"})
     # Check DB
     try:
         with engine.connect() as conn:
