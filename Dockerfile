@@ -9,10 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 # Install the official CPU wheel first so Whisper cannot pull CUDA PyTorch.
-# An optional CA secret is available only during this layer, never in the image.
-RUN --mount=type=secret,id=build_ca_bundle \
-    if [ -f /run/secrets/build_ca_bundle ]; then export PIP_CERT=/run/secrets/build_ca_bundle; fi; \
-    python -m pip install --no-cache-dir 'torch==2.14.1+cpu' --index-url https://download.pytorch.org/whl/cpu \
+RUN python -m pip install --no-cache-dir 'torch==2.14.1+cpu' --index-url https://download.pytorch.org/whl/cpu \
     && python -m pip install --no-cache-dir -r requirements.txt \
     && python -c "import torch; assert torch.version.cuda is None"
 COPY app ./app

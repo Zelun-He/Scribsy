@@ -18,11 +18,9 @@ Configure `OPENAI_API_KEY` with that exact name for SOAP generation. Without it,
 transcription remains available and the API returns the transcript with a summary
 error. Never commit credentials, databases, uploads, or model caches.
 
-For a local container build behind a trusted TLS proxy, the Dockerfile supports
-an optional BuildKit secret: `docker build --secret id=build_ca_bundle,src=/path/to/ca.pem .`.
-The bundle is mounted for dependency installation only and is not copied into the
-runtime image. Verify `/readyz` and authenticated transcription after deployment;
-a successful local build alone does not establish production readiness.
+Verify `/readyz` and authenticated transcription after deployment; a successful
+local build alone does not establish production readiness. Railway does not accept
+Docker secret mounts, so this Dockerfile uses standard certificate verification.
 
 This guide will walk you through deploying your Scribsy application to production.
 
