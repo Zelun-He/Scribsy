@@ -8,5 +8,5 @@ echo "Starting Scribsy backend on Railway (Simple Mode)..."
 python -m app.db.bootstrap
 
 echo "Starting gunicorn server..."
-exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-2} --timeout ${WEB_TIMEOUT:-60}
+exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind "0.0.0.0:${PORT:-8000}" --workers "${WEB_CONCURRENCY:-1}" --timeout "${WEB_TIMEOUT:-180}"
 

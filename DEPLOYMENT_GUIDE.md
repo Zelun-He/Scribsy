@@ -1,5 +1,29 @@
 # 🚀 Scribsy Deployment Guide
 
+## Current backend container
+
+Railway builds the repository Dockerfile. It installs ffmpeg and the official
+CPU-only PyTorch wheel before Whisper, excludes frontend files and local data,
+and starts through `start_railway_simple.sh`. Startup completes additive database
+migrations before serving `/readyz` on Railway's `PORT`.
+
+The image defaults to one worker and two OpenMP threads to avoid loading a Whisper
+model in several workers. `WEB_TIMEOUT` defaults to 180 seconds. Recording and
+transcription still use a synchronous HTTP request; this is not a background job
+queue. Measure the live request before attributing a gateway error to memory or
+processing time.
+
+Use `DATABASE_URL=${{Postgres.DATABASE_URL}}` for Railway private networking.
+Configure `OPENAI_API_KEY` with that exact name for SOAP generation. Without it,
+transcription remains available and the API returns the transcript with a summary
+error. Never commit credentials, databases, uploads, or model caches.
+
+For a local container build behind a trusted TLS proxy, the Dockerfile supports
+an optional BuildKit secret: `docker build --secret id=build_ca_bundle,src=/path/to/ca.pem .`.
+The bundle is mounted for dependency installation only and is not copied into the
+runtime image. Verify `/readyz` and authenticated transcription after deployment;
+a successful local build alone does not establish production readiness.
+
 This guide will walk you through deploying your Scribsy application to production.
 
 ## 📋 **Overview**
