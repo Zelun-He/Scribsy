@@ -13,6 +13,12 @@ transcription still use a synchronous HTTP request; this is not a background job
 queue. Measure the live request before attributing a gateway error to memory or
 processing time.
 
+The CPU image installs Whisper 20250625 without its Linux Triton GPU dependency,
+then explicitly supplies numba, numpy, tqdm, more-itertools and tiktoken. CPU
+inference uses these paths without Triton. The image asserts that CUDA and Triton
+are absent. Dependency downloads use cache mounts, and CPU PyTorch has a separate
+layer so a later dependency change does not reinstall it.
+
 Use `DATABASE_URL=${{Postgres.DATABASE_URL}}` for Railway private networking.
 Configure `OPENAI_API_KEY` with that exact name for SOAP generation. Without it,
 transcription remains available and the API returns the transcript with a summary
