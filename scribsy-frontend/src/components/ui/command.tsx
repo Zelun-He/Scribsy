@@ -7,7 +7,7 @@ export function Command({ children }: { children: React.ReactNode }) {
 }
 
 export function CommandInput({ placeholder, className = '', onChange }: { placeholder?: string; className?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
-  return <input placeholder={placeholder} className={`w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 ${className}`} onChange={onChange} />;
+  return <input placeholder={placeholder} className={`w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 ${className}`} onChange={onChange} />;
 }
 
 export function CommandList({ children }: { children: React.ReactNode }) {
@@ -26,7 +26,7 @@ export function CommandItem({ value, onSelect, children }: { value: string; onSe
   return (
     <button
       type="button"
-      className="w-full text-left px-3 py-2 text-sm rounded hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]"
+      className="w-full text-left px-3 py-2 text-sm rounded hover:bg-slate-50 dark:hover:bg-[#1A1A1A]"
       onClick={() => onSelect?.(value)}
     >
       {children}

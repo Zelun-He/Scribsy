@@ -21,7 +21,7 @@ export default function AccessDeniedPage() {
   }, [user, handleAuthFailure]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-green-50 px-4 py-2">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-50 px-4 py-2">
       <div className="w-full max-w-sm space-y-3">
         <div className="text-center space-y-2">
           <div className="mx-auto w-14 h-14 bg-red-100 rounded-full flex items-center justify-center">

@@ -60,7 +60,7 @@
   flex-shrink: 0;
 }
 .finalDot {
-  background: #047857;
+  background: #475569;
 }
 .meta {
   color: var(--note-muted);
@@ -111,9 +111,9 @@
   white-space: nowrap;
 }
 .finalStatus {
-  color: #065f46;
-  background: #e7f5ef;
-  border-color: #9dcdb9;
+  color: #334155;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 .transcriptLine {
   display: flex;

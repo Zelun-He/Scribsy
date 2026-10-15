@@ -51,7 +51,7 @@ export function TimingComparison({ className = '' }: TimingComparisonProps) {
     handwritten: 'text-gray-600 bg-gray-100',
     ai_assisted: 'text-blue-600 bg-blue-100',
     ai_generated: 'text-purple-600 bg-purple-100',
-    voice_transcription: 'text-green-600 bg-green-100',
+    voice_transcription: 'text-slate-600 bg-slate-100',
   };
 
   if (loading) {
@@ -65,7 +65,7 @@ export function TimingComparison({ className = '' }: TimingComparisonProps) {
         </CardHeader>
         <CardContent>
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto"></div>
             <p className="text-gray-600 mt-2">Loading timing data...</p>
           </div>
         </CardContent>
@@ -137,7 +137,7 @@ export function TimingComparison({ className = '' }: TimingComparisonProps) {
         {/* Time Saved Comparison */}
         <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <ArrowTrendingUpIcon className="w-5 h-5 text-green-600" />
+            <ArrowTrendingUpIcon className="w-5 h-5 text-slate-600" />
             Average Time Saved (minutes)
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -154,7 +154,7 @@ export function TimingComparison({ className = '' }: TimingComparisonProps) {
                     <Icon className="w-6 h-6" />
                   </div>
                   <h4 className="font-semibold text-sm">{label}</h4>
-                  <p className="text-2xl font-bold text-green-600">{timeSaved.toFixed(1)}m</p>
+                  <p className="text-2xl font-bold text-slate-600">{timeSaved.toFixed(1)}m</p>
                   <p className="text-xs text-gray-500">
                     {stats?.total_notes || 0} notes • {baseline}m baseline
                   </p>
@@ -203,9 +203,9 @@ export function TimingComparison({ className = '' }: TimingComparisonProps) {
         </div>
 
         {/* Summary Insights */}
-        <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 p-4 rounded-lg">
+        <div className="bg-gradient-to-r from-slate-50 to-slate-50 dark:from-slate-900/20 dark:to-slate-900/20 p-4 rounded-lg">
           <h3 className="font-semibold mb-2 flex items-center gap-2">
-            <ArrowTrendingUpIcon className="w-5 h-5 text-emerald-600" />
+            <ArrowTrendingUpIcon className="w-5 h-5 text-slate-600" />
             Key Insights
           </h3>
           <div className="text-sm space-y-1">

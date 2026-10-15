@@ -153,7 +153,7 @@ export default function PatientProfilePage() {
     switch (status.toLowerCase()) {
       case 'signed':
       case 'completed':
-        return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+        return 'bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-300';
       case 'pending_review':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
       case 'draft':
@@ -187,7 +187,7 @@ export default function PatientProfilePage() {
     return (
       <DashboardLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
         </div>
       </DashboardLayout>
     );
@@ -336,7 +336,7 @@ export default function PatientProfilePage() {
                     <button
                       disabled={!!user?.is_demo}
                       onClick={() => setShowApptForm((v)=>!v)}
-                      className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                      className="px-3 py-2 text-sm rounded-md bg-slate-600 text-white hover:bg-slate-700"
                     >
                       {showApptForm ? 'Close' : 'New'}
                     </button>
@@ -357,7 +357,7 @@ export default function PatientProfilePage() {
                             <button
                               key={t}
                               onClick={() => { setApptType(t); if (!titleTouched || apptTitle === 'Follow-up' || apptTitle === 'Appointment') setApptTitle(t); }}
-                              className={`px-3 py-1 text-xs rounded-md border ${apptType===t? 'bg-emerald-100 border-emerald-300 text-emerald-800 dark:bg-emerald-900/20 dark:border-emerald-800 dark:text-emerald-300' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-stone-700 dark:text-gray-200'}`}
+                              className={`px-3 py-1 text-xs rounded-md border ${apptType===t? 'bg-slate-100 border-slate-300 text-slate-800 dark:bg-slate-900/20 dark:border-slate-800 dark:text-slate-300' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-stone-700 dark:text-gray-200'}`}
                               type="button"
                             >
                               {t}
@@ -412,7 +412,7 @@ export default function PatientProfilePage() {
                               fetchAppointments(String(patient.id));
                             });
                           }}
-                          className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                          className="px-3 py-2 text-sm rounded-md bg-slate-600 text-white hover:bg-slate-700"
                         >
                           Save
                         </button>
@@ -423,13 +423,13 @@ export default function PatientProfilePage() {
 
                 {appointmentsLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
                   </div>
                 ) : upcomingAppts.length > 0 ? (
                   <div className="space-y-4">
                     {/* Next appointment featured */}
                     {nextAppt && (
-                      <div className="border border-emerald-300 dark:border-emerald-800 rounded-lg p-3 bg-emerald-50/50 dark:bg-emerald-900/10">
+                      <div className="border border-slate-300 dark:border-slate-800 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/10">
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="font-semibold text-gray-900 dark:text-gray-100">Next: {nextAppt.title || 'Appointment'}</div>
@@ -495,7 +495,7 @@ export default function PatientProfilePage() {
                     </h3>
                     <button
                       onClick={() => setShowApptForm(true)}
-                      className="px-3 py-2 text-sm rounded-md bg-emerald-600 text-white hover:bg-emerald-700"
+                      className="px-3 py-2 text-sm rounded-md bg-slate-600 text-white hover:bg-slate-700"
                     >
                       Schedule
                     </button>
@@ -522,7 +522,7 @@ export default function PatientProfilePage() {
               <CardContent>
                 {notesLoading ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600"></div>
                   </div>
                 ) : notes.length > 0 ? (
                   <div className="space-y-4">
@@ -624,7 +624,7 @@ export default function PatientProfilePage() {
             </div>
             <div className="mt-6 flex items-center justify-end gap-3">
               <button onClick={closeResched} className="px-4 py-2 rounded-md border border-stone-200 dark:border-gray-700 text-stone-700 dark:text-gray-200 hover:bg-stone-50 dark:hover:bg-[#1A1A1A]">Cancel</button>
-              <button onClick={saveResched} className="px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-700">Save</button>
+              <button onClick={saveResched} className="px-4 py-2 rounded-md bg-slate-600 text-white hover:bg-slate-700">Save</button>
             </div>
           </div>
         </div>

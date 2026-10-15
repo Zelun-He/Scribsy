@@ -83,7 +83,7 @@ export function TimingControl({ noteId, className = '' }: TimingControlProps) {
       <Card className={className}>
         <CardContent className="p-4">
           <div className="flex items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-slate-600"></div>
             <span className="text-sm text-gray-600">Loading...</span>
           </div>
         </CardContent>
@@ -113,22 +113,22 @@ export function TimingControl({ noteId, className = '' }: TimingControlProps) {
   // If timing is complete, show results
   if (currentSession && currentSession.completedAt) {
     return (
-      <Card className={`${className} border-green-200 bg-green-50 dark:bg-green-900/10`}>
+      <Card className={`${className} border-slate-200 bg-slate-50 dark:bg-slate-900/10`}>
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <CheckCircleIcon className="w-5 h-5 text-green-600" />
+            <CheckCircleIcon className="w-5 h-5 text-slate-600" />
             <div className="flex-1">
-              <h3 className="font-semibold text-green-800 dark:text-green-200">
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">
                 Note Creation Complete
               </h3>
-              <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+              <div className="text-sm text-slate-700 dark:text-slate-300 space-y-1">
                 <p>
                   <strong>Method:</strong> {methodOptions.find(m => m.method === currentSession.method)?.label}
                 </p>
                 <p>
                   <strong>Time:</strong> {currentSession.actualMinutes}m 
                   {currentSession.timeSavedMinutes && currentSession.timeSavedMinutes > 0 && (
-                    <span className="text-green-600 font-semibold">
+                    <span className="text-slate-600 font-semibold">
                       {' '}(Saved {currentSession.timeSavedMinutes}m)
                     </span>
                   )}

@@ -6,6 +6,6 @@ import ShowcaseDashboard from './ShowcaseDashboard';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-[#f8faf6]" aria-label="Loading dashboard" />;
+  if (loading) return <div className="min-h-screen bg-[#f4f6f7]" aria-label="Loading dashboard" />;
   return user ? <AuthenticatedDashboard /> : <ShowcaseDashboard />;
 }

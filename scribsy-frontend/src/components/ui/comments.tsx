@@ -146,7 +146,7 @@ export function Comments({ noteId, currentUserId }: CommentsProps) {
               key={comment.id}
               className={`p-3 rounded-lg border ${
                 comment.is_resolved 
-                  ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' 
+                  ? 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800'
                   : 'bg-gray-50 border-gray-200 dark:bg-gray-800 dark:border-gray-700'
               }`}
             >
@@ -158,7 +158,7 @@ export function Comments({ noteId, currentUserId }: CommentsProps) {
                       {formatDate(comment.created_at)}
                     </span>
                     {comment.is_resolved && (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                      <span className="text-xs bg-slate-100 text-slate-800 px-2 py-1 rounded-full">
                         Resolved
                       </span>
                     )}
@@ -202,7 +202,7 @@ export function Comments({ noteId, currentUserId }: CommentsProps) {
                       {comment.is_resolved ? (
                         <XCircleIcon className="w-4 h-4 text-orange-500" />
                       ) : (
-                        <CheckCircleIcon className="w-4 h-4 text-green-500" />
+                        <CheckCircleIcon className="w-4 h-4 text-slate-500" />
                       )}
                     </Button>
                     <Button

@@ -37,14 +37,6 @@ module.exports = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
-        // Dark mode green theme colors
-        'dark-bg': '#0f2027',
-        'dark-bg-secondary': '#1a4a3a',
-        'dark-navy': '#064e3b',
-        'dark-charcoal': '#1e5a46',
-        'green-accent': '#10b981',
-        'emerald-accent': '#34d399',
-        'mint-accent': '#a7f3d0',
       },
       borderRadius: {
         lg: 'var(--radius)',

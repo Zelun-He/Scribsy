@@ -4,12 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { apiClient } from '@/lib/api';
-import { Patient, Appointment } from '@/types';
+import { Patient } from '@/types';
 import { useToast } from '@/lib/toast';
 import { formatDateOnly } from '@/utils/date';
+import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { AnimatedActionButton } from '@/components/ui/animated-action';
+import { CalendarDaysIcon } from '@heroicons/react/24/outline';
+import styles from './appointment.module.css';
 
 export default function NewAppointmentPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const { show } = useToast();
 
@@ -50,6 +54,7 @@ export default function NewAppointmentPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
@@ -69,6 +74,14 @@ export default function NewAppointmentPage() {
       }
     }
 
+    // Validate before creating a patient, so invalid dates have no side effects.
+    const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`);
+    if (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()) {
+      setError('Appointment must be scheduled in the future');
+      setLoading(false);
+      return;
+    }
+
     try {
       let finalPatientId = selectedPatientId;
 
@@ -83,16 +96,9 @@ export default function NewAppointmentPage() {
           ...(newPatientAddress.trim() && { address: newPatientAddress.trim() })
         });
         finalPatientId = newPatient.id.toString();
-      }
-
-      // Combine date and time into ISO string
-      const scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`);
-      
-      // Validate that the appointment is in the future
-      if (scheduledAt <= new Date()) {
-        setError('Appointment must be scheduled in the future');
-        setLoading(false);
-        return;
+        setSelectedPatientId(finalPatientId);
+        setPatients(previous => [...previous, newPatient]);
+        setShowNewPatientForm(false);
       }
 
       const appointmentData = {
@@ -119,287 +125,62 @@ export default function NewAppointmentPage() {
     router.push('/dashboard');
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-              Schedule New Appointment
-            </h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-              Create a new appointment for a patient
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md p-4">
-                <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
-              </div>
-            )}
-
-            {/* Patient Selection */}
-            <div>
-              <label htmlFor="patient" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Patient <span className="text-red-500">*</span>
-              </label>
-              
-              {!showNewPatientForm ? (
-                <div className="space-y-3">
-                  <select
-                    id="patient"
-                    value={selectedPatientId}
-                    onChange={(e) => setSelectedPatientId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-                  >
-                    <option value="">Select a patient...</option>
-                    {patients.map((patient) => (
-                      <option key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} (DOB: {formatDateOnly(patient.date_of_birth)})
-                      </option>
-                    ))}
-                  </select>
-                  
-                  <div className="flex items-center justify-center">
-                    <span className="text-sm text-gray-500 dark:text-gray-400">or</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewPatientForm(true);
-                      setSelectedPatientId('');
-                    }}
-                    className="w-full px-4 py-2 border border-emerald-600 text-emerald-600 rounded-md hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                  >
-                    + Add New Patient
-                  </button>
+    <DashboardLayout>
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <p className={styles.eyebrow}>Schedule / New appointment</p>
+          <h1>Schedule an appointment</h1>
+          <p>Choose a patient and set the details for their next visit.</p>
+        </header>
+        <form onSubmit={handleSubmit} className={styles.card} aria-label="New appointment">
+          {error && <div className={styles.error} role="alert">{error}</div>}
+          <fieldset disabled={loading} className={styles.fields}>
+            <section className={styles.section} aria-labelledby="patient-section-title">
+              <div className={styles.sectionHeader}><h2 id="patient-section-title">Patient</h2><p>Select an existing patient or add someone new.</p></div>
+              {!showNewPatientForm ? <div className={styles.patientChoice}>
+                <label className={styles.field} htmlFor="patient">Patient <span>*</span></label>
+                <select id="patient" value={selectedPatientId} onChange={event => setSelectedPatientId(event.target.value)} required>
+                  <option value="">Select a patient…</option>
+                  {patients.map(patient => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name} (DOB: {formatDateOnly(patient.date_of_birth)})</option>)}
+                </select>
+                <button type="button" className={styles.secondaryButton} onClick={() => { setShowNewPatientForm(true); setSelectedPatientId(''); }}>+ Add new patient</button>
+              </div> : <div className={styles.newPatient}>
+                <div className={styles.newPatientHeader}><h3>New patient details</h3><button type="button" onClick={() => setShowNewPatientForm(false)}>Use an existing patient</button></div>
+                <div className={styles.grid}>
+                  <label className={styles.field}>First name <span>*</span><input value={newPatientFirstName} onChange={event => setNewPatientFirstName(event.target.value)} required /></label>
+                  <label className={styles.field}>Last name <span>*</span><input value={newPatientLastName} onChange={event => setNewPatientLastName(event.target.value)} required /></label>
+                  <label className={styles.field}>Date of birth <span>*</span><input type="date" value={newPatientDOB} onChange={event => setNewPatientDOB(event.target.value)} required /></label>
+                  <label className={styles.field}>Phone number<input type="tel" value={newPatientPhone} onChange={event => setNewPatientPhone(event.target.value)} /></label>
+                  <label className={styles.field}>Email<input type="email" value={newPatientEmail} onChange={event => setNewPatientEmail(event.target.value)} /></label>
+                  <label className={styles.field}>Address<input value={newPatientAddress} onChange={event => setNewPatientAddress(event.target.value)} /></label>
                 </div>
-              ) : (
-                <div className="space-y-4 p-4 border border-emerald-200 dark:border-emerald-800 rounded-md bg-emerald-50 dark:bg-emerald-900/10">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-emerald-800 dark:text-emerald-200">New Patient Information</h3>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowNewPatientForm(false);
-                        setNewPatientFirstName('');
-                        setNewPatientLastName('');
-                        setNewPatientDOB('');
-                        setNewPatientPhone('');
-                        setNewPatientEmail('');
-                        setNewPatientAddress('');
-                      }}
-                      className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="firstName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        First Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="firstName"
-                        value={newPatientFirstName}
-                        onChange={(e) => setNewPatientFirstName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="lastName" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Last Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        id="lastName"
-                        value={newPatientLastName}
-                        onChange={(e) => setNewPatientLastName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="dob" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Date of Birth <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        id="dob"
-                        value={newPatientDOB}
-                        onChange={(e) => setNewPatientDOB(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                        required
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="phone" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        id="phone"
-                        value={newPatientPhone}
-                        onChange={(e) => setNewPatientPhone(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="email" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Email
-                      </label>
-                      <input
-                        type="email"
-                        id="email"
-                        value={newPatientEmail}
-                        onChange={(e) => setNewPatientEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="address" className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Address
-                      </label>
-                      <input
-                        type="text"
-                        id="address"
-                        value={newPatientAddress}
-                        onChange={(e) => setNewPatientAddress(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    </div>
-                  </div>
+              </div>}
+            </section>
+            <section className={styles.section} aria-labelledby="appointment-section-title">
+              <div className={styles.sectionHeader}><h2 id="appointment-section-title">Appointment details</h2><p>All times are shown in your device’s local time.</p></div>
+              <div className={styles.details}>
+                <label className={styles.field}>Title <small>Optional</small><input value={title} onChange={event => setTitle(event.target.value)} placeholder="e.g., Follow-up, Consultation, Check-up" /></label>
+                <div className={styles.grid}>
+                  <label className={styles.field}>Date <span>*</span><input type="date" value={scheduledDate} min={today} onChange={event => setScheduledDate(event.target.value)} required /></label>
+                  <label className={styles.field}>Time <span>*</span><input type="time" value={scheduledTime} onChange={event => setScheduledTime(event.target.value)} required /></label>
                 </div>
-              )}
-            </div>
-
-            {/* Title */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Title
-              </label>
-              <input
-                type="text"
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g., Follow-up, Consultation, Check-up"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
-            {/* Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Date <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-                  required
-                />
+                <label className={styles.field}>Reminder<select aria-label="Reminder" value={notifyBeforeMinutes} onChange={event => setNotifyBeforeMinutes(Number(event.target.value))}>
+                  <option value={15}>15 minutes before</option><option value={30}>30 minutes before</option><option value={60}>1 hour before</option><option value={120}>2 hours before</option><option value={1440}>1 day before</option>
+                </select></label>
+                <label className={styles.field}>Notes <small>Optional</small><textarea value={note} onChange={event => setNote(event.target.value)} rows={4} placeholder="Additional notes about the appointment…" /></label>
               </div>
-
-              <div>
-                <label htmlFor="time" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Time <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="time"
-                  id="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Notification */}
-            <div>
-              <label htmlFor="notify" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Remind Before (minutes)
-              </label>
-              <select
-                id="notify"
-                value={notifyBeforeMinutes}
-                onChange={(e) => setNotifyBeforeMinutes(parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-              >
-                <option value={15}>15 minutes</option>
-                <option value={30}>30 minutes</option>
-                <option value={60}>1 hour</option>
-                <option value={120}>2 hours</option>
-                <option value={1440}>1 day</option>
-              </select>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label htmlFor="note" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Notes
-              </label>
-              <textarea
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                rows={3}
-                placeholder="Additional notes about the appointment..."
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-
-            {/* Buttons */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Creating...' : 'Create Appointment'}
-              </button>
-            </div>
-          </form>
-        </div>
+            </section>
+            <footer className={styles.actions}>
+              <button type="button" className={styles.secondaryButton} onClick={handleCancel}>Cancel</button>
+              <AnimatedActionButton type="submit" label="Create appointment" loadingLabel="Creating appointment…" loading={loading} icon={<CalendarDaysIcon />} className={styles.createButton} />
+            </footer>
+          </fieldset>
+        </form>
       </div>
-    </div>
+    </DashboardLayout>
   );
 }

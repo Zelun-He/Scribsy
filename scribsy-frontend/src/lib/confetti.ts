@@ -23,7 +23,7 @@ export function burstConfetti() {
   container.style.zIndex = '9999';
   document.body.appendChild(container);
 
-  const colors = ['#10b981', '#34d399', '#06b6d4', '#f59e0b', '#ef4444', '#6366f1'];
+  const colors = ['#475569', '#94a3b8', '#06b6d4', '#f59e0b', '#ef4444', '#6366f1'];
   const count = 60;
   for (let i = 0; i < count; i++) {
     const piece = document.createElement('span');

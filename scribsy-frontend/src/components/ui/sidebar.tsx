@@ -162,7 +162,7 @@ export const SidebarFloatingTrigger: React.FC<React.ButtonHTMLAttributes<HTMLBut
     <button
       aria-label="Open sidebar"
       onClick={toggle}
-      className={`fixed left-4 top-4 z-50 p-3 rounded-full shadow-md bg-emerald-600 text-white hover:bg-emerald-700 ${className}`}
+      className={`fixed left-4 top-4 z-50 p-3 rounded-full shadow-md bg-slate-600 text-white hover:bg-slate-700 ${className}`}
       {...rest}
     >
       <svg

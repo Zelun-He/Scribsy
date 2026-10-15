@@ -159,15 +159,15 @@ export default function SettingsPage() {
         {/* Header */}
         <div className="flex items-center gap-4">
           <Cog6ToothIcon className="w-8 h-8 text-gray-400" />
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-100">
             Settings
           </h1>
         </div>
 
         {/* Success/Error Messages */}
         {success && (
-          <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-md p-4">
-            <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          <div className="bg-slate-50 dark:bg-slate-900/10 border border-slate-200 dark:border-slate-800 rounded-md p-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">{success}</p>
           </div>
         )}
 
@@ -324,19 +324,19 @@ export default function SettingsPage() {
                       onClick={() => setTheme(option.value as 'light' | 'dark')}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         theme === option.value
-                          ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-900/20'
+                          ? 'border-slate-500 bg-slate-50 dark:border-slate-500 dark:bg-slate-900/20'
                           : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                       }`}
                     >
-                      <Icon className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-emerald-400" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                      <Icon className="w-6 h-6 mx-auto mb-2 text-gray-600 dark:text-slate-400" />
+                      <span className="text-sm font-medium text-gray-900 dark:text-slate-100">
                         {option.label}
                       </span>
                     </button>
                   );
                 })}
               </div>
-              <p className="text-sm text-gray-500 dark:text-emerald-400">
+              <p className="text-sm text-gray-500 dark:text-slate-400">
                 Choose between light and dark themes for your interface.
               </p>
             </div>
@@ -358,10 +358,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100">
                     Email Notifications
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Receive email updates about your notes
                   </p>
                 </div>
@@ -377,10 +377,10 @@ export default function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100">
                     Push Notifications
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Receive push notifications for important updates
                   </p>
                 </div>
@@ -411,7 +411,7 @@ export default function SettingsPage() {
           <CardContent>
             <form onSubmit={handleBaselineSave} className="flex items-end gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">
                   Baseline minutes per note
                 </label>
                 <input
@@ -420,7 +420,7 @@ export default function SettingsPage() {
                   max={240}
                   value={baseline}
                   onChange={(e)=> setBaseline(parseInt(e.target.value||'15',10))}
-                  className="w-40 h-10 px-3 py-2 text-sm border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-emerald-100"
+                  className="w-40 h-10 px-3 py-2 text-sm border border-gray-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500 dark:focus:ring-slate-500 bg-gray-50 dark:bg-gray-800 dark:text-slate-100"
                 />
               </div>
               <Button type="submit">Save</Button>
@@ -443,10 +443,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="space-y-3">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100">
                     Data Export
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Download a copy of your clinical notes, patients, and account data
                   </p>
                 </div>
@@ -480,10 +480,10 @@ export default function SettingsPage() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100">
                     Change Password
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Update your account password
                   </p>
                 </div>
@@ -512,10 +512,10 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-900 dark:text-emerald-100">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-slate-100">
                     Sign Out
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Sign out of your account on this device
                   </p>
                 </div>
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                   <h3 className="text-sm font-medium text-red-600 dark:text-red-400">
                     Delete Account
                   </h3>
-                  <p className="text-sm text-gray-500 dark:text-emerald-400">
+                  <p className="text-sm text-gray-500 dark:text-slate-400">
                     Permanently delete your account and all data
                   </p>
                 </div>

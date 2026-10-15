@@ -125,8 +125,8 @@ export function FinalizationWarning({ isOpen, onClose }: FinalizationWarningProp
             </div>
           ) : pendingNotes.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircleIcon className="w-12 h-12 text-green-500 mx-auto mb-2" />
-              <p className="text-green-600 dark:text-green-400 font-medium">
+              <CheckCircleIcon className="w-12 h-12 text-slate-500 mx-auto mb-2" />
+              <p className="text-slate-600 dark:text-slate-400 font-medium">
                 Great! No pending notes to finalize.
               </p>
             </div>
@@ -141,7 +141,7 @@ export function FinalizationWarning({ isOpen, onClose }: FinalizationWarningProp
                     onClick={handleFinalizeAll}
                     variant="outline"
                     size="sm"
-                    className="text-green-600 border-green-600 hover:bg-green-50 dark:text-green-400 dark:border-green-400 dark:hover:bg-green-900/20"
+                    className="text-slate-600 border-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:border-slate-400 dark:hover:bg-slate-900/20"
                   >
                     Finalize All
                   </Button>
@@ -180,7 +180,7 @@ export function FinalizationWarning({ isOpen, onClose }: FinalizationWarningProp
                             onClick={() => handleFinalizeNote(note.id)}
                             disabled={finalizing === note.id}
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-slate-600 hover:bg-slate-700 text-white"
                           >
                             {finalizing === note.id ? (
                               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

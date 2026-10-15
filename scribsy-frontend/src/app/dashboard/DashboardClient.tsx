@@ -264,11 +264,11 @@ export default function DashboardClient() {
 
   const getCategoryColor = (category: string) => {
     const colors: { [key: string]: string } = {
-      consultation: 'bg-emerald-100 text-emerald-800',
+      consultation: 'bg-slate-100 text-slate-800',
       'follow-up': 'bg-amber-100 text-amber-800',
       physical: 'bg-blue-100 text-blue-800',
       urgent: 'bg-red-100 text-red-800',
-      'post-op': 'bg-emerald-100 text-emerald-800'
+      'post-op': 'bg-slate-100 text-slate-800'
     };
     return colors[category] || 'bg-gray-100 text-gray-800';
   };
@@ -282,7 +282,7 @@ export default function DashboardClient() {
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
       </div>
     );
   }
@@ -297,11 +297,11 @@ export default function DashboardClient() {
               <h1 className="text-3xl font-bold mb-2">
                 Welcome back, {user?.username || 'Dr. Smith'}!
               </h1>
-              <p className="text-green-100 mb-6 text-lg">
+              <p className="text-slate-100 mb-6 text-lg">
                 Ready to create your next clinical note? Let&apos;s make a difference today.
               </p>
               <Link href="/notes/new?from_action=true">
-                <button className="bg-white text-green-600 px-6 py-3 rounded-lg font-semibold hover:bg-green-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
+                <button className="bg-white text-slate-600 px-6 py-3 rounded-lg font-semibold hover:bg-slate-50 transition-all transform hover:scale-105 shadow-lg flex items-center">
                   <DocumentPlus className="w-5 h-5 mr-2" />
                   Create New Note
                 </button>
@@ -309,10 +309,10 @@ export default function DashboardClient() {
             </div>
             <div className="hidden md:block">
               <div className="bg-white/20 backdrop-blur-sm rounded-xl p-6 text-center">
-                <Heart className="w-8 h-8 mx-auto mb-2 text-green-100 dark:text-emerald-100" />
-                <p className="text-sm text-green-100 dark:text-emerald-100">Caring for</p>
+                <Heart className="w-8 h-8 mx-auto mb-2 text-slate-100 dark:text-slate-100" />
+                <p className="text-sm text-slate-100 dark:text-slate-100">Caring for</p>
                 <p className="text-2xl font-bold">{loading ? '...' : animatedStats.patientEncounters}</p>
-                <p className="text-xs text-green-100 dark:text-emerald-100">active patients</p>
+                <p className="text-xs text-slate-100 dark:text-slate-100">active patients</p>
               </div>
             </div>
           </div>
@@ -322,16 +322,16 @@ export default function DashboardClient() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-gray-800 hover:shadow-xl transition-all">
             <div className="flex items-center justify-between mb-4">
-              <div className="bg-emerald-100 p-3 rounded-lg">
-                <FileText className="w-6 h-6 text-emerald-600" />
+              <div className="bg-slate-100 p-3 rounded-lg">
+                <FileText className="w-6 h-6 text-slate-600" />
               </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
+              <TrendingUp className="w-5 h-5 text-slate-500" />
             </div>
             <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1">
               {loading ? '...' : animatedStats.totalNotes}
             </div>
             <p className="text-stone-600 dark:text-gray-300 text-sm">Total Notes Generated</p>
-            <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Clinical documentation</div>
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Clinical documentation</div>
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-gray-800 hover:shadow-xl transition-all">
@@ -339,13 +339,13 @@ export default function DashboardClient() {
               <div className="bg-blue-100 p-3 rounded-lg">
                 <Clock className="w-6 h-6 text-blue-600" />
               </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
+              <TrendingUp className="w-5 h-5 text-slate-500" />
             </div>
             <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1">
               {loading ? '...' : `${animatedStats.timeSaved}m`}
             </div>
             <p className="text-stone-600 dark:text-gray-300 text-sm">Time Saved</p>
-            <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Efficiency gained</div>
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Efficiency gained</div>
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-gray-800 hover:shadow-xl transition-all">
@@ -353,43 +353,43 @@ export default function DashboardClient() {
               <div className="bg-amber-100 p-3 rounded-lg">
                 <Users className="w-6 h-6 text-amber-600" />
               </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
+              <TrendingUp className="w-5 h-5 text-slate-500" />
             </div>
             <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1">
               {loading ? '...' : animatedStats.patientEncounters}
             </div>
             <p className="text-stone-600 dark:text-gray-300 text-sm">Active Patients</p>
-            <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Currently under care (24 months)</div>
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Currently under care (24 months)</div>
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-xl p-6 shadow-lg border border-stone-200 dark:border-gray-800 hover:shadow-xl transition-all">
             <div className="flex items-center justify-between mb-4">
-              <div className="bg-emerald-100 p-3 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-emerald-600" />
+              <div className="bg-slate-100 p-3 rounded-lg">
+                <BarChart3 className="w-6 h-6 text-slate-600" />
               </div>
-              <TrendingUp className="w-5 h-5 text-green-500" />
+              <TrendingUp className="w-5 h-5 text-slate-500" />
             </div>
             <div className="text-3xl font-bold text-stone-800 dark:text-gray-100 mb-1">
               {loading ? '...' : `${animatedStats.noteAccuracy}%`}
             </div>
             <p className="text-stone-600 dark:text-gray-300 text-sm">Note Accuracy Rate</p>
-            <div className="mt-2 text-xs text-green-600 dark:text-emerald-400">Completion & approval rate</div>
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-400">Completion & approval rate</div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Interactive Calendar */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-stone-200 dark:border-gray-800 overflow-hidden">
-            <div className="bg-gradient-to-r from-emerald-50 to-green-50 dark:from-[#1A1A1A] dark:to-[#121212] p-6 border-b border-stone-200 dark:border-gray-800">
+            <div className="bg-gradient-to-r from-slate-50 to-slate-50 dark:from-[#1A1A1A] dark:to-[#121212] p-6 border-b border-stone-200 dark:border-gray-800">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-stone-800 dark:text-gray-100 flex items-center">
-                  <Calendar className="w-6 h-6 mr-2 text-emerald-600 dark:text-emerald-400" />
+                  <Calendar className="w-6 h-6 mr-2 text-slate-600 dark:text-slate-400" />
                   Clinical Notes Calendar
                 </h2>
                 <div className="flex items-center space-x-4">
                   <button
                     onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1))}
-                    className="text-stone-600 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-gray-100 transition-colors p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]"
+                    className="text-stone-600 dark:text-gray-300 hover:text-slate-600 dark:hover:text-gray-100 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#1A1A1A]"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -398,7 +398,7 @@ export default function DashboardClient() {
                   </span>
                   <button
                     onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1))}
-                    className="text-stone-600 dark:text-gray-300 hover:text-emerald-600 dark:hover:text-gray-100 transition-colors p-2 rounded-lg hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]"
+                    className="text-stone-600 dark:text-gray-300 hover:text-slate-600 dark:hover:text-gray-100 transition-colors p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#1A1A1A]"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -420,26 +420,26 @@ export default function DashboardClient() {
                   <div
                     key={index}
                     className={`aspect-square p-2 rounded-lg transition-all cursor-pointer ${
-                      day ? 'hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]' : ''
+                      day ? 'hover:bg-slate-50 dark:hover:bg-[#1A1A1A]' : ''
                     } ${
-                      day?.isToday ? 'bg-emerald-100 dark:bg-[#1A1A1A] ring-2 ring-emerald-500 dark:ring-emerald-500' : ''
+                      day?.isToday ? 'bg-slate-100 dark:bg-[#1A1A1A] ring-2 ring-slate-500 dark:ring-slate-500' : ''
                     }`}
                     onClick={() => day && day.notes && day.notes.length > 0 && setSelectedNote(day.notes[0])}
                   >
                     {day && (
                       <div className="h-full flex flex-col">
                         <span className={`text-sm font-medium ${
-                          day.isToday ? 'text-emerald-700 dark:text-emerald-300' : 'text-stone-700 dark:text-gray-300'
+                          day.isToday ? 'text-slate-700 dark:text-slate-300' : 'text-stone-700 dark:text-gray-300'
                         }`}>
                           {day.day}
                         </span>
                         {day.notes && day.notes.length > 0 && (
                           <div className="flex-1 mt-1">
                             {day.notes.slice(0, 2).map((note: Note, idx: number) => (
-                              <div key={idx} className="w-full h-1 bg-emerald-400 dark:bg-emerald-400 rounded mb-1" />
+                              <div key={idx} className="w-full h-1 bg-slate-400 dark:bg-slate-400 rounded mb-1" />
                             ))}
                             {day.notes.length > 2 && (
-                              <div className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                              <div className="text-xs text-slate-600 dark:text-slate-400 font-semibold">
                                 +{day.notes.length - 2}
                               </div>
                             )}
@@ -455,9 +455,9 @@ export default function DashboardClient() {
 
           {/* Right Panel: Combobox + Appointments or Recent Notes */}
           <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-stone-200 dark:border-gray-800">
-            <div className="bg-gradient-to-r from-stone-50 to-green-50 dark:from-[#1A1A1A] dark:to-[#121212] p-6 border-b border-stone-200 dark:border-gray-800">
+            <div className="bg-gradient-to-r from-stone-50 to-slate-50 dark:from-[#1A1A1A] dark:to-[#121212] p-6 border-b border-stone-200 dark:border-gray-800">
               <div className="flex items-center justify-between gap-4">
-                <h3 className="text-lg font-bold text-stone-800 dark:text-emerald-100">{panelView === 'appointments' ? 'Upcoming Appointments' : 'Recent Notes'}</h3>
+                <h3 className="text-lg font-bold text-stone-800 dark:text-slate-100">{panelView === 'appointments' ? 'Upcoming Appointments' : 'Recent Notes'}</h3>
                 {/* Combobox */}
                 <div className="relative">
                   <Popover open={openCombobox} onOpenChange={setOpenCombobox}>
@@ -490,14 +490,14 @@ export default function DashboardClient() {
                   </Popover>
                 </div>
               </div>
-              <p className="text-stone-600 dark:text-emerald-300 text-sm mt-1">Tip: Press Ctrl+K to quickly switch</p>
+              <p className="text-stone-600 dark:text-slate-300 text-sm mt-1">Tip: Press Ctrl+K to quickly switch</p>
             </div>
 
             <div className="p-6">
               {panelView === 'appointments' ? (
                 loadingUpcoming ? (
                   <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 dark:border-emerald-500"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 dark:border-slate-500"></div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -505,19 +505,19 @@ export default function DashboardClient() {
                       <div className="text-center py-8 text-stone-500 dark:text-gray-400 text-sm">No upcoming appointments</div>
                     ) : (
                       upcoming.map((appt) => (
-                        <div key={appt.id} className="p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-400 hover:shadow-md transition-all">
+                        <div key={appt.id} className="p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-400 hover:shadow-md transition-all">
                           <div className="flex items-start justify-between mb-2">
-                            <h4 className="font-semibold text-stone-800 dark:text-emerald-100 text-sm leading-tight">
+                            <h4 className="font-semibold text-stone-800 dark:text-slate-100 text-sm leading-tight">
                               {appt.title || 'Appointment'}
                             </h4>
-                            <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                            <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-300">
                               {new Date(appt.scheduled_at).toLocaleString()}
                             </span>
                           </div>
                           {appt.note && (
-                            <p className="text-stone-600 dark:text-emerald-300 text-xs mb-2 line-clamp-2">{appt.note}</p>
+                            <p className="text-stone-600 dark:text-slate-300 text-xs mb-2 line-clamp-2">{appt.note}</p>
                           )}
-                          <div className="text-stone-400 dark:text-emerald-400 text-xs">
+                          <div className="text-stone-400 dark:text-slate-400 text-xs">
                             Notify {appt.notify_before_minutes} min before
                           </div>
                         </div>
@@ -531,17 +531,17 @@ export default function DashboardClient() {
                     <div className="text-center py-8 text-stone-500 dark:text-gray-400 text-sm">No recent notes</div>
                   ) : (
                     stats.recentNotes.map((note) => (
-                      <Link key={note.id} href={`/notes/${note.id}`} className="block p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-400 hover:shadow-md transition-all">
+                      <Link key={note.id} href={`/notes/${note.id}`} className="block p-4 border border-stone-200 dark:border-gray-700 rounded-lg hover:border-slate-300 dark:hover:border-slate-400 hover:shadow-md transition-all">
                         <div className="flex items-start justify-between">
                           <div>
-                            <div className="font-semibold text-stone-800 dark:text-emerald-100 text-sm leading-tight">
+                            <div className="font-semibold text-stone-800 dark:text-slate-100 text-sm leading-tight">
                               {note.note_type} · Visit #{note.visit_id}
                             </div>
-                            <div className="text-xs text-stone-600 dark:text-emerald-300 mt-1 line-clamp-2">
+                            <div className="text-xs text-stone-600 dark:text-slate-300 mt-1 line-clamp-2">
                               {note.content}
                             </div>
                           </div>
-                          <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                          <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-900/20 dark:text-slate-300">
                             {new Date(note.created_at).toLocaleString()}
                           </span>
                         </div>
@@ -562,7 +562,7 @@ export default function DashboardClient() {
                 <input
                   autoFocus
                   placeholder="Switch to: appointments or recent notes"
-                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-stone-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-slate-500"
                   onChange={(e) => {
                     const v = e.target.value.toLowerCase();
                     if (v.startsWith('app')) setPanelView('appointments');
@@ -575,10 +575,10 @@ export default function DashboardClient() {
                 />
               </div>
               <div className="p-2">
-                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={() => { setPanelView('appointments'); setCommandOpen(false); }}>
+                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-slate-50 dark:hover:bg-[#1A1A1A]" onClick={() => { setPanelView('appointments'); setCommandOpen(false); }}>
                   Appointments
                 </button>
-                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-emerald-50 dark:hover:bg-[#1A1A1A]" onClick={() => { setPanelView('recent'); setCommandOpen(false); }}>
+                <button className="w-full text-left px-3 py-2 text-sm rounded hover:bg-slate-50 dark:hover:bg-[#1A1A1A]" onClick={() => { setPanelView('recent'); setCommandOpen(false); }}>
                   Recent notes
                 </button>
               </div>
@@ -590,15 +590,15 @@ export default function DashboardClient() {
         {selectedNote && (
           <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white dark:bg-gray-900 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-              <div className="p-6 border-b border-stone-200 dark:border-gray-800 bg-gradient-to-r from-emerald-50 to-green-50 dark:from-[#1A1A1A] dark:to-[#121212]">
+              <div className="p-6 border-b border-stone-200 dark:border-gray-800 bg-gradient-to-r from-slate-50 to-slate-50 dark:from-[#1A1A1A] dark:to-[#121212]">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-stone-800 dark:text-emerald-100">{selectedNote.note_type || 'Clinical Note'}</h3>
-                    <p className="text-stone-600 dark:text-emerald-300 text-sm mt-1">{formatDate(selectedNote.created_at)}</p>
+                    <h3 className="text-xl font-bold text-stone-800 dark:text-slate-100">{selectedNote.note_type || 'Clinical Note'}</h3>
+                    <p className="text-stone-600 dark:text-slate-300 text-sm mt-1">{formatDate(selectedNote.created_at)}</p>
                   </div>
                   <button
                     onClick={() => setSelectedNote(null)}
-                    className="text-stone-400 dark:text-emerald-400 hover:text-stone-600 dark:hover:text-emerald-100 transition-colors p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-[#1A1A1A]"
+                    className="text-stone-400 dark:text-slate-400 hover:text-stone-600 dark:hover:text-slate-100 transition-colors p-2 rounded-lg hover:bg-stone-100 dark:hover:bg-[#1A1A1A]"
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -610,16 +610,16 @@ export default function DashboardClient() {
                     {selectedNote.note_type || 'general'}
                   </span>
                 </div>
-                <div className="prose prose-stone dark:prose-invert text-stone-700 dark:text-emerald-200">
+                <div className="prose prose-stone dark:prose-invert text-stone-700 dark:text-slate-200">
                   {selectedNote.content}
                 </div>
                 <div className="mt-6 flex space-x-3">
                   <Link href={`/notes/${selectedNote.id}`}>
-                    <button className="px-4 py-2 bg-emerald-600 dark:bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 dark:hover:bg-emerald-700 transition-colors">
+                    <button className="px-4 py-2 bg-slate-600 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-700 dark:hover:bg-slate-700 transition-colors">
                       Edit Note
                     </button>
                   </Link>
-                  <button className="px-4 py-2 bg-stone-100 dark:bg-[#1A1A1A] text-stone-600 dark:text-emerald-100 rounded-lg hover:bg-stone-200 dark:hover:bg-[#222] transition-colors">
+                  <button className="px-4 py-2 bg-stone-100 dark:bg-[#1A1A1A] text-stone-600 dark:text-slate-100 rounded-lg hover:bg-stone-200 dark:hover:bg-[#222] transition-colors">
                     Share
                   </button>
                 </div>

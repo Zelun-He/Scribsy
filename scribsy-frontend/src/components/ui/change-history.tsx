@@ -59,7 +59,7 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
   const getActionIcon = (action: string) => {
     switch (action.toLowerCase()) {
       case 'created':
-        return <DocumentTextIcon className="w-4 h-4 text-green-500" />;
+        return <DocumentTextIcon className="w-4 h-4 text-slate-500" />;
       case 'updated':
         return <DocumentTextIcon className="w-4 h-4 text-blue-500" />;
       case 'signed':
@@ -74,7 +74,7 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
   const getActionColor = (action: string) => {
     switch (action.toLowerCase()) {
       case 'created':
-        return 'text-green-600 bg-green-100 dark:bg-green-900/20 dark:text-green-400';
+        return 'text-slate-600 bg-slate-100 dark:bg-slate-900/20 dark:text-slate-400';
       case 'updated':
         return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20 dark:text-blue-400';
       case 'signed':
@@ -105,7 +105,7 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
               variant="ghost"
               size="sm"
               onClick={() => setExpanded(!expanded)}
-              className="text-gray-500 hover:text-gray-700 dark:text-green-400 dark:hover:text-green-300"
+              className="text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-slate-300"
             >
               {expanded ? (
                 <>
@@ -124,7 +124,7 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
       </CardHeader>
       <CardContent>
         {history.length === 0 ? (
-          <div className="text-center py-4 text-gray-500 dark:text-green-400">
+          <div className="text-center py-4 text-gray-500 dark:text-slate-400">
             No change history available
           </div>
         ) : (
@@ -145,19 +145,19 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActionColor(entry.action)}`}>
                       {entry.action}
                     </span>
-                    <span className="text-xs text-gray-500 dark:text-green-400">
+                    <span className="text-xs text-gray-500 dark:text-slate-400">
                       {formatDate(entry.created_at)}
                     </span>
                   </div>
                   
                   <div className="flex items-center gap-2 mb-2">
-                    <UserIcon className="w-3 h-3 text-gray-400 dark:text-green-500" />
-                    <span className="text-sm text-gray-600 dark:text-green-300">
+                    <UserIcon className="w-3 h-3 text-gray-400 dark:text-slate-500" />
+                    <span className="text-sm text-gray-600 dark:text-slate-300">
                       {entry.username}
                     </span>
                   </div>
                   
-                  <p className="text-sm text-gray-700 dark:text-green-200">
+                  <p className="text-sm text-gray-700 dark:text-slate-200">
                     {entry.summary}
                   </p>
                 </div>
@@ -170,7 +170,7 @@ export function ChangeHistory({ noteId }: ChangeHistoryProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => setExpanded(true)}
-                  className="text-blue-600 hover:text-blue-700 dark:text-green-400 dark:hover:text-green-300"
+                  className="text-blue-600 hover:text-blue-700 dark:text-slate-400 dark:hover:text-slate-300"
                 >
                   +{history.length - 3} more changes
                 </Button>

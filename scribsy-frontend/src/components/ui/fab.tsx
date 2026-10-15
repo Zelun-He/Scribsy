@@ -23,7 +23,7 @@ export const Fab: React.FC = () => {
       className="flex items-center gap-2 px-3 py-2 rounded-full bg-white dark:bg-gray-900 border border-stone-200 dark:border-gray-800 shadow hover:shadow-md text-sm"
       onClick={() => { onClick(); setOpen(false); }}
     >
-      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+      <span className="w-2 h-2 rounded-full bg-slate-500" />
       {label}
     </button>
   );
@@ -40,7 +40,7 @@ export const Fab: React.FC = () => {
       <button
         aria-label="Create"
         onClick={() => setOpen(v => !v)}
-        className="h-14 w-14 rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center"
+        className="h-14 w-14 rounded-full bg-slate-600 text-white shadow-lg hover:bg-slate-700 active:scale-95 transition-all flex items-center justify-center"
       >
         <svg viewBox="0 0 24 24" className={`h-6 w-6 transition-transform ${open ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 5v14M5 12h14" strokeLinecap="round" />

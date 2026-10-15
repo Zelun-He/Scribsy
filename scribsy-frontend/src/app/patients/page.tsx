@@ -118,7 +118,7 @@ export default function PatientsPage() {
     return (
       <DashboardLayout>
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-600"></div>
         </div>
       </DashboardLayout>
     );
@@ -177,7 +177,7 @@ export default function PatientsPage() {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-xl hover:text-emerald-600 transition-colors">
+                      <CardTitle className="text-xl hover:text-slate-600 transition-colors">
                         {patient.first_name} {patient.last_name}
                       </CardTitle>
                       <CardDescription className="mt-2">

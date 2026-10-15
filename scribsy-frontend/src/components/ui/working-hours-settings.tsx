@@ -165,7 +165,7 @@ export function WorkingHoursSettings() {
         {workingHours && (
           <div className="text-sm text-gray-600 dark:text-gray-400">
             {workingHours.is_workday ? (
-              <span className="text-green-600 dark:text-green-400">
+              <span className="text-slate-600 dark:text-slate-400">
                 Workday - {workingHours.time_until_end 
                   ? `${formatTimeRemaining(workingHours.time_until_end)} remaining`
                   : 'Workday ended'
@@ -190,7 +190,7 @@ export function WorkingHoursSettings() {
         )}
         
         {success && (
-          <div className="p-3 bg-green-50 border border-green-200 rounded-md text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400 flex items-center gap-2">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-md text-slate-700 dark:bg-slate-900/20 dark:border-slate-800 dark:text-slate-400 flex items-center gap-2">
             <CheckIcon className="w-4 h-4" />
             Working hours updated successfully!
           </div>

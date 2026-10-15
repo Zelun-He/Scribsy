@@ -348,11 +348,11 @@
 }
 .gray {
   background: #f1f4f3;
-  color: #344a40;
+  color: #475569;
 }
 .green {
-  background: #e5f5ef;
-  color: #006749;
+  background: #f1f5f9;
+  color: #334155;
 }
 .reviewHeader {
   display: flex;
@@ -729,8 +729,8 @@
   color: var(--subtle);
 }
 .status.green {
-  background: #eaf6ef;
-  color: #166534;
+  background: #f1f5f9;
+  color: #475569;
 }
 .status {
   border-radius: 99px;
@@ -768,6 +768,6 @@
   border-color: #72523d;
 }
 :global(.dark) .status.green {
-  background: #20372b;
-  color: #b4ddbd;
+  background: #243244;
+  color: #cbd5e1;
 }
