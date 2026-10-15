@@ -9,8 +9,10 @@ migrations before serving `/readyz` on Railway's `PORT`.
 The free Railway service has 512 MB RAM. Production testing confirmed that both
 PyTorch base and tiny model loading were killed by the memory limit. The image
 therefore uses faster-whisper 1.2.1 with CTranslate2 CPU int8, one inference thread,
-one worker, and the compact `tiny` model. PyAV bundles the FFmpeg decoder libraries;
+one worker, and the compact `tiny` model. PyAV 18.1.0 bundles the FFmpeg decoder libraries;
 no system FFmpeg package, PyTorch, Triton, or CUDA dependency is required.
+PyAV is pinned because version 19 removed a decoder argument used by faster-whisper.
+The container build decodes a generated WAV to verify this compatibility.
 The compact model trades accuracy for memory use; review transcripts before use.
 Set `WHISPER_MODEL` to a larger model only after provisioning and measuring enough RAM.
 
