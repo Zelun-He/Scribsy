@@ -2,7 +2,7 @@
 
 ## Current backend container
 
-Railway builds the repository Dockerfile. It installs ffmpeg and the official
+Railway builds the repository Dockerfile. It supplies the FFmpeg executable from the ImageIO wheel and installs the official
 CPU-only PyTorch wheel before Whisper, excludes frontend files and local data,
 and starts through `start_railway_simple.sh`. Startup completes additive database
 migrations before serving `/readyz` on Railway's `PORT`.
@@ -14,7 +14,9 @@ queue. Measure the live request before attributing a gateway error to memory or
 processing time.
 
 The CPU image installs Whisper 20250625 without its Linux Triton GPU dependency,
-then explicitly supplies numba, numpy, tqdm, more-itertools and tiktoken. CPU
+then explicitly supplies numba, numpy, tqdm, more-itertools and tiktoken.
+ImageIO-FFmpeg 0.6.0 supplies a packaged Linux executable, linked into PATH.
+This avoids installing the broad Debian FFmpeg package set during every build. CPU
 inference uses these paths without Triton. The image asserts that CUDA and Triton
 are absent. Dependency downloads use cache mounts, and CPU PyTorch has a separate
 layer so a later dependency change does not reinstall it. Railway requires the
