@@ -4,6 +4,8 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { useRouter } from 'next/navigation';
 import { User, LoginRequest, RegisterRequest } from '@/types';
 import { apiClient } from '@/lib/api';
+import { clearRecoveryCopies } from '@/lib/note-draft';
+import { confirmLeave } from '@/lib/navigation-guard';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +26,7 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   const handleAuthFailure = useCallback(() => {
+    clearRecoveryCopies();
     apiClient.clearToken();
     setUser(null);
     if (typeof window !== 'undefined' && !['/', '/dashboard', '/sample-visit', '/contact', '/login', '/register', '/auth/forgot-password', '/auth/reset-password'].includes(window.location.pathname)) {
@@ -37,8 +40,10 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
         const currentUser = await apiClient.getCurrentUser();
         setUser(currentUser);
       } catch {
-        // User is not authenticated or token is invalid.
-        handleAuthFailure();
+        // A genuine 401 invokes handleAuthFailure through the API callback.
+        // Network outages must not erase a recoverable draft during refresh.
+        setUser(null);
+        if (!['/', '/dashboard', '/sample-visit', '/contact', '/login', '/register', '/auth/forgot-password', '/auth/reset-password'].includes(window.location.pathname)) router.push('/login');
       } finally {
         setLoading(false);
       }
@@ -66,6 +71,8 @@ function LegacyAuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    if (!confirmLeave()) return;
+    clearRecoveryCopies();
     const logoutRequest = apiClient.logoutServer();
     apiClient.clearToken();
     logoutRequest.catch(() => {});

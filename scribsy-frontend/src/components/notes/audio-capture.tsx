@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MicrophoneIcon, StopIcon, CloudArrowUpIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/button';
+import { GenerateButton } from '@/components/ui/generate-button';
 import styles from './audio-capture.module.css';
 
 type Phase = 'idle' | 'requesting' | 'recording' | 'stopping';
@@ -249,7 +250,7 @@ export function AudioCapture({ audioFile, onAudioReady, onBusyChange, onTranscri
       {audioUrl && audioFile && <div className={styles.preview}>
         <div className={styles.previewHeading}><div><h3>Audio preview</h3><p className={styles.filename}>{audioFile.name}</p></div><a href={audioUrl} download={audioFile.name} aria-label="Download audio recording"><ArrowDownTrayIcon className={styles.icon} aria-hidden="true" /></a></div>
         <audio ref={player} aria-label="Recorded audio preview" src={audioUrl} controls preload="metadata" className={styles.player} />
-        <Button type="button" onClick={onTranscribe} disabled={busy || disabled || isTranscribing} loading={isTranscribing} className="w-full">{isTranscribing ? 'Transcribing…' : 'Transcribe & generate SOAP note'}</Button>
+        <GenerateButton onClick={onTranscribe} disabled={busy || disabled} loading={isTranscribing} label="Transcribe & generate SOAP note" loadingLabel="Transcribing & generating…" fullWidth />
       </div>}
     </section>
   );

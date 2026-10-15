@@ -20,6 +20,9 @@ import { useAuth } from '@/lib/auth';
 import { Patient } from '@/types';
 import { ClinicalNote } from '@/components/notes/clinical-note';
 import { AudioCapture } from '@/components/notes/audio-capture';
+import { GenerateButton } from '@/components/ui/generate-button';
+import { useNoteDraft } from '@/hooks/use-note-draft';
+import { draftKey } from '@/lib/note-draft';
 import { useToast } from '@/lib/toast';
 import { burstConfetti } from '@/lib/confetti';
 import { recordNoteSession } from '@/lib/metrics';
@@ -44,6 +47,8 @@ const isSOAPNote = (value: unknown): value is SOAPNote => {
   );
 };
 
+const EMPTY_NEW_DRAFT = { content: '', selectedPatientId: '', visitId: '', noteType: '', status: 'pending_review', transcription: '', patientFirstName: '', patientLastName: '', patientDOB: '', patientPhone: '', patientEmail: '', patientAddress: '', soap_subjective: '', soap_objective: '', soap_assessment: '', soap_plan: '', audioName: '' };
+
 function NewNotePageContent() {
   const { user } = useAuth();
   const { show } = useToast();
@@ -55,6 +60,8 @@ function NewNotePageContent() {
   const [status, setStatus] = useState('pending_review'); // Always pending review for new notes
   const [isCapturingAudio, setIsCapturingAudio] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [recoveredAudioName, setRecoveredAudioName] = useState('');
+  const recoveredRef = useRef(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isGeneratingSoap, setIsGeneratingSoap] = useState(false);
   const [transcription, setTranscription] = useState('');
@@ -81,6 +88,30 @@ function NewNotePageContent() {
   const creationStartedRef = useRef(Date.now());
   const router = useRouter();
 
+  const draftValue = useMemo(() => ({ content, selectedPatientId, visitId, noteType, status, transcription, patientFirstName, patientLastName, patientDOB, patientPhone, patientEmail, patientAddress, soap_subjective: soapNote?.subjective || '', soap_objective: soapNote?.objective || '', soap_assessment: soapNote?.assessment || '', soap_plan: soapNote?.plan || '', audioName: audioFile?.name || recoveredAudioName }), [content, selectedPatientId, visitId, noteType, status, transcription, patientFirstName, patientLastName, patientDOB, patientPhone, patientEmail, patientAddress, soapNote, audioFile, recoveredAudioName]);
+  const draft = useNoteDraft({
+    scope: draftKey(user?.id || 0, 'new'), initial: EMPTY_NEW_DRAFT, value: draftValue,
+    enabled: !!user && !user.is_demo,
+    apply: saved => {
+      recoveredRef.current = true;
+      setContent(saved.content);
+      setSelectedPatientId(saved.selectedPatientId);
+      setVisitId(saved.visitId);
+      setNoteType(saved.noteType);
+      setStatus(saved.status);
+      setTranscription(saved.transcription);
+      setPatientFirstName(saved.patientFirstName);
+      setPatientLastName(saved.patientLastName);
+      setPatientDOB(saved.patientDOB);
+      setPatientPhone(saved.patientPhone);
+      setPatientEmail(saved.patientEmail);
+      setPatientAddress(saved.patientAddress);
+      setRecoveredAudioName(saved.audioName);
+      const restoredSoap = { subjective: saved.soap_subjective, objective: saved.soap_objective, assessment: saved.soap_assessment, plan: saved.soap_plan };
+      setSoapNote(Object.values(restoredSoap).some(Boolean) ? restoredSoap : null);
+    },
+  });
+
   // Fetch patients on component mount and handle URL params
   useEffect(() => {
     const fetchPatients = async () => {
@@ -90,22 +121,10 @@ function NewNotePageContent() {
         
         // Check if patient_id is provided in URL params
         const patientIdParam = searchParams.get('patient_id');
-        if (patientIdParam) {
+        if (patientIdParam && !recoveredRef.current) {
           setSelectedPatientId(patientIdParam);
         }
         
-        // Check if this is coming from an action button (like New SOAP)
-        const fromAction = searchParams.get('from_action');
-        const clearPatientData = fromAction === 'true' || fromAction === '1';
-        
-        // Always start fresh - no draft restoration for new notes
-        // Clear any existing draft data to ensure clean start
-        if (typeof window !== 'undefined') {
-          try {
-            const draftKey = user?.id ? `draft:new:${user.id}` : 'draft:new:anon';
-            window.localStorage.removeItem(draftKey);
-          } catch {}
-        }
       } catch (error) {
         console.error('Failed to fetch patients:', error);
       } finally {
@@ -147,7 +166,7 @@ function NewNotePageContent() {
   }, []);
 
   const transcribeAudio = async () => {
-    if (isCapturingAudio) return;
+    if (isCapturingAudio || isTranscribing || isGeneratingSoap || loading) return;
     if (!audioFile) {
       setError('No audio file selected');
       return;
@@ -166,12 +185,10 @@ function NewNotePageContent() {
         true // Always summarize when transcribing
       );
 
-      console.log('Transcription received:', response.transcript);
       setTranscription(response.transcript);
 
       // Handle the summary response - convert dictionary to SOAPNote object
       if (response.summary) {
-        console.log('Summary received:', response.summary);
         // Convert the dictionary response to SOAPNote object
         const soapNoteData = response.summary;
         if (isSOAPNote(soapNoteData)) {
@@ -182,7 +199,6 @@ function NewNotePageContent() {
             plan: soapNoteData.plan
           });
         } else {
-          console.log('Invalid SOAP note structure:', soapNoteData);
           setSoapNote(null);
         }
       } else {
@@ -207,6 +223,7 @@ function NewNotePageContent() {
   };
 
   const generateSoapFromConversation = async () => {
+    if (isCapturingAudio || isTranscribing || isGeneratingSoap || loading) return;
     const sourceText = (transcription || content || '').trim();
     if (!sourceText) {
       setError('Add typed notes or transcribe audio first to generate SOAP.');
@@ -336,6 +353,7 @@ function NewNotePageContent() {
       const created = await apiClient.createNote(noteData);
       const savedAt = Date.now();
       try { recordNoteSession({ id: String(created.id), startTime: new Date(creationStartedRef.current), baselineMinutes: 15 }); } catch {}
+      draft.clear();
       setCreatedNoteId(created.id);
       show('Saved just now');
       router.push(`/notes/${created.id}`);
@@ -354,17 +372,17 @@ function NewNotePageContent() {
               Create New Note
             </h1>
             <div className="flex flex-wrap items-center gap-3">
-            <Button
+            <GenerateButton
               type="button"
-              variant="secondary"
               onClick={generateSoapFromConversation}
-              disabled={isCapturingAudio || isGeneratingSoap || (!content.trim() && !transcription.trim())}
-            >
-              {isGeneratingSoap ? 'Generating SOAP...' : 'Summarize to SOAP'}
-            </Button>
+              disabled={!!draft.pending || isCapturingAudio || isTranscribing || loading || (!content.trim() && !transcription.trim())}
+              loading={isGeneratingSoap}
+              label="Generate SOAP"
+              loadingLabel="Generating SOAP…"
+            />
             <Button
               onClick={handleSubmit}
-              disabled={isCapturingAudio || loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
+              disabled={!!draft.pending || isCapturingAudio || isTranscribing || isGeneratingSoap || loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
               loading={loading}
             >
               {loading ? 'Saving...' : 'Save Note'}
@@ -378,14 +396,18 @@ function NewNotePageContent() {
           </div>
         )}
 
+        {draft.pending && <section role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-slate-900"><p>A draft from this tab is available. Restore it or start fresh.</p><div className="flex gap-4 mt-2"><button type="button" className="underline" onClick={draft.restore}>Restore draft</button><button type="button" className="underline" onClick={draft.discard}>Discard recovery copy</button></div></section>}
+        {draft.storageError && <p role="status">Tab recovery is unavailable. Keep this page open until your note is saved.</p>}
+        {recoveredAudioName && !audioFile && <p role="status">Your text was recovered. Reattach {recoveredAudioName} to use the original audio.</p>}
         <form onSubmit={handleSubmit} className="space-y-6">
+          <fieldset disabled={!!draft.pending} className="contents">
           <AudioCapture
             audioFile={audioFile}
             onAudioReady={handleAudioReady}
             onBusyChange={setIsCapturingAudio}
             onTranscribe={transcribeAudio}
             isTranscribing={isTranscribing}
-            disabled={loading}
+            disabled={loading || isGeneratingSoap || !draft.ready || !!draft.pending}
             autoStart={captureMode === 'record' || searchParams.get('start_dictation') === '1'}
           />
           {/* Patient Information */}
@@ -633,6 +655,7 @@ function NewNotePageContent() {
               caption="Save the note to review, edit, approve, and export it."
             />
           )}
+                  </fieldset>
         </form>
       </div>
     </DashboardLayout>
