@@ -9,11 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg ca-certi
     && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 # Install the official CPU wheel first so Whisper cannot pull CUDA PyTorch.
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=s/41a265a4-0ab3-4fa6-b3c2-85fcca6a866f-/root/cache/pip,target=/root/.cache/pip \
     python -m pip install 'torch==2.14.1+cpu' --index-url https://download.pytorch.org/whl/cpu
 # Whisper's Linux dependency list includes the Triton GPU compiler. Its CPU
 # inference/alignment paths use the libraries installed explicitly here instead.
-RUN --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,id=s/41a265a4-0ab3-4fa6-b3c2-85fcca6a866f-/root/cache/pip,target=/root/.cache/pip \
     sed '/^openai-whisper/d' requirements.txt > /tmp/backend-requirements.txt \
     && python -m pip install -r /tmp/backend-requirements.txt numba numpy tqdm more-itertools tiktoken \
     && python -m pip install --no-deps 'openai-whisper==20250625' \

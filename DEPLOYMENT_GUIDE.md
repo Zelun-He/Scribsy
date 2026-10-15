@@ -17,7 +17,9 @@ The CPU image installs Whisper 20250625 without its Linux Triton GPU dependency,
 then explicitly supplies numba, numpy, tqdm, more-itertools and tiktoken. CPU
 inference uses these paths without Triton. The image asserts that CUDA and Triton
 are absent. Dependency downloads use cache mounts, and CPU PyTorch has a separate
-layer so a later dependency change does not reinstall it.
+layer so a later dependency change does not reinstall it. Railway requires the
+service ID in cache mount IDs; the Dockerfile uses the existing Scribsy service.
+Change the cache ID when deploying this Dockerfile to a different Railway service.
 
 Use `DATABASE_URL=${{Postgres.DATABASE_URL}}` for Railway private networking.
 Configure `OPENAI_API_KEY` with that exact name for SOAP generation. Without it,
