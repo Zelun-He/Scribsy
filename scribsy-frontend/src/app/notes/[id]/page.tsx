@@ -20,6 +20,8 @@ import { isFinalized, parseDate } from "@/lib/dashboard";
 import { SOAP_SECTIONS } from "@/lib/sample-visit";
 import { ClinicalNote } from "@/components/notes/clinical-note";
 import { ApprovalDialog } from "@/components/notes/approval-dialog";
+import { GenerateButton } from "@/components/ui/generate-button";
+import { NoteEditor } from "@/components/notes/note-editor";
 import type { Note, NoteCode, NoteProvenance, SOAPNote } from "@/types";
 import styles from "@/components/notes/note-workspace.module.css";
 
@@ -348,6 +350,12 @@ export default function NotePage() {
   const finalized = isFinalized(note);
   const readonly = !!user.is_demo;
   const canEdit = !finalized && !readonly;
+  if (editing && canEdit) return (
+    <div className={styles.workspace}>
+      <h1 className="text-2xl font-semibold mb-5">Edit clinical note</h1>
+      <NoteEditor key={`${user.id}:${note.id}`} note={note} accountId={user.id} inline onDone={() => { setEditing(false); void refresh(); }} />
+    </div>
+  );
   const soap = editing ? editedSoap : noteSoap(note);
   const hasSoap = Object.values(noteSoap(note)).some((value) => value.trim());
   const allComplete = Object.values(noteSoap(note)).every((value) =>
@@ -596,18 +604,13 @@ export default function NotePage() {
       )}
       <div className={styles.tools}>
         {canEdit && !editing && (
-          <button
+          <GenerateButton
             disabled={!!busy}
-            className={styles.secondaryButton}
+            loading={busy === "generate"}
+            label={hasSoap ? "Regenerate SOAP" : "Generate SOAP"}
+            loadingLabel="Generating SOAP…"
             onClick={() => void generateSoap()}
-          >
-            <Sparkles size={15} />
-            {busy === "generate"
-              ? "Generating…"
-              : hasSoap
-                ? "Regenerate SOAP"
-                : "Generate SOAP"}
-          </button>
+          />
         )}
         <button
           className={styles.secondaryButton}

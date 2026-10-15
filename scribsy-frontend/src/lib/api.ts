@@ -616,25 +616,28 @@ class ApiClient {
     file: File, 
     summarize: boolean = false
   ): Promise<TranscriptionResult> {
+    this.refreshTokenFromStorage();
     const formData = new FormData();
     formData.append('file', file);
 
     const params = new URLSearchParams();
     params.append('summarize', summarize.toString());
 
-    const response = await fetch(`${this.baseURL}/transcribe?${params}`, {
-      method: 'POST',
-      headers: { Authorization: this.token ? `Bearer ${this.token}` : '' },
-      body: formData,
-      credentials: this.isLocalDev ? 'omit' : 'include',
-    });
-
+    const headers = new Headers(this.getHeaders());
+    headers.delete('Content-Type'); // Let the browser supply the multipart boundary.
     try {
-      const result = await this.handleResponse<TranscriptionResult>(response);
-      console.log('Transcription result:', result);
-      return result;
+      const response = await fetch(`${this.baseURL}/transcribe?${params}`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: this.requestCredentials(),
+      });
+      if ([502, 503, 504].includes(response.status)) {
+        throw new Error('The transcription service is temporarily unavailable or took too long to respond. Your audio is still attached; please retry.');
+      }
+      return await this.handleResponse<TranscriptionResult>(response);
     } catch (error) {
-      console.error('Transcription error in API client:', error);
+      if (error instanceof TypeError) throw new Error('Could not reach the transcription service. Check your connection and retry; your audio is still attached.');
       throw error;
     }
   }
