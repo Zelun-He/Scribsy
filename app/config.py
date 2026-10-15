@@ -3,6 +3,7 @@ Configuration settings for Scribsy application
 """
 import os
 from typing import Optional
+from pydantic import field_validator
 try:
     from pydantic_settings import BaseSettings
 except ImportError:
@@ -13,6 +14,17 @@ class Settings(BaseSettings):
     
     # OpenAI Configuration
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
+
+    @field_validator('openai_api_key', mode='before')
+    @classmethod
+    def normalize_openai_key(cls, value):
+        if isinstance(value, str):
+            value = value.strip()
+            # A legacy Railway variable was named OPENAI_API_KEY=, which can
+            # arrive in the process as OPENAI_API_KEY with an extra '=' value.
+            if value.startswith('=sk-'):
+                value = value[1:]
+        return value
     
     # Database Configuration
     # Use private endpoint to avoid egress fees and deployment issues
@@ -57,7 +69,7 @@ class Settings(BaseSettings):
     log_file: str = os.getenv("LOG_FILE", "logs/scribsy.log")
     
     # Whisper Configuration
-    whisper_model: str = os.getenv("WHISPER_MODEL", "base")
+    whisper_model: str = os.getenv("WHISPER_MODEL", "tiny")
 
     # Monitoring / Sentry
     sentry_dsn: str = os.getenv("SENTRY_DSN", "")

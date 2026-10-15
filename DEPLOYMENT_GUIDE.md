@@ -2,31 +2,33 @@
 
 ## Current backend container
 
-Railway builds the repository Dockerfile. It supplies the FFmpeg executable from the ImageIO wheel and installs the official
-CPU-only PyTorch wheel before Whisper, excludes frontend files and local data,
+Railway builds the repository Dockerfile, excludes frontend files and local data,
 and starts through `start_railway_simple.sh`. Startup completes additive database
 migrations before serving `/readyz` on Railway's `PORT`.
 
-The image defaults to one worker and two OpenMP threads to avoid loading a Whisper
-model in several workers. `WEB_TIMEOUT` defaults to 180 seconds. Recording and
-transcription still use a synchronous HTTP request; this is not a background job
-queue. Measure the live request before attributing a gateway error to memory or
-processing time.
+The free Railway service has 512 MB RAM. Production testing confirmed that both
+PyTorch base and tiny model loading were killed by the memory limit. The image
+therefore uses faster-whisper 1.2.1 with CTranslate2 CPU int8, one inference thread,
+one worker, and the compact `tiny` model. PyAV bundles the FFmpeg decoder libraries;
+no system FFmpeg package, PyTorch, Triton, or CUDA dependency is required.
+The compact model trades accuracy for memory use; review transcripts before use.
+Set `WHISPER_MODEL` to a larger model only after provisioning and measuring enough RAM.
 
-The CPU image installs Whisper 20250625 without its Linux Triton GPU dependency,
-then explicitly supplies numba, numpy, tqdm, more-itertools and tiktoken.
-ImageIO-FFmpeg 0.6.0 supplies a packaged Linux executable, linked into PATH.
-This avoids installing the broad Debian FFmpeg package set during every build. CPU
-inference uses these paths without Triton. The image asserts that CUDA and Triton
-are absent. Dependency downloads use cache mounts, and CPU PyTorch has a separate
-layer so a later dependency change does not reinstall it. Railway requires the
-service ID in cache mount IDs; the Dockerfile uses the existing Scribsy service.
-Change the cache ID when deploying this Dockerfile to a different Railway service.
+`WEB_TIMEOUT` defaults to 180 seconds. Transcription still uses a synchronous HTTP
+request; this is not a background job queue. The first request downloads public
+model weights. Verify a real recording after deployment, including memory usage.
+Dependency downloads use a cache mount scoped to the existing Scribsy service ID;
+change the cache ID when using this Dockerfile on another Railway service.
 
 Use `DATABASE_URL=${{Postgres.DATABASE_URL}}` for Railway private networking.
 Configure `OPENAI_API_KEY` with that exact name for SOAP generation. Without it,
 transcription remains available and the API returns the transcript with a summary
 error. Never commit credentials, databases, uploads, or model caches.
+
+The legacy variable name `OPENAI_API_KEY=` can inject an extra equals sign into
+the process value. The settings loader normalizes that specific `=sk-` prefix;
+use the correct variable name for new configuration. Provider authentication and
+usage-limit errors are reported without exposing the credential or transcript.
 
 Verify `/readyz` and authenticated transcription after deployment; a successful
 local build alone does not establish production readiness. Railway does not accept

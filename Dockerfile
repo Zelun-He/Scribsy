@@ -1,22 +1,15 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PORT=8000 WEB_CONCURRENCY=1 WEB_TIMEOUT=180 OMP_NUM_THREADS=2
+    PORT=8000 WEB_CONCURRENCY=1 WEB_TIMEOUT=180 OMP_NUM_THREADS=1 WHISPER_MODEL=tiny
 WORKDIR /app
 
 COPY requirements.txt .
-# Install the official CPU wheel first so Whisper cannot pull CUDA PyTorch.
+# CTranslate2 uses CPU int8; PyAV bundles the FFmpeg decoder libraries.
+# Avoid PyTorch, Triton and CUDA dependencies on the 512 MB service.
 RUN --mount=type=cache,id=s/41a265a4-0ab3-4fa6-b3c2-85fcca6a866f-/root/cache/pip,target=/root/.cache/pip \
-    python -m pip install 'torch==2.14.1+cpu' --index-url https://download.pytorch.org/whl/cpu
-# Whisper's Linux dependency list includes the Triton GPU compiler. Its CPU
-# inference/alignment paths use the libraries installed explicitly here instead.
-RUN --mount=type=cache,id=s/41a265a4-0ab3-4fa6-b3c2-85fcca6a866f-/root/cache/pip,target=/root/.cache/pip \
-    sed '/^openai-whisper/d' requirements.txt > /tmp/backend-requirements.txt \
-    && python -m pip install -r /tmp/backend-requirements.txt numba numpy tqdm more-itertools tiktoken imageio-ffmpeg==0.6.0 \
-    && python -m pip install --no-deps 'openai-whisper==20250625' \
-    && python -c "import os, imageio_ffmpeg; os.symlink(imageio_ffmpeg.get_ffmpeg_exe(), '/usr/local/bin/ffmpeg')" \
-    && ffmpeg -version \
-    && python -c "import torch, whisper, importlib.util; assert torch.version.cuda is None; assert importlib.util.find_spec('triton') is None"
+    python -m pip install -r requirements.txt \
+    && python -c "import faster_whisper, av, importlib.util; assert importlib.util.find_spec('torch') is None; assert importlib.util.find_spec('triton') is None"
 COPY app ./app
 COPY start_railway_simple.sh ./start_railway_simple.sh
 EXPOSE 8000

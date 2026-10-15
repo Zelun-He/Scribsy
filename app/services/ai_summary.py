@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from openai import OpenAI
+from openai import OpenAI, AuthenticationError, RateLimitError
+import logging
 import os
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -105,6 +106,12 @@ Do not invent or infer symptoms, findings, diagnoses, or treatments. If a sectio
         return NoteSummary.model_validate_json(response.choices[0].message.content or "")
     except HTTPException:
         raise
+    except AuthenticationError as exc:
+        logging.getLogger(__name__).error('SOAP provider rejected authentication')
+        raise HTTPException(status_code=503, detail='SOAP generation requires a valid OPENAI_API_KEY in the backend settings. Your transcript is available.') from exc
+    except RateLimitError as exc:
+        logging.getLogger(__name__).error('SOAP provider usage limit reached')
+        raise HTTPException(status_code=503, detail='SOAP generation has reached its provider usage limit. Your transcript is available; retry later or continue editing manually.') from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail="SOAP generation failed. Your transcript is available; retry or continue editing manually.") from exc
     finally:

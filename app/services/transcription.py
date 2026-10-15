@@ -1,5 +1,5 @@
 """
-transcription.py: Placeholder for audio transcription service (e.g., Whisper).
+CPU int8 Whisper transcription with serialized inference.
 """
 from pathlib import Path
 import logging
@@ -15,7 +15,7 @@ class TranscriptionService:
         Initialize the transcription service with a specified Whisper model.
         
         Args:
-            model_size: Size of the Whisper model to use (base, small, medium, large)
+            model_size: Size of the Whisper model to use (tiny, base, small, medium, large)
         """
         self.model_size = model_size or settings.whisper_model
         self.model = None
@@ -24,28 +24,23 @@ class TranscriptionService:
     def _load_model(self):
         """Lazy load the Whisper model only when needed."""
         if self.model is None:
-            try:
-                logger.info(f"Loading Whisper model: {self.model_size}")
-                # Import whisper lazily to avoid import-time failures on startup
-                import whisper  # type: ignore
-                self.model = whisper.load_model(self.model_size)
-                logger.info("Whisper model loaded successfully")
-            except Exception as e:
-                logger.error(f"Failed to load Whisper model: {e}")
-                # Try to load the base model as a fallback
-                try:
-                    logger.info("Trying to load base model as fallback")
-                    import whisper  # type: ignore
-                    self.model = whisper.load_model("base")
-                    logger.info("Base model loaded successfully as fallback")
-                except Exception as fallback_error:
-                    logger.error(f"Failed to load base model as fallback: {fallback_error}")
-                    raise Exception(f"Failed to load any Whisper model: {str(e)}")
+            # CTranslate2 int8 avoids the PyTorch weight-loading memory spike.
+            # Never retry with a larger model after a load failure.
+            logger.info("Loading CPU int8 Whisper model: %s", self.model_size)
+            from faster_whisper import WhisperModel
+            self.model = WhisperModel(
+                self.model_size, device="cpu", compute_type="int8",
+                cpu_threads=1, num_workers=1,
+            )
+            logger.info("Whisper model loaded successfully")
 
     def _transcribe_file(self, path: str):
+        # Consume the lazy segment iterator inside the lock and background thread.
+        # This keeps inference serialized and the API event loop responsive.
         with self._inference_lock:
             self._load_model()
-            return self.model.transcribe(path)
+            segments, _ = self.model.transcribe(path, beam_size=1)
+            return {"text": " ".join(segment.text.strip() for segment in segments).strip()}
 
     async def transcribe(self, audio_path: Path) -> str:
         """
