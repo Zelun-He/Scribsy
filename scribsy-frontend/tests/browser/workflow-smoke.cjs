@@ -75,6 +75,7 @@ const waitFor = async (page, predicate) => { for (let n = 0; n < 100; n++) { if 
     note.status = 'pending_review';
     await page.goto(root + '/notes/new?mode=type');
     await page.getByRole('textbox', { name: 'Manual notes', exact: true }).fill('Recover my new fictional note.');
+    await page.getByRole('button', { name: 'New patient', exact: true }).click();
     await page.getByPlaceholder('Enter first name', { exact: true }).fill('Fictional');
     await page.waitForTimeout(200);
     await page.reload();
@@ -118,7 +119,7 @@ const waitFor = async (page, predicate) => { for (let n = 0; n < 100; n++) { if 
     await p.getByText(/Your audio is still attached; please retry/).waitFor(); assert.equal(await transcribe.isEnabled(), true);
     await p.getByRole('link', { name: 'Download audio recording' }).waitFor();
     await p.emulateMedia({ reducedMotion: 'reduce' });
-    assert.equal(await generate.locator('svg').evaluate(svg => getComputedStyle(svg).animationName), 'none');
+    assert.equal(await p.getByRole('link', { name: 'New note', exact: true }).locator('svg').evaluate(svg => getComputedStyle(svg).animationName), 'none');
     await p.getByRole('button', { name: 'Dark mode', exact: true }).click();
     assert.equal(await p.evaluate(() => document.documentElement.classList.contains('dark')), true);
     await p.getByRole('button', { name: 'Light mode', exact: true }).click();

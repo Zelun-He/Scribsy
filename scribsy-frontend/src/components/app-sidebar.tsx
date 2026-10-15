@@ -10,7 +10,6 @@ import {
   CalendarDays,
   FileText,
   Settings,
-  Mic,
   LogOut,
   Menu,
   X,
@@ -18,6 +17,7 @@ import {
 import { useAuth } from "@/lib/auth";
 import { apiClient } from "@/lib/api";
 import { needsReview } from "@/lib/dashboard";
+import { NewNoteLink } from "@/components/ui/new-note-link";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import styles from "./app-sidebar.module.css";
 
@@ -90,7 +90,7 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
         <Link href="/dashboard" className={styles.brand}>
           <span>S</span>Scribsy
         </Link>
-        <Link
+        <NewNoteLink
           className={styles.newNote}
           href={
             user?.is_demo
@@ -98,10 +98,9 @@ export function AppSidebar({ preview = false }: { preview?: boolean }) {
               : destination("/notes/new?mode=record")
           }
           onClick={() => setOpen(false)}
-        >
-          <Mic size={16} />
-          {user?.is_demo ? "Try sample visit" : "New note"}
-        </Link>
+          label={user?.is_demo ? "Try sample visit" : "New note"}
+          aria-current={pathname === "/notes/new" ? "page" : undefined}
+        />
         <nav>
           {navigation.map((item) => {
             const active =

@@ -3,24 +3,18 @@
 import React, { useState, useRef, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
   DocumentTextIcon,
   SparklesIcon,
-  UserIcon,
-  PhoneIcon,
-  EnvelopeIcon,
-  MapPinIcon,
-  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { Patient } from '@/types';
 import { ClinicalNote } from '@/components/notes/clinical-note';
 import { AudioCapture } from '@/components/notes/audio-capture';
-import { GenerateButton } from '@/components/ui/generate-button';
+import styles from './new-note.module.css';
 import { useNoteDraft } from '@/hooks/use-note-draft';
 import { draftKey } from '@/lib/note-draft';
 import { useToast } from '@/lib/toast';
@@ -71,6 +65,7 @@ function NewNotePageContent() {
   const [createdNoteId, setCreatedNoteId] = useState<number | null>(null);
   
   // Patient management
+  const [patientEntryMode, setPatientEntryMode] = useState<'existing' | 'new'>('existing');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [loadingPatients, setLoadingPatients] = useState(true);
@@ -96,6 +91,7 @@ function NewNotePageContent() {
       recoveredRef.current = true;
       setContent(saved.content);
       setSelectedPatientId(saved.selectedPatientId);
+      setPatientEntryMode(saved.selectedPatientId ? 'existing' : (saved.patientFirstName || saved.patientLastName || saved.patientDOB) ? 'new' : 'existing');
       setVisitId(saved.visitId);
       setNoteType(saved.noteType);
       setStatus(saved.status);
@@ -143,7 +139,7 @@ function NewNotePageContent() {
     } else if (captureMode === 'upload') {
       document.querySelector<HTMLInputElement>('input[type="file"]')?.focus();
     } else {
-      document.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+      document.querySelector<HTMLTextAreaElement>('textarea')?.focus({ preventScroll: true });
     }
   }, [user, captureMode, searchParams]);
 
@@ -245,6 +241,8 @@ function NewNotePageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (draft.pending || !draft.ready || isTranscribing || isGeneratingSoap || loading) return;
+    if (patientEntryMode === 'existing' && !selectedPatientId) { setError('Select a patient or choose New patient.'); return; }
     if (isCapturingAudio) {
       setError('Stop recording before saving your note.');
       return;
@@ -364,298 +362,153 @@ function NewNotePageContent() {
     }
   };
 
+  const patientReady = patientEntryMode === 'existing'
+    ? !!selectedPatientId
+    : !!(patientFirstName.trim() && patientLastName.trim() && patientDOB);
+  const busy = isCapturingAudio || isTranscribing || isGeneratingSoap || loading;
+  const hasSource = !!(content.trim() || transcription.trim());
+  const canSave = draft.ready && !draft.pending && !busy && hasSource && patientReady && !!noteType;
+
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-emerald-100">
-              Create New Note
-            </h1>
-            <div className="flex flex-wrap items-center gap-3">
-            <GenerateButton
-              type="button"
-              onClick={generateSoapFromConversation}
-              disabled={!!draft.pending || isCapturingAudio || isTranscribing || loading || (!content.trim() && !transcription.trim())}
-              loading={isGeneratingSoap}
-              label="Generate SOAP"
-              loadingLabel="Generating SOAP…"
-            />
-            <Button
-              onClick={handleSubmit}
-              disabled={!!draft.pending || isCapturingAudio || isTranscribing || isGeneratingSoap || loading || (!content && !transcription) || (!selectedPatientId && !(patientFirstName && patientLastName && patientDOB)) || !noteType}
-              loading={loading}
-            >
-              {loading ? 'Saving...' : 'Save Note'}
-            </Button>
-          </div>
-        </div>
+      <div className={styles.page}>
+        <header className={styles.pageHeader}>
+          <p className={styles.eyebrow}>Workspace / Notes</p>
+          <h1>Create a note</h1>
+          <p>Capture the visit, add patient details, and review your draft.</p>
+        </header>
 
-        {error && (
-          <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-md p-4">
-            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        {error && <div className={styles.error} role="alert">{error}</div>}
+        {draft.pending && <section role="status" className={styles.recovery}>
+          <strong>A draft from this tab is available.</strong>
+          <p>Restore it to pick up where you left off, or start fresh.</p>
+          <div className={styles.recoveryActions}>
+            <Button type="button" variant="secondary" onClick={draft.restore}>Restore draft</Button>
+            <button type="button" onClick={draft.discard}>Discard recovery copy</button>
           </div>
-        )}
+        </section>}
+        {draft.storageError && <p role="status" className={styles.notice}>Tab recovery is unavailable. Keep this page open until your note is saved.</p>}
+        {recoveredAudioName && !audioFile && <p role="status" className={styles.notice}>Your text was recovered. Reattach {recoveredAudioName} to use the original audio.</p>}
 
-        {draft.pending && <section role="status" className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-slate-900"><p>A draft from this tab is available. Restore it or start fresh.</p><div className="flex gap-4 mt-2"><button type="button" className="underline" onClick={draft.restore}>Restore draft</button><button type="button" className="underline" onClick={draft.discard}>Discard recovery copy</button></div></section>}
-        {draft.storageError && <p role="status">Tab recovery is unavailable. Keep this page open until your note is saved.</p>}
-        {recoveredAudioName && !audioFile && <p role="status">Your text was recovered. Reattach {recoveredAudioName} to use the original audio.</p>}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <fieldset disabled={!!draft.pending} className="contents">
-          <AudioCapture
-            audioFile={audioFile}
-            onAudioReady={handleAudioReady}
-            onBusyChange={setIsCapturingAudio}
-            onTranscribe={transcribeAudio}
-            isTranscribing={isTranscribing}
-            disabled={loading || isGeneratingSoap || !draft.ready || !!draft.pending}
-            autoStart={captureMode === 'record' || searchParams.get('start_dictation') === '1'}
-          />
-          {/* Patient Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Patient Information</CardTitle>
-              <CardDescription>
-                Required fields for proper note management
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                    Patient *
-                  </label>
-                  <select
-                    aria-label="Patient"
-                    value={selectedPatientId}
-                    onChange={(e) => setSelectedPatientId(e.target.value)}
-                    className="w-full h-10 px-3 py-2 text-sm border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 bg-gray-50 dark:bg-gray-800 dark:text-emerald-100"
-                    disabled={loadingPatients}
-                  >
-                    <option value="">{loadingPatients ? 'Loading patients...' : 'Select an existing patient'}</option>
-                    {patients.map((patient) => (
-                      <option key={patient.id} value={patient.id}>
-                        {patient.first_name} {patient.last_name} (ID: {patient.id})
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    OR create a new patient in the form below
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                    Visit ID (Auto-generated)
-                  </label>
-                  <Input
-                    type="text"
-                    value={visitId}
-                    onChange={(e) => setVisitId(e.target.value)}
-                    placeholder="Leave empty for auto-generation"
-                    className="h-10 text-sm bg-gray-50 dark:bg-gray-800"
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <fieldset disabled={!!draft.pending || !draft.ready} className={styles.fields}>
+            <div className={styles.columns}>
+              <div className={styles.captureColumn}>
+                <AudioCapture
+                  audioFile={audioFile}
+                  onAudioReady={handleAudioReady}
+                  onBusyChange={setIsCapturingAudio}
+                  onTranscribe={transcribeAudio}
+                  isTranscribing={isTranscribing}
+                  disabled={loading || isGeneratingSoap || !draft.ready || !!draft.pending}
+                  autoStart={captureMode === 'record' || searchParams.get('start_dictation') === '1'}
+                />
+
+                <section className={styles.card} aria-labelledby="visit-notes-title">
+                  <div className={styles.cardHeading}>
+                    <div>
+                      <h2 id="visit-notes-title">Visit notes</h2>
+                      <p>Type your notes or add context to your recording.</p>
+                    </div>
+                    <DocumentTextIcon className={styles.sectionIcon} aria-hidden="true" />
+                  </div>
+                  <label htmlFor="manual-notes" className="sr-only">Manual notes</label>
+                  <textarea
+                    id="manual-notes"
+                    aria-label="Manual notes"
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="Start with the reason for the visit, symptoms, findings, and next steps…"
+                    rows={10}
+                    className={styles.notesInput}
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Leave empty to auto-generate based on patient and date
-                  </p>
-                </div>
+                  <div className={styles.generateRow}>
+                    <p>Turn your visit notes into a structured SOAP draft.</p>
+                    <Button type="button" variant="secondary" onClick={generateSoapFromConversation}
+                      disabled={!!draft.pending || isCapturingAudio || isTranscribing || loading || !hasSource}
+                      loading={isGeneratingSoap} aria-busy={isGeneratingSoap}>
+                      <SparklesIcon className={styles.buttonIcon} aria-hidden="true" />
+                      {isGeneratingSoap ? 'Generating SOAP…' : 'Generate SOAP'}
+                    </Button>
+                    <span className="sr-only" role="status">{isGeneratingSoap ? 'Generating SOAP…' : ''}</span>
+                  </div>
+                </section>
               </div>
-              
-              {/* Selected Patient Information */}
-              {selectedPatient && (
-                <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-3">
-                    Selected Patient Information
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <UserIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-blue-800 dark:text-blue-200">
-                        {selectedPatient.first_name} {selectedPatient.last_name}
-                      </span>
+
+              <aside className={styles.detailsColumn} aria-labelledby="visit-details-title">
+                <section className={styles.card}>
+                  <div className={styles.cardHeading}>
+                    <div>
+                      <h2 id="visit-details-title">Visit details</h2>
+                      <p>Connect this note to the right patient.</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-blue-800 dark:text-blue-200">
-                        DOB: {formatDateOfBirthWithAge(selectedPatient.date_of_birth)}
-                      </span>
-                    </div>
-                    {selectedPatient.phone_number && (
-                      <div className="flex items-center gap-2">
-                        <PhoneIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span className="text-blue-800 dark:text-blue-200">
-                          {selectedPatient.phone_number}
-                        </span>
-                      </div>
-                    )}
-                    {selectedPatient.email && (
-                      <div className="flex items-center gap-2">
-                        <EnvelopeIcon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        <span className="text-blue-800 dark:text-blue-200">
-                          {selectedPatient.email}
-                        </span>
-                      </div>
-                    )}
-                    {selectedPatient.address && (
-                      <div className="flex items-start gap-2 col-span-full">
-                        <MapPinIcon className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5" />
-                        <span className="text-blue-800 dark:text-blue-200">
-                          {selectedPatient.address}
-                          {selectedPatient.city && selectedPatient.state && (
-                            <span>, {selectedPatient.city}, {selectedPatient.state} {selectedPatient.zip_code}</span>
-                          )}
-                        </span>
-                      </div>
-                    )}
                   </div>
-                </div>
-              )}
-              
-              {/* Patient Information */}
-              <div className="mt-6">
-                <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">
-                  Patient Information
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      First Name
-                    </label>
-                    <Input
-                      type="text"
-                      value={patientFirstName}
-                      onChange={(e) => setPatientFirstName(e.target.value)}
-                      placeholder="Enter first name"
-                    />
+                  <div className={styles.patientSwitch} aria-label="Patient entry method">
+                    <button type="button" aria-pressed={patientEntryMode === 'existing'} onClick={() => setPatientEntryMode('existing')}>Existing patient</button>
+                    <button type="button" aria-pressed={patientEntryMode === 'new'} onClick={() => { setPatientEntryMode('new'); setSelectedPatientId(''); }}>New patient</button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      Last Name
-                    </label>
-                    <Input
-                      type="text"
-                      value={patientLastName}
-                      onChange={(e) => setPatientLastName(e.target.value)}
-                      placeholder="Enter last name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      Date of Birth
-                    </label>
-                    <Input
-                      type="date"
-                      value={patientDOB}
-                      onChange={(e) => setPatientDOB(e.target.value)}
-                      placeholder="Enter date of birth"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      Phone Number
-                    </label>
-                    <Input
-                      type="tel"
-                      value={patientPhone}
-                      onChange={(e) => setPatientPhone(e.target.value)}
-                      placeholder="(555) 123-4567"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      Email Address
-                    </label>
-                    <Input
-                      type="email"
-                      value={patientEmail}
-                      onChange={(e) => setPatientEmail(e.target.value)}
-                      placeholder="patient@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                      Address
-                    </label>
-                    <Input
-                      type="text"
-                      value={patientAddress}
-                      onChange={(e) => setPatientAddress(e.target.value)}
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                    Note Type *
-                  </label>
-                  <select
-                    aria-label="Note type"
-                    value={noteType}
-                    onChange={(e) => setNoteType(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 dark:bg-gray-800 dark:text-emerald-100"
-                    required
-                  >
-                    <option value="">Select note type</option>
-                    <option value="consultation">Consultation</option>
-                    <option value="follow-up">Follow-up</option>
-                    <option value="physical">Physical Examination</option>
-                    <option value="urgent">Urgent Care</option>
-                    <option value="post-op">Post-Operative</option>
-                    <option value="admission">Admission</option>
-                    <option value="discharge">Discharge</option>
-                    <option value="progress">Progress Note</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-emerald-300 mb-1">
-                    Status
-                  </label>
-                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                    Pending Review (Default)
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Timing Control - Only show after note is created */}
-          {createdNoteId && <TimingControl noteId={createdNoteId} className="mb-6" />}
+                  {patientEntryMode === 'existing' ? <div className={styles.fieldGroup}>
+                    <label className={styles.field}>
+                      <span>Patient <span className={styles.required}>*</span></span>
+                      <select aria-label="Patient" value={selectedPatientId} onChange={(e) => setSelectedPatientId(e.target.value)} disabled={loadingPatients} required>
+                        <option value="">{loadingPatients ? 'Loading patients…' : 'Select a patient'}</option>
+                        {patients.map(patient => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name} (ID: {patient.id})</option>)}
+                      </select>
+                    </label>
+                    {!loadingPatients && patients.length === 0 && <p className={styles.help}>No patients yet. Choose “New patient” to add one.</p>}
+                    {selectedPatient && <div className={styles.patientSummary}>
+                      <strong>{selectedPatient.first_name} {selectedPatient.last_name}</strong>
+                      <span>DOB: {formatDateOfBirthWithAge(selectedPatient.date_of_birth)}</span>
+                      {selectedPatient.phone_number && <span>{selectedPatient.phone_number}</span>}
+                      {selectedPatient.email && <span>{selectedPatient.email}</span>}
+                    </div>}
+                  </div> : <div className={styles.patientFields}>
+                    <label className={styles.field}><span>First name <span className={styles.required}>*</span></span><Input value={patientFirstName} onChange={e => setPatientFirstName(e.target.value)} placeholder="Enter first name" autoComplete="off" required /></label>
+                    <label className={styles.field}><span>Last name <span className={styles.required}>*</span></span><Input value={patientLastName} onChange={e => setPatientLastName(e.target.value)} placeholder="Enter last name" autoComplete="off" required /></label>
+                    <label className={styles.field}><span>Date of birth <span className={styles.required}>*</span></span><Input type="date" value={patientDOB} onChange={e => setPatientDOB(e.target.value)} required /></label>
+                    <label className={styles.field}><span>Phone <small>Optional</small></span><Input type="tel" value={patientPhone} onChange={e => setPatientPhone(e.target.value)} placeholder="(555) 123-4567" /></label>
+                    <label className={styles.field}><span>Email <small>Optional</small></span><Input type="email" value={patientEmail} onChange={e => setPatientEmail(e.target.value)} placeholder="patient@example.com" /></label>
+                    <label className={styles.field}><span>Address <small>Optional</small></span><Input value={patientAddress} onChange={e => setPatientAddress(e.target.value)} placeholder="123 Main Street" /></label>
+                  </div>}
 
-          {/* Manual Content Input */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <DocumentTextIcon className="w-5 h-5 mr-2" />
-                Manual Notes
-              </CardTitle>
-              <CardDescription>
-                Type your clinical notes directly or edit transcribed content
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <textarea
-                aria-label="Manual notes"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Enter your clinical notes here..."
-                rows={8}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-emerald-600 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 dark:focus:ring-emerald-500 dark:bg-gray-800 dark:text-emerald-100"
-              />
-            </CardContent>
-          </Card>
+                  <div className={styles.noteDetails}>
+                    <label className={styles.field}>
+                      <span>Note type <span className={styles.required}>*</span></span>
+                      <select aria-label="Note type" value={noteType} onChange={e => setNoteType(e.target.value)} required>
+                        <option value="">Select note type</option>
+                        <option value="consultation">Consultation</option><option value="follow-up">Follow-up</option>
+                        <option value="physical">Physical Examination</option><option value="urgent">Urgent Care</option>
+                        <option value="post-op">Post-Operative</option><option value="admission">Admission</option>
+                        <option value="discharge">Discharge</option><option value="progress">Progress Note</option><option value="other">Other</option>
+                      </select>
+                    </label>
+                    <div className={styles.reviewStatus}><span>Status</span><span className={styles.statusBadge}>Pending review</span></div>
+                    <details className={styles.advanced}>
+                      <summary>Visit reference <span>Optional</span></summary>
+                      <label className={styles.field}><span>Visit ID</span><Input type="text" inputMode="numeric" value={visitId} onChange={e => setVisitId(e.target.value)} placeholder="Generated automatically" /></label>
+                      <p className={styles.help}>Leave blank to create a reference for this visit.</p>
+                    </details>
+                  </div>
+                </section>
+                <p className={styles.contextHint}>Review the transcript and generated content before approving your note.</p>
+              </aside>
+            </div>
 
-          {(transcription || soapNote) && (
-            <ClinicalNote
+            {(transcription || soapNote) && <ClinicalNote
               title="Visit result · Draft for review"
               transcript={transcription || content}
               sourceLabel={transcription ? 'Transcript' : 'Visit notes'}
               soap={soapNote || { subjective: '', objective: '', assessment: '', plan: '' }}
               caption="Save the note to review, edit, approve, and export it."
-            />
-          )}
-                  </fieldset>
+            />}
+            {createdNoteId && <TimingControl noteId={createdNoteId} />}
+
+            <footer className={styles.saveBar}>
+              <div><h2>Save for review</h2><p>{canSave ? 'Your note will be saved as pending review.' : 'Add visit notes, choose a patient, and select a note type.'}</p></div>
+              <Button type="submit" disabled={!canSave} loading={loading} className={styles.saveButton}>{loading ? 'Saving…' : 'Save Note'}</Button>
+            </footer>
+          </fieldset>
         </form>
       </div>
     </DashboardLayout>

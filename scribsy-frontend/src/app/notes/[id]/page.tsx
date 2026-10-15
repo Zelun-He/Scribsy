@@ -20,7 +20,7 @@ import { isFinalized, parseDate } from "@/lib/dashboard";
 import { SOAP_SECTIONS } from "@/lib/sample-visit";
 import { ClinicalNote } from "@/components/notes/clinical-note";
 import { ApprovalDialog } from "@/components/notes/approval-dialog";
-import { GenerateButton } from "@/components/ui/generate-button";
+import { Button } from "@/components/ui/button";
 import { NoteEditor } from "@/components/notes/note-editor";
 import type { Note, NoteCode, NoteProvenance, SOAPNote } from "@/types";
 import styles from "@/components/notes/note-workspace.module.css";
@@ -604,13 +604,15 @@ export default function NotePage() {
       )}
       <div className={styles.tools}>
         {canEdit && !editing && (
-          <GenerateButton
+          <Button
+            variant="secondary"
             disabled={!!busy}
             loading={busy === "generate"}
-            label={hasSoap ? "Regenerate SOAP" : "Generate SOAP"}
-            loadingLabel="Generating SOAP…"
+            aria-busy={busy === "generate"}
             onClick={() => void generateSoap()}
-          />
+          >
+            {busy === "generate" ? "Generating SOAP…" : hasSoap ? "Regenerate SOAP" : "Generate SOAP"}
+          </Button>
         )}
         <button
           className={styles.secondaryButton}

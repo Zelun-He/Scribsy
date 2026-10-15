@@ -48,6 +48,7 @@ const root = process.env.RECORDING_BASE_URL || 'http://127.0.0.1:3100';
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
     });
     const page = await context.newPage();
+    page.on('dialog', dialog => dialog.accept()); // Confirm intentional navigation away from an unsaved recording.
     page.setDefaultTimeout(20000);
     page.on('pageerror', error => errors.push(error.message));
     return { context, page };

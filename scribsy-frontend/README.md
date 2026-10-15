@@ -13,9 +13,10 @@ are not stored and must be reattached. Sign-out warns about unsaved changes and
 clears recovery copies. Page close and application links warn about unsaved work.
 Recovery is a convenience, not a substitute for a confirmed server save.
 
-The shared GenerateButton uses actual request state for loading and disabled
-behavior. Its animation is scoped to the button, supports reduced motion, and
-does not change the page theme. Light remains the default; dark mode is optional.
+The animated NewNoteLink is the sidebar entry point to note creation. SOAP
+and transcription actions use standard buttons with request-driven loading and
+disabled states. The creation page separates capture, patient details, results,
+and saving with explicit grid gaps, including inside its disabled fieldset.
 
 Run `npm run test:api` for client/recovery tests. With a production frontend
 running and Playwright installed, run `node tests/browser/workflow-smoke.cjs` for
